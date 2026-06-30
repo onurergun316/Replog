@@ -1,0 +1,106 @@
+//
+//  QuizAnswers.swift
+//  Replog
+//
+//  The onboarding intake. Feeds the deterministic PlanGenerator.
+//
+
+import Foundation
+
+enum Experience: String, Codable, CaseIterable, Identifiable, Sendable {
+    case beginner, intermediate, advanced
+    var id: String { rawValue }
+    var displayName: String { rawValue.capitalized }
+}
+
+enum Sex: String, Codable, CaseIterable, Identifiable, Sendable {
+    case male, female, preferNotToSay
+    var id: String { rawValue }
+    var displayName: String {
+        switch self {
+        case .male: return "Male"
+        case .female: return "Female"
+        case .preferNotToSay: return "Prefer not to say"
+        }
+    }
+}
+
+enum Sport: String, Codable, CaseIterable, Identifiable, Sendable {
+    case running, swimming, football, basketball, cycling
+    var id: String { rawValue }
+    var displayName: String { rawValue.capitalized }
+
+    /// Muscles a sport most depends on, highest priority first.
+    var priorityMuscles: [Muscle] {
+        switch self {
+        case .running:    return [.quadriceps, .hamstrings, .calves, .glutes, .abdominals]
+        case .swimming:   return [.lats, .shoulders, .chest, .triceps, .middleBack]
+        case .football:   return [.quadriceps, .hamstrings, .glutes, .calves, .abdominals]
+        case .basketball: return [.quadriceps, .calves, .glutes, .shoulders, .abdominals]
+        case .cycling:    return [.quadriceps, .hamstrings, .glutes, .calves, .abdominals]
+        }
+    }
+}
+
+enum Injury: String, Codable, CaseIterable, Identifiable, Sendable {
+    case knee, shoulder, lowerBack, postInjuryRecovery
+    var id: String { rawValue }
+    var displayName: String {
+        switch self {
+        case .knee: return "Knee"
+        case .shoulder: return "Shoulder"
+        case .lowerBack: return "Lower back"
+        case .postInjuryRecovery: return "Post-injury recovery"
+        }
+    }
+    /// Muscle regions to avoid loading for this limitation.
+    var avoidMuscles: [Muscle] {
+        switch self {
+        case .knee: return [.quadriceps, .hamstrings, .calves]
+        case .shoulder: return [.shoulders]
+        case .lowerBack: return [.lowerBack]
+        case .postInjuryRecovery: return []
+        }
+    }
+}
+
+enum EquipmentAccess: String, Codable, CaseIterable, Identifiable, Sendable {
+    case fullGym, home, bodyweight
+    var id: String { rawValue }
+    var displayName: String {
+        switch self {
+        case .fullGym: return "Full gym"
+        case .home: return "Home (dumbbells)"
+        case .bodyweight: return "Bodyweight only"
+        }
+    }
+    /// The equipment types this access level permits.
+    var allowedEquipment: Set<Equipment> {
+        switch self {
+        case .fullGym:
+            return [.barbell, .dumbbell, .machine, .cable, .bodyOnly, .bands,
+                    .kettlebells, .ezCurlBar, .exerciseBall, .foamRoll, .medicineBall, .other]
+        case .home:
+            return [.dumbbell, .bodyOnly, .bands, .kettlebells, .exerciseBall, .foamRoll, .medicineBall]
+        case .bodyweight:
+            return [.bodyOnly, .bands]
+        }
+    }
+}
+
+struct QuizAnswers: Equatable, Sendable {
+    var goal: Goal = .buildMuscle
+    var sport: Sport? = nil
+    var experience: Experience = .beginner
+    var sex: Sex = .preferNotToSay
+    var age: Int = 28
+    var daysPerWeek: Int = 3
+    var minutesPerSession: Int = 45
+    var injuries: Set<Injury> = []
+    var equipment: EquipmentAccess = .fullGym
+
+    /// All muscle regions to avoid, derived from selected injuries.
+    var avoidedMuscles: Set<Muscle> {
+        Set(injuries.flatMap(\.avoidMuscles))
+    }
+}

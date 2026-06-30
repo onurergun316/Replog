@@ -1,0 +1,321 @@
+//
+//  OnboardingFlow.swift
+//  Replog
+//
+//  The tap-driven AI quiz. One question per step with a top progress bar + back,
+//  a sticky CTA, an on-device "Building your plan" spinner, and a result screen.
+//   - .firstRun: first launch; finishing marks onboarding done -> main app.
+//   - .generatePlan: from Plans; finishing inserts a plan and reports it.
+//
+
+import SwiftUI
+import SwiftData
+
+struct OnboardingFlow: View {
+    @Environment(\.modelContext) private var context
+    @Environment(\.dismiss) private var dismiss
+    @Query(sort: \Plan.order) private var plans: [Plan]
+    @Query private var profiles: [UserProfile]
+
+    var mode: OnboardingMode = .firstRun
+    var onGenerated: ((Plan) -> Void)? = nil
+
+    @State private var vm = OnboardingViewModel()
+
+    var body: some View {
+        VStack(spacing: 0) {
+            topBar
+            ScrollView {
+                stepContent
+                    .padding(20)
+                    .id(vm.current)
+                    .transition(.asymmetric(insertion: .move(edge: .trailing).combined(with: .opacity),
+                                            removal: .move(edge: .leading).combined(with: .opacity)))
+            }
+            if vm.showsPrimaryCTA { ctaBar }
+        }
+        .background(Color.bg.ignoresSafeArea())
+    }
+
+    // MARK: Top bar (progress + back)
+
+    private var topBar: some View {
+        HStack(spacing: 12) {
+            if vm.canGoBack {
+                Button { withAnimation(.snappy) { vm.back() } } label: {
+                    Image(systemName: "chevron.left").font(.system(size: 15, weight: .heavy))
+                        .foregroundStyle(Color.text2).frame(width: 36, height: 36)
+                        .background(Circle().fill(Color.surface2))
+                }
+                .buttonStyle(.plain)
+            }
+            GeometryReader { geo in
+                ZStack(alignment: .leading) {
+                    Capsule().fill(Color.surface2)
+                    Capsule().fill(Color.accent)
+                        .frame(width: max(8, geo.size.width * vm.progress))
+                }
+            }
+            .frame(height: 6)
+        }
+        .padding(.horizontal, 20).padding(.top, 8).padding(.bottom, 4)
+    }
+
+    // MARK: CTA
+
+    private var ctaBar: some View {
+        PrimaryButton(title: ctaTitle, systemImage: vm.current == .result ? "arrow.right" : nil) {
+            primaryAction()
+        }
+        .opacity(vm.canProceed ? 1 : 0.5)
+        .disabled(!vm.canProceed)
+        .padding(.horizontal, 20).padding(.bottom, 12)
+    }
+
+    private var ctaTitle: String {
+        switch vm.current {
+        case .welcome: return "Get started"
+        case .equipment: return "Build my plan"
+        case .result: return mode == .firstRun ? "Start Replog" : "Use this plan"
+        default: return "Continue"
+        }
+    }
+
+    private func primaryAction() {
+        switch vm.current {
+        case .result:
+            finish()
+        default:
+            withAnimation(.snappy) { vm.advance() }
+        }
+    }
+
+    // MARK: Steps
+
+    @ViewBuilder
+    private var stepContent: some View {
+        switch vm.current {
+        case .welcome:    welcomeStep
+        case .goal:       goalStep
+        case .sport:      sportStep
+        case .experience: experienceStep
+        case .sex:        sexStep
+        case .age:        ageStep
+        case .days:       daysStep
+        case .time:       timeStep
+        case .injuries:   injuriesStep
+        case .equipment:  equipmentStep
+        case .generating: generatingStep
+        case .result:     resultStep
+        }
+    }
+
+    private var welcomeStep: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .fill(LinearGradient(colors: [Color.accent, Color.accentPress], startPoint: .topLeading, endPoint: .bottomTrailing))
+                .frame(width: 72, height: 72)
+                .overlay(Image(systemName: "dumbbell.fill").font(.system(size: 30)).foregroundStyle(.white))
+                .padding(.top, 40)
+            Text("Welcome to Replog.").font(.screenTitle).foregroundStyle(Color.textPrimary)
+            Text("Answer a few quick questions and we'll build your training plan on-device.")
+                .font(.bodyText).foregroundStyle(Color.text2)
+        }
+    }
+
+    private var goalStep: some View {
+        OnboardingStepScaffold(eyebrow: "Your goal", question: "What brings you to Replog?",
+                               caption: "We'll tailor your plan to this.") {
+            VStack(spacing: 10) {
+                ForEach(Goal.allCases) { goal in
+                    OptionCard(title: goal.displayName, subtitle: goalSubtitle(goal), emoji: goalEmoji(goal),
+                               isSelected: vm.answers.goal == goal) { vm.answers.goal = goal }
+                }
+            }
+        }
+    }
+
+    private var sportStep: some View {
+        OnboardingStepScaffold(eyebrow: "Your sport", question: "Which sport?",
+                               caption: "We'll prioritize the muscles it needs.") {
+            VStack(spacing: 10) {
+                ForEach(Sport.allCases) { sport in
+                    OptionCard(title: sport.displayName, isSelected: vm.answers.sport == sport) {
+                        vm.answers.sport = sport
+                    }
+                }
+            }
+        }
+    }
+
+    private var experienceStep: some View {
+        OnboardingStepScaffold(eyebrow: "Experience", question: "How experienced are you?") {
+            VStack(spacing: 10) {
+                ForEach(Experience.allCases) { level in
+                    OptionCard(title: level.displayName, isSelected: vm.answers.experience == level) {
+                        vm.answers.experience = level
+                    }
+                }
+            }
+        }
+    }
+
+    private var sexStep: some View {
+        OnboardingStepScaffold(eyebrow: "About you", question: "Sex") {
+            VStack(spacing: 10) {
+                ForEach(Sex.allCases) { sex in
+                    OptionCard(title: sex.displayName, isSelected: vm.answers.sex == sex) {
+                        vm.answers.sex = sex
+                    }
+                }
+            }
+        }
+    }
+
+    private var ageStep: some View {
+        OnboardingStepScaffold(eyebrow: "About you", question: "How old are you?") {
+            sliderBlock(value: Binding(get: { Double(vm.answers.age) },
+                                       set: { vm.answers.age = Int($0) }),
+                        range: 14...80, unit: "years")
+        }
+    }
+
+    private var daysStep: some View {
+        OnboardingStepScaffold(eyebrow: "Schedule", question: "Days per week?") {
+            HStack(spacing: 10) {
+                ForEach(2...6, id: \.self) { d in
+                    ChoiceChip(label: "\(d)", isSelected: vm.answers.daysPerWeek == d) {
+                        vm.answers.daysPerWeek = d
+                    }
+                }
+            }
+        }
+    }
+
+    private var timeStep: some View {
+        OnboardingStepScaffold(eyebrow: "Schedule", question: "Time per session?") {
+            sliderBlock(value: Binding(get: { Double(vm.answers.minutesPerSession) },
+                                       set: { vm.answers.minutesPerSession = Int($0) }),
+                        range: 20...90, step: 5, unit: "min")
+        }
+    }
+
+    private var injuriesStep: some View {
+        OnboardingStepScaffold(eyebrow: "Limits", question: "Any injuries or limits?",
+                               caption: "We'll work around these. Pick any that apply.") {
+            VStack(spacing: 10) {
+                OptionCard(title: "None", isSelected: vm.answers.injuries.isEmpty) {
+                    vm.answers.injuries = []
+                }
+                ForEach(Injury.allCases) { injury in
+                    OptionCard(title: injury.displayName, isSelected: vm.answers.injuries.contains(injury)) {
+                        toggleInjury(injury)
+                    }
+                }
+            }
+        }
+    }
+
+    private var equipmentStep: some View {
+        OnboardingStepScaffold(eyebrow: "Equipment", question: "What can you train with?") {
+            VStack(spacing: 10) {
+                ForEach(EquipmentAccess.allCases) { access in
+                    OptionCard(title: access.displayName, isSelected: vm.answers.equipment == access) {
+                        vm.answers.equipment = access
+                    }
+                }
+            }
+        }
+    }
+
+    private var generatingStep: some View {
+        VStack(spacing: 20) {
+            Spacer(minLength: 80)
+            ProgressView().controlSize(.large).tint(.accent)
+            Text("Building your plan").font(.rounded(20, .black)).foregroundStyle(Color.textPrimary)
+            Text("Running on-device…").font(.bodyText).foregroundStyle(Color.text2)
+            Spacer()
+        }
+        .frame(maxWidth: .infinity)
+        .task {
+            vm.runGeneration()
+            try? await Task.sleep(for: .seconds(1.8))
+            withAnimation(.snappy) { vm.advance() }
+        }
+    }
+
+    private var resultStep: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Pill(text: "✨ Plan ready", style: .accentSoft)
+            Text(vm.generated?.headline ?? "Your Plan").font(.screenTitle).foregroundStyle(Color.textPrimary)
+            Text("\(vm.answers.daysPerWeek) days/week · ~\(vm.answers.minutesPerSession) min sessions")
+                .font(.rounded(13, .semibold)).foregroundStyle(Color.text2)
+            HStack(spacing: 8) {
+                Pill(text: vm.answers.experience.displayName, style: .soft)
+                Pill(text: vm.answers.equipment.displayName, style: .soft)
+                Pill(text: vm.answers.goal.shortName, style: .soft)
+            }
+            ForEach(Array((vm.generated?.workouts ?? []).enumerated()), id: \.offset) { _, workout in
+                HStack {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(workout.name).font(.cardTitle).foregroundStyle(Color.textPrimary)
+                        Text("\(workout.items.count) exercises · \(workout.items.reduce(0) { $0 + $1.sets.count }) sets")
+                            .font(.rounded(12, .semibold)).foregroundStyle(Color.text2)
+                    }
+                    Spacer()
+                    Pill(text: workout.day.short, style: .accentSoft)
+                }
+                .padding(14).cardSurface()
+            }
+        }
+    }
+
+    // MARK: Helpers
+
+    private func sliderBlock(value: Binding<Double>, range: ClosedRange<Double>,
+                            step: Double = 1, unit: String) -> some View {
+        VStack(spacing: 16) {
+            Text("\(Int(value.wrappedValue))")
+                .font(.rounded(60, .black)).foregroundStyle(Color.accent).tabularNumbers()
+            Text(unit).eyebrow()
+            Slider(value: value, in: range, step: step).tint(.accent)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.top, 20)
+    }
+
+    private func toggleInjury(_ injury: Injury) {
+        if vm.answers.injuries.contains(injury) { vm.answers.injuries.remove(injury) }
+        else { vm.answers.injuries.insert(injury) }
+    }
+
+    private func goalEmoji(_ g: Goal) -> String {
+        switch g {
+        case .buildMuscle: return "💪"
+        case .loseWeight: return "🔥"
+        case .recomp: return "⚖️"
+        case .sport: return "🏃"
+        }
+    }
+    private func goalSubtitle(_ g: Goal) -> String {
+        switch g {
+        case .buildMuscle: return "Hypertrophy & strength"
+        case .loseWeight: return "Burn fat, stay lean"
+        case .recomp: return "Recomposition"
+        case .sport: return "Sport-specific focus"
+        }
+    }
+
+    private func finish() {
+        let generated = vm.generated ?? PlanGenerator().generate(vm.answers)
+        let plan = PlanFactory.insert(generated, into: context, order: plans.count)
+        let profile = profiles.first ?? context.userProfile()
+        profile.goal = vm.answers.goal
+        profile.onboardingDone = true
+        try? context.save()
+        if mode == .generatePlan {
+            onGenerated?(plan)
+            dismiss()
+        }
+    }
+}

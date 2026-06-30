@@ -1,0 +1,278 @@
+//
+//  PlanGenerator.swift
+//  Replog
+//
+//  The on-device "AI": a deterministic engine that builds a training Plan from the
+//  onboarding answers using the real exercise catalog. Same input -> same plan.
+//  (The UI shows a ~1.8s "Building your plan" spinner over this work.)
+//
+
+import Foundation
+
+// MARK: - Output (pure value types, no SwiftData)
+
+struct GeneratedSet: Equatable, Sendable {
+    var weightKg: Double
+    var reps: Int
+    var rpe: Int
+}
+
+struct GeneratedItem: Equatable, Sendable {
+    var exId: String
+    var sets: [GeneratedSet]
+}
+
+struct GeneratedWorkout: Equatable, Sendable {
+    var name: String
+    var day: Weekday
+    var items: [GeneratedItem]
+}
+
+struct GeneratedPlan: Equatable, Sendable {
+    var name: String
+    var colorHex: String
+    var workouts: [GeneratedWorkout]
+    /// Display header on the result screen, e.g. "Your Hypertrophy Plan".
+    var headline: String
+}
+
+// MARK: - Generator
+
+struct PlanGenerator {
+    let catalog: ExerciseCatalog
+
+    nonisolated init(catalog: ExerciseCatalog = .shared) {
+        self.catalog = catalog
+    }
+
+    /// Builds a complete plan for the given answers. Deterministic.
+    func generate(_ answers: QuizAnswers) -> GeneratedPlan {
+        let split = Split.choose(forDays: answers.daysPerWeek)
+        let days = Self.weekdays(count: split.dayTemplates.count)
+        let perWorkout = exercisesPerWorkout(minutes: answers.minutesPerSession)
+        let allowed = answers.equipment.allowedEquipment
+        let avoid = answers.avoidedMuscles
+        let priority = priorityMuscles(answers)
+
+        var workouts: [GeneratedWorkout] = []
+        for (index, template) in split.dayTemplates.enumerated() {
+            let items = buildItems(
+                for: template,
+                priority: priority,
+                count: perWorkout,
+                allowedEquipment: allowed,
+                avoidMuscles: avoid,
+                answers: answers
+            )
+            workouts.append(GeneratedWorkout(name: template.name, day: days[index], items: items))
+        }
+
+        return GeneratedPlan(
+            name: split.planName,
+            colorHex: Self.planColor(for: answers.goal),
+            workouts: workouts,
+            headline: headline(for: answers.goal)
+        )
+    }
+
+    // MARK: Exercise selection
+
+    private func buildItems(
+        for template: DayTemplate,
+        priority: [Muscle],
+        count: Int,
+        allowedEquipment: Set<Equipment>,
+        avoidMuscles: Set<Muscle>,
+        answers: QuizAnswers
+    ) -> [GeneratedItem] {
+        // Order this day's target muscles by the user's global priority, then template order.
+        let orderedTargets = template.muscles.sorted { lhs, rhs in
+            let li = priority.firstIndex(of: lhs) ?? Int.max
+            let ri = priority.firstIndex(of: rhs) ?? Int.max
+            if li != ri { return li < ri }
+            let ti = template.muscles.firstIndex(of: lhs) ?? 0
+            let tj = template.muscles.firstIndex(of: rhs) ?? 0
+            return ti < tj
+        }
+
+        var chosen: [Exercise] = []
+        var usedIDs = Set<String>()
+
+        // One pass picking the best exercise per target muscle, looping until we hit `count`.
+        var pass = 0
+        while chosen.count < count, pass < 4 {
+            for muscle in orderedTargets where chosen.count < count {
+                let candidate = bestExercise(
+                    for: muscle,
+                    allowedEquipment: allowedEquipment,
+                    avoidMuscles: avoidMuscles,
+                    excluding: usedIDs,
+                    preferCompound: pass == 0
+                )
+                if let candidate {
+                    chosen.append(candidate)
+                    usedIDs.insert(candidate.id)
+                }
+            }
+            pass += 1
+        }
+
+        return chosen.map { ex in
+            GeneratedItem(exId: ex.id, sets: setTemplate(for: ex, answers: answers))
+        }
+    }
+
+    /// The best catalog exercise for a muscle under the constraints, or nil.
+    private func bestExercise(
+        for muscle: Muscle,
+        allowedEquipment: Set<Equipment>,
+        avoidMuscles: Set<Muscle>,
+        excluding usedIDs: Set<String>,
+        preferCompound: Bool
+    ) -> Exercise? {
+        let candidates = catalog.exercises(forMuscle: muscle).filter { ex in
+            guard !usedIDs.contains(ex.id) else { return false }
+            // Equipment must be permitted (nil equipment = bodyweight, always allowed).
+            if let eq = ex.equipment, !allowedEquipment.contains(eq) { return false }
+            // Don't load an avoided region as a primary mover.
+            if !avoidMuscles.isEmpty, ex.primaryMuscles.contains(where: avoidMuscles.contains) { return false }
+            // Must actually target this muscle as primary for a strong stimulus.
+            return ex.primaryMuscles.contains(muscle)
+        }
+        // Deterministic ranking: compound first (if preferred), then strength category,
+        // then stable by name.
+        return candidates.min { a, b in
+            let aScore = rank(a, preferCompound: preferCompound)
+            let bScore = rank(b, preferCompound: preferCompound)
+            if aScore != bScore { return aScore < bScore }
+            return a.name.localizedCaseInsensitiveCompare(b.name) == .orderedAscending
+        }
+    }
+
+    private func rank(_ ex: Exercise, preferCompound: Bool) -> Int {
+        var score = 0
+        if preferCompound { score += ex.mechanic == .compound ? 0 : 2 }
+        score += ex.category == .strength ? 0 : 1
+        return score
+    }
+
+    // MARK: Set/rep prescription
+
+    private func setTemplate(for ex: Exercise, answers: QuizAnswers) -> [GeneratedSet] {
+        let setCount: Int = {
+            switch answers.experience {
+            case .beginner: return 3
+            case .intermediate: return ex.mechanic == .compound ? 4 : 3
+            case .advanced: return 4
+            }
+        }()
+        let reps: Int = {
+            switch answers.goal {
+            case .buildMuscle, .recomp: return 10
+            case .loseWeight: return 13
+            case .sport: return 8
+            }
+        }()
+        let rpe: Int = {
+            switch answers.experience {
+            case .beginner: return 7
+            case .intermediate: return 8
+            case .advanced: return 9
+            }
+        }()
+        let weight = startingWeight(for: ex)
+        return Array(repeating: GeneratedSet(weightKg: weight, reps: reps, rpe: rpe), count: setCount)
+    }
+
+    /// A sensible starting prescription (kg) the user can tune. Bodyweight = 0.
+    private func startingWeight(for ex: Exercise) -> Double {
+        switch ex.equipment {
+        case .none, .bodyOnly, .bands, .foamRoll, .exerciseBall: return 0
+        case .barbell, .ezCurlBar: return ex.mechanic == .compound ? 40 : 20
+        case .dumbbell, .kettlebells: return ex.mechanic == .compound ? 16 : 8
+        case .machine, .cable: return 25
+        case .medicineBall, .other: return 6
+        }
+    }
+
+    // MARK: Priorities & cosmetics
+
+    private func priorityMuscles(_ answers: QuizAnswers) -> [Muscle] {
+        if answers.goal == .sport, let sport = answers.sport {
+            return sport.priorityMuscles
+        }
+        // General hypertrophy / recomp / fat-loss: big movers first.
+        return [.chest, .lats, .quadriceps, .hamstrings, .shoulders, .glutes,
+                .middleBack, .biceps, .triceps, .calves, .abdominals]
+    }
+
+    private func exercisesPerWorkout(minutes: Int) -> Int {
+        min(6, max(3, minutes / 12))
+    }
+
+    private func headline(for goal: Goal) -> String {
+        switch goal {
+        case .buildMuscle: return "Your Hypertrophy Plan"
+        case .loseWeight:  return "Your Fat-Loss Plan"
+        case .recomp:      return "Your Recomposition Plan"
+        case .sport:       return "Your Sport Plan"
+        }
+    }
+
+    private static func planColor(for goal: Goal) -> String {
+        switch goal {
+        case .buildMuscle: return "#FF6A3D"
+        case .loseWeight:  return "#2FA779"
+        case .recomp:      return "#3D7DFF"
+        case .sport:       return "#B36AFF"
+        }
+    }
+
+    /// Weekdays spread across the week for `count` training days.
+    static func weekdays(count: Int) -> [Weekday] {
+        switch count {
+        case ...2: return [.mon, .thu]
+        case 3:    return [.mon, .wed, .fri]
+        case 4:    return [.mon, .tue, .thu, .fri]
+        case 5:    return [.mon, .tue, .wed, .fri, .sat]
+        default:   return [.mon, .tue, .wed, .thu, .fri, .sat]
+        }
+    }
+}
+
+// MARK: - Splits & day templates
+
+struct DayTemplate: Equatable, Sendable {
+    var name: String
+    var muscles: [Muscle]
+}
+
+struct Split: Equatable, Sendable {
+    var planName: String
+    var dayTemplates: [DayTemplate]
+
+    static let push = DayTemplate(name: "Push Day", muscles: [.chest, .shoulders, .triceps])
+    static let pull = DayTemplate(name: "Pull Day", muscles: [.lats, .middleBack, .biceps, .traps])
+    static let legs = DayTemplate(name: "Leg Day", muscles: [.quadriceps, .hamstrings, .glutes, .calves])
+    static let upper = DayTemplate(name: "Upper Day", muscles: [.chest, .lats, .shoulders, .biceps, .triceps])
+    static let lower = DayTemplate(name: "Lower Day", muscles: [.quadriceps, .hamstrings, .glutes, .calves])
+    static let full = DayTemplate(name: "Full Body", muscles: [.chest, .lats, .quadriceps, .shoulders, .hamstrings])
+
+    /// Picks a split appropriate to the number of training days.
+    static func choose(forDays days: Int) -> Split {
+        switch days {
+        case ...2:
+            return Split(planName: "Upper / Lower", dayTemplates: [upper, lower])
+        case 3:
+            return Split(planName: "Push · Pull · Legs", dayTemplates: [push, pull, legs])
+        case 4:
+            return Split(planName: "Upper / Lower", dayTemplates: [upper, lower, upper, lower])
+        case 5:
+            return Split(planName: "Push · Pull · Legs + Upper / Lower",
+                         dayTemplates: [push, pull, legs, upper, lower])
+        default:
+            return Split(planName: "Push · Pull · Legs ×2",
+                         dayTemplates: [push, pull, legs, push, pull, legs])
+        }
+    }
+}
