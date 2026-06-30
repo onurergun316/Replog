@@ -41,14 +41,18 @@ enum Units: String, Codable, CaseIterable, Identifiable, Sendable {
 
 @Model
 final class UserProfile {
-    var name: String = "Alex"
+    /// The user's full name ("First Last"), captured during onboarding.
+    var name: String = ""
     var goalRaw: String = Goal.buildMuscle.rawValue
+    /// Consecutive scheduled workouts completed (see `StreakEngine.workoutStreak`).
     var streak: Int = 0
+    /// Consecutive "perfect weeks" (see `StreakEngine.weekStreak`).
+    var weekStreak: Int = 0
     var doneDates: [Date] = []
     var onboardingDone: Bool = false
     var totalWorkouts: Int = 0
 
-    init(name: String = "Alex", goal: Goal = .buildMuscle) {
+    init(name: String = "", goal: Goal = .buildMuscle) {
         self.name = name
         self.goalRaw = goal.rawValue
     }
@@ -58,8 +62,23 @@ final class UserProfile {
         set { goalRaw = newValue.rawValue }
     }
 
+    /// The consecutive-workout streak (alias for `streak`, for readable call sites).
+    var workoutStreak: Int {
+        get { streak }
+        set { streak = newValue }
+    }
+
+    /// First name for greetings, falling back to a friendly default.
+    var firstName: String {
+        let first = name.split(separator: " ").first.map(String.init) ?? name
+        return first.isEmpty ? "there" : first
+    }
+
     /// The user's initial for the avatar.
-    var initial: String { String(name.prefix(1)).uppercased() }
+    var initial: String {
+        let trimmed = name.trimmingCharacters(in: .whitespaces)
+        return trimmed.isEmpty ? "?" : String(trimmed.prefix(1)).uppercased()
+    }
 }
 
 @Model

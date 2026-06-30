@@ -109,6 +109,8 @@ struct StepperControl: View {
     let onMinus: () -> Void
     let onPlus: () -> Void
 
+    @State private var taps = 0
+
     var body: some View {
         HStack(spacing: 8) {
             stepButton("minus", action: onMinus)
@@ -117,12 +119,14 @@ struct StepperControl: View {
                 .tabularNumbers()
                 .foregroundStyle(Color.textPrimary)
                 .frame(minWidth: 44)
+                .contentTransition(.numericText())
             stepButton("plus", action: onPlus)
         }
+        .sensoryFeedback(.selection, trigger: taps)
     }
 
     private func stepButton(_ symbol: String, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
+        Button { taps += 1; action() } label: {
             Image(systemName: symbol)
                 .font(.system(size: 13, weight: .black))
                 .foregroundStyle(Color.text2)
@@ -142,8 +146,10 @@ struct PrimaryButton: View {
     var filled: Bool = true
     let action: () -> Void
 
+    @State private var taps = 0
+
     var body: some View {
-        Button(action: action) {
+        Button { taps += 1; action() } label: {
             HStack(spacing: 8) {
                 if let systemImage { Image(systemName: systemImage) }
                 Text(title)
@@ -158,6 +164,7 @@ struct PrimaryButton: View {
             )
         }
         .buttonStyle(.plain)
+        .sensoryFeedback(.impact(weight: .medium), trigger: taps)
     }
 }
 
@@ -167,25 +174,31 @@ struct SegmentedToggle<T: Hashable>: View {
     let options: [(value: T, label: String)]
     @Binding var selection: T
 
+    @Namespace private var ns
+
     var body: some View {
         HStack(spacing: 4) {
             ForEach(options, id: \.value) { opt in
-                Button { selection = opt.value } label: {
+                Button { withAnimation(.snappy) { selection = opt.value } } label: {
                     Text(opt.label)
                         .font(.rounded(14, .heavy))
                         .foregroundStyle(selection == opt.value ? Color.white : Color.text2)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 9)
-                        .background(
-                            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                                .fill(selection == opt.value ? Color.accent : Color.clear)
-                        )
+                        .background {
+                            if selection == opt.value {
+                                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                    .fill(Color.accent)
+                                    .matchedGeometryEffect(id: "seg", in: ns)
+                            }
+                        }
                 }
                 .buttonStyle(.plain)
             }
         }
         .padding(4)
         .background(RoundedRectangle(cornerRadius: 13, style: .continuous).fill(Color.surface2))
+        .sensoryFeedback(.selection, trigger: selection)
     }
 }
 

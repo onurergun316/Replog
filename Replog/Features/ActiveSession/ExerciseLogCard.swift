@@ -93,40 +93,49 @@ private struct SetLogRow: View {
     let onChange: () -> Void
 
     @State private var dragOffset: CGFloat = 0
+    private let revealWidth: CGFloat = 72
 
     var body: some View {
         VStack(spacing: 0) {
             ZStack(alignment: .trailing) {
-                // Delete affordance revealed by swiping left.
+                // Delete affordance, only visible while swiped open. Clipped with the row so
+                // it never bleeds past the rounded corner.
                 Button(action: onDelete) {
                     Image(systemName: "trash").foregroundStyle(.white)
-                        .frame(width: 56, height: 44).background(Color.down)
-                        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                        .font(.system(size: 15, weight: .bold))
+                        .frame(width: revealWidth)
+                        .frame(maxHeight: .infinity)
+                        .background(Color.down)
                 }
                 .buttonStyle(.plain)
+                .opacity(dragOffset < -4 ? 1 : 0)
 
                 rowContent
-                    .background(RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .background(RoundedRectangle(cornerRadius: 12, style: .continuous)
                         .fill(set.done ? Color.up.opacity(0.12) : Color.surface2))
                     .offset(x: dragOffset)
                     .gesture(swipe)
             }
+            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
             if isEditing { inlineEditor }
         }
         .padding(.vertical, 4)
+        .animation(.snappy, value: set.done)
+        .sensoryFeedback(.success, trigger: set.done) { _, done in done } // haptic only when marked done
     }
 
     private var rowContent: some View {
         HStack(spacing: 8) {
             Text("\(index)").font(.rounded(13, .heavy)).foregroundStyle(Color.text3).frame(width: 22)
 
-            // Weight + trend
+            // Weight + trend — struck through when the set is done.
             valueButton {
                 HStack(spacing: 2) {
                     Text(Formulas.formatWeight(kg: set.weightKg, units: units, includeUnit: false))
                         .font(.rounded(16, .heavy)).foregroundStyle(Color.textPrimary).tabularNumbers()
+                        .strikethrough(set.done, color: Color.up)
                     Text(units.label).font(.rounded(9, .bold)).foregroundStyle(Color.text3)
-                    TrendArrow(trend: set.weightTrend)
+                    if !set.done { TrendArrow(trend: set.weightTrend) }
                 }
             }
             Text("×").font(.rounded(13, .bold)).foregroundStyle(Color.text3)
@@ -134,22 +143,26 @@ private struct SetLogRow: View {
             valueButton {
                 HStack(spacing: 2) {
                     Text("\(set.reps)").font(.rounded(16, .heavy)).foregroundStyle(Color.textPrimary).tabularNumbers()
+                        .strikethrough(set.done, color: Color.up)
                     Text("reps").font(.rounded(9, .bold)).foregroundStyle(Color.text3)
-                    TrendArrow(trend: set.repsTrend)
+                    if !set.done { TrendArrow(trend: set.repsTrend) }
                 }
             }
             Spacer()
             valueButton {
                 Text("RPE \(set.rpe)").font(.rounded(12, .heavy)).foregroundStyle(Color.accent)
             }
+            .opacity(set.done ? 0.5 : 1)
             // Check circle
             Button(action: onCheck) {
                 Image(systemName: set.done ? "checkmark.circle.fill" : "circle")
                     .font(.system(size: 24)).foregroundStyle(set.done ? Color.up : Color.text3)
+                    .contentTransition(.symbolEffect(.replace))
             }
             .buttonStyle(.plain)
         }
         .padding(.horizontal, 10).padding(.vertical, 8)
+        .opacity(set.done ? 0.78 : 1)
     }
 
     private func valueButton<C: View>(@ViewBuilder _ content: () -> C) -> some View {
@@ -200,7 +213,7 @@ private struct SetLogRow: View {
 
     private var swipe: some Gesture {
         DragGesture(minimumDistance: 12)
-            .onChanged { v in if v.translation.width < 0 { dragOffset = max(-64, v.translation.width) } }
-            .onEnded { v in withAnimation(.snappy) { dragOffset = v.translation.width < -40 ? -64 : 0 } }
+            .onChanged { v in if v.translation.width < 0 { dragOffset = max(-revealWidth, v.translation.width) } }
+            .onEnded { v in withAnimation(.snappy) { dragOffset = v.translation.width < -40 ? -revealWidth : 0 } }
     }
 }

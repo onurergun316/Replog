@@ -16,27 +16,34 @@ struct PlanDetailView: View {
     @Bindable var plan: Plan
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
+        List {
+            Group {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Plan").eyebrow()
                     TextField("Plan name", text: $plan.name)
                         .font(.screenTitle).foregroundStyle(Color.textPrimary)
                         .onChange(of: plan.name) { try? context.save() }
                 }
-
-                Text("\(plan.workouts.count) workouts · \(plan.exerciseCount) exercises")
+                Text("\(plan.workouts.count) workouts · \(plan.exerciseCount) exercises · swipe to delete")
                     .font(.rounded(13, .semibold)).foregroundStyle(Color.text2)
-
                 SectionHeader(title: "Workouts")
+            }
+            .plainListRow()
 
-                ForEach(plan.orderedWorkouts) { workout in
-                    NavigationLink(value: workout) {
-                        WorkoutCard(workout: workout, catalog: catalog) { start(workout) }
-                    }
-                    .buttonStyle(.plain)
+            ForEach(plan.orderedWorkouts) { workout in
+                ZStack {
+                    WorkoutCard(workout: workout, catalog: catalog) { start(workout) }
+                    NavigationLink(value: workout) { EmptyView() }.opacity(0) // hides the List chevron
                 }
+                .plainListRow()
+                .swipeActions(edge: .trailing) {
+                    Button(role: .destructive) { deleteWorkout(workout) } label: {
+                        Label("Delete", systemImage: "trash")
+                    }
+                }
+            }
 
+            Group {
                 Button { addWorkout() } label: {
                     dashedButtonLabel(icon: "plus", title: "Add workout")
                 }
@@ -53,10 +60,17 @@ struct PlanDetailView: View {
                 }
                 .buttonStyle(.plain)
             }
-            .padding(20)
+            .plainListRow()
         }
+        .listStyle(.plain)
+        .scrollContentBackground(.hidden)
         .background(Color.bg.ignoresSafeArea())
         .navigationBarTitleDisplayMode(.inline)
+    }
+
+    private func deleteWorkout(_ workout: Workout) {
+        context.delete(workout)
+        try? context.save()
     }
 
     private func dashedButtonLabel(icon: String, title: String) -> some View {
@@ -74,7 +88,12 @@ struct PlanDetailView: View {
     }
 
     private func start(_ workout: Workout) {
-        SessionBuilder.start(workout: workout, into: context)
+        // One session at a time: resume an in-progress workout instead of starting a second.
+        if let existing = (try? context.fetch(FetchDescriptor<ActiveSession>()))?.first {
+            existing.isOpen = true
+        } else {
+            SessionBuilder.start(workout: workout, into: context)
+        }
         try? context.save()
     }
 

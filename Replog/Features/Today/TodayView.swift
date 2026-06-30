@@ -15,10 +15,16 @@ struct TodayView: View {
     @Query(sort: \Plan.order) private var plans: [Plan]
     @Query private var profiles: [UserProfile]
     @Query private var history: [HistoryEntry]
+    @Query private var activeSessions: [ActiveSession]
 
     @State private var path = NavigationPath()
 
     private var profile: UserProfile { profiles.first ?? context.userProfile() }
+
+    /// A paused/in-progress session, if any (one at a time).
+    private var activeSession: ActiveSession? { activeSessions.first }
+
+    private var scheduledDays: Set<Weekday> { StreakEngine.scheduledDays(in: plans) }
 
     /// All workouts across all plans.
     private var allWorkouts: [Workout] {
@@ -36,7 +42,11 @@ struct TodayView: View {
     }
 
     private var streak: Int {
-        StreakCalendar.streak(doneDates: profile.doneDates)
+        StreakEngine.workoutStreak(scheduledDays: scheduledDays, doneDates: profile.doneDates)
+    }
+
+    private var weekStreak: Int {
+        StreakEngine.weekStreak(scheduledDays: scheduledDays, doneDates: profile.doneDates)
     }
 
     var body: some View {
@@ -46,9 +56,14 @@ struct TodayView: View {
                     header
                     WeekStripView(cells: StreakCalendar.weekStrip(doneDates: profile.doneDates))
 
+                    if let session = activeSession {
+                        resumeBanner(session)
+                    }
+
                     if let workout = todaysWorkout {
                         SectionHeader(title: "Today's Workout")
-                        TodayHeroCard(workout: workout, catalog: catalog) { start(workout) }
+                        TodayHeroCard(workout: workout, catalog: catalog,
+                                      isResuming: isActive(workout)) { start(workout) }
                     } else {
                         SectionHeader(title: "Today")
                         restDayCard
@@ -108,7 +123,7 @@ struct TodayView: View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 12) {
                 ForEach(otherWorkouts) { workout in
-                    OtherWorkoutCard(workout: workout) { start(workout) }
+                    OtherWorkoutCard(workout: workout, isResuming: isActive(workout)) { start(workout) }
                 }
                 NewWorkoutCard { createPlanAndOpen() }
             }
@@ -125,10 +140,41 @@ struct TodayView: View {
 
     private var quickStats: some View {
         HStack(spacing: 12) {
+            StatCard(value: "\(weekStreak)", label: "Week streak")
             StatCard(value: "\(profile.doneDates.filter { Calendar.current.isDate($0, equalTo: Date(), toGranularity: .weekOfYear) }.count)",
                      label: "This week")
             StatCard(value: "\(profile.totalWorkouts)", label: "Workouts")
         }
+    }
+
+    @ViewBuilder
+    private func resumeBanner(_ session: ActiveSession) -> some View {
+        Button {
+            session.isOpen = true
+            try? context.save()
+        } label: {
+            HStack(spacing: 12) {
+                Image(systemName: "figure.strengthtraining.traditional")
+                    .font(.system(size: 18, weight: .bold)).foregroundStyle(.white)
+                    .frame(width: 40, height: 40)
+                    .background(Circle().fill(Color.accent))
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Workout in progress").eyebrow()
+                    Text(session.name).font(.cardTitle).foregroundStyle(Color.textPrimary)
+                }
+                Spacer()
+                Text("Continue").font(.rounded(14, .heavy)).foregroundStyle(.white)
+                    .padding(.horizontal, 14).padding(.vertical, 8)
+                    .background(Capsule().fill(Color.accent))
+            }
+            .padding(14)
+            .cardSurface(fill: Color.accentSoft)
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func isActive(_ workout: Workout) -> Bool {
+        activeSession?.workoutId == workout.id
     }
 
     private var recentHighlight: (some View)? {
@@ -169,7 +215,12 @@ struct TodayView: View {
     // MARK: Actions
 
     private func start(_ workout: Workout) {
-        SessionBuilder.start(workout: workout, into: context)
+        // One session at a time: resume the in-progress one rather than starting a second.
+        if let existing = activeSession {
+            existing.isOpen = true
+        } else {
+            SessionBuilder.start(workout: workout, into: context)
+        }
         try? context.save()
     }
 }
@@ -179,6 +230,7 @@ struct TodayView: View {
 private struct TodayHeroCard: View {
     let workout: Workout
     let catalog: ExerciseCatalog
+    var isResuming: Bool = false
     let onStart: () -> Void
 
     private var muscleChips: [String] {
@@ -218,8 +270,8 @@ private struct TodayHeroCard: View {
 
             Button(action: onStart) {
                 HStack(spacing: 8) {
-                    Image(systemName: "play.fill")
-                    Text("Start Workout")
+                    Image(systemName: isResuming ? "arrow.forward.circle.fill" : "play.fill")
+                    Text(isResuming ? "Continue" : "Start Workout")
                 }
                 .font(.rounded(16, .heavy)).foregroundStyle(Color.accent)
                 .frame(maxWidth: .infinity).padding(.vertical, 15)
@@ -248,6 +300,7 @@ private struct TodayHeroCard: View {
 
 private struct OtherWorkoutCard: View {
     let workout: Workout
+    var isResuming: Bool = false
     let onStart: () -> Void
 
     var body: some View {
@@ -262,8 +315,9 @@ private struct OtherWorkoutCard: View {
             Spacer(minLength: 4)
             Button(action: onStart) {
                 HStack(spacing: 5) {
-                    Image(systemName: "play.fill").font(.system(size: 10, weight: .black))
-                    Text("Start now").font(.rounded(13, .heavy))
+                    Image(systemName: isResuming ? "arrow.forward.circle.fill" : "play.fill")
+                        .font(.system(size: 10, weight: .black))
+                    Text(isResuming ? "Continue" : "Start now").font(.rounded(13, .heavy))
                 }
                 .foregroundStyle(Color.accent)
             }

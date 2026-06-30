@@ -89,11 +89,17 @@ enum EquipmentAccess: String, Codable, CaseIterable, Identifiable, Sendable {
 }
 
 struct QuizAnswers: Equatable, Sendable {
+    var firstName: String = ""
+    var lastName: String = ""
     var goal: Goal = .buildMuscle
     var sport: Sport? = nil
     var experience: Experience = .beginner
     var sex: Sex = .preferNotToSay
     var age: Int = 28
+    /// Body height in centimetres (stored metric; display converts at the edge).
+    var heightCm: Int = 175
+    /// Body weight in kilograms (stored metric).
+    var bodyWeightKg: Double = 75
     var daysPerWeek: Int = 3
     var minutesPerSession: Int = 45
     var injuries: Set<Injury> = []
@@ -102,5 +108,31 @@ struct QuizAnswers: Equatable, Sendable {
     /// All muscle regions to avoid, derived from selected injuries.
     var avoidedMuscles: Set<Muscle> {
         Set(injuries.flatMap(\.avoidMuscles))
+    }
+
+    /// Trimmed full name ("First Last"), or empty if no first name given.
+    var fullName: String {
+        [firstName, lastName]
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .filter { !$0.isEmpty }
+            .joined(separator: " ")
+    }
+
+    /// Body-mass index from height & weight, or nil if height is unset.
+    var bmi: Double? {
+        guard heightCm > 0 else { return nil }
+        let m = Double(heightCm) / 100
+        return bodyWeightKg / (m * m)
+    }
+
+    /// A plain-language BMI band used in the coach report.
+    var bmiCategory: String? {
+        guard let bmi else { return nil }
+        switch bmi {
+        case ..<18.5: return "underweight"
+        case 18.5..<25: return "a healthy weight"
+        case 25..<30: return "overweight"
+        default: return "in the obese range"
+        }
     }
 }

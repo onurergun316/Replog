@@ -82,22 +82,26 @@ struct ActiveSessionTests {
         #expect(!session.isComplete)
     }
 
-    @Test func finishWritesTopSetHistoryAndStreak() throws {
+    @Test func finishCompleteWorkoutWritesHistoryAndStreak() throws {
         let ctx = makeContext()
         let workout = seedWorkout(ctx)
+        // Schedule the workout on today's weekday so completing it today counts.
+        let fixedDay = Date()
+        workout.day = Weekday.from(fixedDay)
         let session = SessionBuilder.start(workout: workout, into: ctx)
         let profile = ctx.userProfile()
 
-        // Complete the Bench exercise: 60x10 and 70x10 -> top by e1RM is 70x10.
-        let bench = session.orderedExercises.first { $0.exId == "Bench" }!
-        bench.sets.forEach { $0.done = true }
+        // Complete EVERY exercise so the workout is fully complete (Bench top is 70x10).
+        session.exercises.forEach { $0.sets.forEach { $0.done = true } }
+        try ctx.save()
+        #expect(session.isComplete)
 
-        let fixedDay = Date()
         let summary = SessionFinisher.finish(session, profile: profile, context: ctx, date: fixedDay)
         try ctx.save()
 
-        #expect(summary.exercisesLogged == 1)        // only Bench had completed sets
-        #expect(summary.newStreak == 1)
+        #expect(summary.exercisesLogged == 2)
+        #expect(summary.countedAsComplete == true)
+        #expect(summary.newStreak == 1)             // today's scheduled workout done
         #expect(profile.totalWorkouts == 1)
         #expect(profile.doneDates.count == 1)
 
@@ -112,7 +116,27 @@ struct ActiveSessionTests {
         #expect(try ctx.fetch(FetchDescriptor<ActiveSession>()).isEmpty)
     }
 
-    @Test func finishWithNoCompletedSetsLogsNothingButStillCountsDay() throws {
+    @Test func partialFinishSavesHistoryButDoesNotCountTheDay() throws {
+        let ctx = makeContext()
+        let workout = seedWorkout(ctx)
+        let session = SessionBuilder.start(workout: workout, into: ctx)
+        let profile = ctx.userProfile()
+
+        // Complete only Bench (Press left undone) → workout is not fully complete.
+        let bench = session.orderedExercises.first { $0.exId == "Bench" }!
+        bench.sets.forEach { $0.done = true }
+
+        let summary = SessionFinisher.finish(session, profile: profile, context: ctx, date: Date())
+        try ctx.save()
+
+        #expect(summary.countedAsComplete == false)
+        #expect(summary.exercisesLogged == 1)            // Bench history still saved
+        #expect(ctx.history(forExercise: "Bench").count == 1)
+        #expect(profile.totalWorkouts == 0)              // incomplete workout doesn't count
+        #expect(profile.doneDates.isEmpty)               // day not marked complete
+    }
+
+    @Test func finishWithNoCompletedSetsCountsNothing() throws {
         let ctx = makeContext()
         let workout = seedWorkout(ctx)
         let session = SessionBuilder.start(workout: workout, into: ctx)
@@ -120,7 +144,8 @@ struct ActiveSessionTests {
 
         let summary = SessionFinisher.finish(session, profile: profile, context: ctx)
         #expect(summary.exercisesLogged == 0)
+        #expect(summary.countedAsComplete == false)
         #expect(ctx.history(forExercise: "Bench").isEmpty)
-        #expect(profile.totalWorkouts == 1) // finishing still records the day
+        #expect(profile.totalWorkouts == 0)              // nothing done → nothing counts
     }
 }

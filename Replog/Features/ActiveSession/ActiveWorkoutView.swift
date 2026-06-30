@@ -22,6 +22,7 @@ struct ActiveWorkoutView: View {
     @State private var restEndDate: Date?
     @State private var restTotal: Int = 90
     @State private var detailRef: ExerciseRef?
+    @State private var showFinishConfirm = false
 
     private var profile: UserProfile { profiles.first ?? context.userProfile() }
     private var settings: AppSettings { settingsList.first ?? context.appSettings() }
@@ -56,6 +57,24 @@ struct ActiveWorkoutView: View {
         .sheet(item: $detailRef) { ref in
             NavigationStack { ExerciseDetailView(exId: ref.id, showProgress: true) }
         }
+        .confirmationDialog("Finish workout?", isPresented: $showFinishConfirm, titleVisibility: .visible) {
+            Button("Finish anyway", role: .destructive) { finish() }
+            Button("Keep training", role: .cancel) {}
+        } message: {
+            Text(finishWarningMessage)
+        }
+    }
+
+    private var finishWarningMessage: String {
+        let remaining = max(0, session.totalSets - session.completedSets)
+        var msg = "You still have \(remaining) set\(remaining == 1 ? "" : "s") to go. "
+        if profile.streak > 0 {
+            msg += "Finishing now won't count this workout, and you'll lose your "
+                + "\(profile.streak)-workout streak."
+        } else {
+            msg += "Finishing now won't count this workout toward your streak."
+        }
+        return msg
     }
 
     // MARK: Header
@@ -63,7 +82,7 @@ struct ActiveWorkoutView: View {
     private var header: some View {
         VStack(spacing: 10) {
             HStack {
-                circleButton("xmark") { dismiss() }
+                circleButton("xmark") { close() }
                 Spacer()
                 VStack(spacing: 1) {
                     Text(session.name).font(.rounded(16, .heavy)).foregroundStyle(Color.textPrimary)
@@ -73,7 +92,7 @@ struct ActiveWorkoutView: View {
                 }
                 Spacer()
                 circleButton("timer") { startRest() }
-                Button { finish() } label: {
+                Button { attemptFinish() } label: {
                     Text("Finish").font(.rounded(14, .heavy)).foregroundStyle(.white)
                         .padding(.horizontal, 14).padding(.vertical, 8)
                         .background(Capsule().fill(Color.accent))
@@ -131,7 +150,8 @@ struct ActiveWorkoutView: View {
     private func circleButton(_ symbol: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Image(systemName: symbol).font(.system(size: 14, weight: .heavy)).foregroundStyle(Color.text2)
-                .frame(width: 36, height: 36).background(Circle().fill(Color.surface2))
+                .frame(width: 38, height: 38)
+                .glassEffect(.regular, in: .circle)
         }
         .buttonStyle(.plain)
     }
@@ -139,8 +159,8 @@ struct ActiveWorkoutView: View {
     private func restButton(_ label: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Text(label).font(.rounded(12, .heavy)).foregroundStyle(Color.accent)
-                .padding(.horizontal, 10).padding(.vertical, 6)
-                .background(Capsule().fill(Color.surface))
+                .padding(.horizontal, 12).padding(.vertical, 7)
+                .glassEffect(.regular.tint(Color.surface), in: .capsule)
         }
         .buttonStyle(.plain)
     }
@@ -197,6 +217,21 @@ struct ActiveWorkoutView: View {
         guard let end = restEndDate else { return }
         restTotal = max(15, restTotal + delta)
         restEndDate = end.addingTimeInterval(TimeInterval(delta))
+    }
+
+    /// Closes the cover but keeps the session: it's paused & persisted, continuable from Today.
+    private func close() {
+        session.isOpen = false
+        try? context.save()
+        dismiss()
+    }
+
+    private func attemptFinish() {
+        if session.isComplete {
+            finish()
+        } else {
+            showFinishConfirm = true
+        }
     }
 
     private func finish() {

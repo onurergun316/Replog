@@ -17,18 +17,33 @@ struct PlansListView: View {
 
     var body: some View {
         NavigationStack(path: $path) {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 16) {
+            List {
+                Group {
                     header
                     createCards
-                    ForEach(plans) { plan in
-                        NavigationLink(value: plan) { PlanCard(plan: plan) }
-                            .buttonStyle(.plain)
-                    }
                     if plans.isEmpty { emptyState }
                 }
-                .padding(20)
+                .listRowInsets(EdgeInsets(top: 8, leading: 20, bottom: 8, trailing: 20))
+                .listRowBackground(Color.clear)
+                .listRowSeparator(.hidden)
+
+                ForEach(plans) { plan in
+                    ZStack {
+                        PlanCard(plan: plan)
+                        NavigationLink(value: plan) { EmptyView() }.opacity(0) // hides the List chevron
+                    }
+                    .listRowInsets(EdgeInsets(top: 6, leading: 20, bottom: 6, trailing: 20))
+                    .listRowBackground(Color.clear)
+                    .listRowSeparator(.hidden)
+                    .swipeActions(edge: .trailing) {
+                        Button(role: .destructive) { delete(plan) } label: {
+                            Label("Delete", systemImage: "trash")
+                        }
+                    }
+                }
             }
+            .listStyle(.plain)
+            .scrollContentBackground(.hidden)
             .background(Color.bg.ignoresSafeArea())
             .toolbar(.hidden, for: .navigationBar)
             .planNavigationDestinations()
@@ -39,21 +54,17 @@ struct PlansListView: View {
     }
 
     private var header: some View {
-        HStack(alignment: .firstTextBaseline) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text("Plans").font(.screenTitle).foregroundStyle(Color.textPrimary)
-                Text("\(plans.count) \(plans.count == 1 ? "plan" : "plans")")
-                    .font(.rounded(13, .semibold)).foregroundStyle(Color.text2)
-            }
-            Spacer()
-            Button { buildYourOwn() } label: {
-                Image(systemName: "plus")
-                    .font(.system(size: 16, weight: .black)).foregroundStyle(.white)
-                    .frame(width: 40, height: 40)
-                    .background(Circle().fill(Color.accent))
-            }
-            .buttonStyle(.plain)
+        VStack(alignment: .leading, spacing: 2) {
+            Text("Plans").font(.screenTitle).foregroundStyle(Color.textPrimary)
+            Text("\(plans.count) \(plans.count == 1 ? "plan" : "plans") · swipe a plan to delete")
+                .font(.rounded(13, .semibold)).foregroundStyle(Color.text2)
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func delete(_ plan: Plan) {
+        context.delete(plan)
+        try? context.save()
     }
 
     private var createCards: some View {

@@ -43,6 +43,7 @@ struct OptionCard: View {
             )
         }
         .buttonStyle(.plain)
+        .sensoryFeedback(.selection, trigger: isSelected)
     }
 }
 
@@ -62,6 +63,7 @@ struct ChoiceChip: View {
                 .background(Capsule().fill(isSelected ? Color.accent : Color.surface2))
         }
         .buttonStyle(.plain)
+        .sensoryFeedback(.selection, trigger: isSelected)
     }
 }
 
@@ -75,9 +77,14 @@ struct OnboardingStepScaffold<Content: View>: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text(eyebrow).eyebrow()
-            Text(question).font(.rounded(26, .black)).foregroundStyle(Color.textPrimary)
+            Text(question)
+                .font(.rounded(26, .black)).foregroundStyle(Color.textPrimary)
+                .fixedSize(horizontal: false, vertical: true)
+                .minimumScaleFactor(0.8)
+                .lineLimit(2)
             if let caption {
                 Text(caption).font(.bodyText).foregroundStyle(Color.text2)
+                    .fixedSize(horizontal: false, vertical: true)
             }
             content().padding(.top, 8)
         }

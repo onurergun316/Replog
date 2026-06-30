@@ -40,9 +40,12 @@ enum DebugSeed {
         guard !profile.onboardingDone else { return }
 
         var answers = QuizAnswers()
+        answers.firstName = "Alex"
+        answers.lastName = "Carter"
         answers.daysPerWeek = 3
         let generated = PlanGenerator().generate(answers)
-        let plan = PlanFactory.insert(generated, into: context, order: 0)
+        let report = ReportComposer.fallbackMarkdown(answers: answers, plan: generated)
+        let plan = PlanFactory.insert(generated, into: context, order: 0, reportMarkdown: report)
 
         // Fabricate a few weeks of history for the first exercise to populate Progress.
         if let firstItem = plan.orderedWorkouts.first?.orderedItems.first {
@@ -57,7 +60,9 @@ enum DebugSeed {
             }
         }
 
+        profile.name = "Alex Carter"
         profile.streak = 3
+        profile.weekStreak = 2
         profile.totalWorkouts = 12
         profile.doneDates = StreakCalendar.recordingCompletion(Date(), into: [])
         profile.onboardingDone = true
@@ -66,7 +71,11 @@ enum DebugSeed {
         // Optionally drop straight into a live workout for verification.
         if ProcessInfo.processInfo.environment["REPLOG_ACTIVE"] == "1",
            let workout = plan.orderedWorkouts.first {
-            SessionBuilder.start(workout: workout, into: context)
+            let session = SessionBuilder.start(workout: workout, into: context)
+            // Mark the first exercise's first set done so the "crossing" state is visible.
+            if let firstSet = session.orderedExercises.first?.orderedSets.first {
+                firstSet.done = true
+            }
             try? context.save()
         }
     }

@@ -25,12 +25,43 @@ struct OnboardingViewModelTests {
         let vm = OnboardingViewModel()
         #expect(vm.current == .welcome)
         vm.advance()
+        #expect(vm.current == .name)
+        vm.advance()
         #expect(vm.current == .goal)
+        vm.back()
+        #expect(vm.current == .name)
         vm.back()
         #expect(vm.current == .welcome)
         // Can't go back past the first step.
         vm.back()
         #expect(vm.index == 0)
+    }
+
+    @Test func nameStepGatesProceedUntilFirstNameEntered() {
+        let vm = OnboardingViewModel()
+        vm.advance() // welcome -> name
+        #expect(vm.current == .name)
+        #expect(!vm.canProceed)            // no name yet
+        vm.answers.firstName = "  "        // whitespace doesn't count
+        #expect(!vm.canProceed)
+        vm.answers.firstName = "Jordan"
+        #expect(vm.canProceed)
+    }
+
+    @Test func quizCollectsHeightAndWeightSteps() {
+        let vm = OnboardingViewModel()
+        #expect(vm.steps.contains(.height))
+        #expect(vm.steps.contains(.weight))
+    }
+
+    @Test func generateProducesPlanAndReportViaFallback() async {
+        let vm = OnboardingViewModel(service: AIPlanService(catalog: ExerciseCatalog(bundle: .main),
+                                                            forceFallback: true))
+        vm.answers.daysPerWeek = 3
+        await vm.generate()
+        #expect(vm.generated?.workouts.count == 3)
+        #expect(!vm.reportMarkdown.isEmpty)
+        #expect(vm.usedAppleIntelligence == false)
     }
 
     @Test func progressIsMonotonicFromZeroToOne() {
@@ -58,8 +89,8 @@ struct OnboardingViewModelTests {
     @Test func backFromExperienceSkipsSportWhenGoalIsNotSport() {
         let vm = OnboardingViewModel()
         vm.answers.goal = .buildMuscle
-        // welcome -> goal -> experience
-        vm.advance(); vm.advance()
+        // welcome -> name -> goal -> experience
+        vm.advance(); vm.advance(); vm.advance()
         #expect(vm.current == .experience)
         vm.back()
         #expect(vm.current == .goal)     // no sport step to land on
@@ -72,10 +103,4 @@ struct OnboardingViewModelTests {
         #expect(!vm.canGoBack)
     }
 
-    @Test func runGenerationProducesPlanMatchingAnswers() {
-        let vm = OnboardingViewModel(generator: PlanGenerator(catalog: ExerciseCatalog(bundle: .main)))
-        vm.answers.daysPerWeek = 3
-        vm.runGeneration()
-        #expect(vm.generated?.workouts.count == 3)
-    }
 }

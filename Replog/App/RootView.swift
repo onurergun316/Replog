@@ -30,8 +30,11 @@ struct RootView: View {
         .tint(.accent)
         .preferredColorScheme(darkMode ? .dark : .light)
         .fullScreenCover(item: Binding(
-            get: { activeSessions.first },
-            set: { _ in }
+            get: { activeSessions.first(where: \.isOpen) },
+            set: { newValue in
+                // Cover dismissed (e.g. swipe) → pause the session, don't destroy it.
+                if newValue == nil { activeSessions.first(where: \.isOpen)?.isOpen = false }
+            }
         )) { session in
             ActiveWorkoutView(session: session)
                 .preferredColorScheme(darkMode ? .dark : .light)

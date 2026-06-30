@@ -19,6 +19,8 @@ struct ProfileView: View {
 
     private var profile: UserProfile { profiles.first ?? context.userProfile() }
     private var settings: AppSettings { settingsList.first ?? context.appSettings() }
+    private var scheduledDays: Set<Weekday> { StreakEngine.scheduledDays(in: plans) }
+    private var plansWithReports: [Plan] { plans.filter(\.hasReport) }
 
     var body: some View {
         NavigationStack {
@@ -27,6 +29,7 @@ struct ProfileView: View {
                     Text("Profile").font(.screenTitle).foregroundStyle(Color.textPrimary)
                     profileHeader
                     statsRow
+                    if !plansWithReports.isEmpty { coachReports }
                     preferences
                     resetButton
                 }
@@ -63,8 +66,40 @@ struct ProfileView: View {
     private var statsRow: some View {
         HStack(spacing: 12) {
             stat("\(profile.totalWorkouts)", "Workouts")
-            stat("\(StreakCalendar.streak(doneDates: profile.doneDates))", "Day streak")
-            stat("\(plans.count)", "Plans")
+            stat("\(StreakEngine.workoutStreak(scheduledDays: scheduledDays, doneDates: profile.doneDates))",
+                 "Workout streak")
+            stat("\(StreakEngine.weekStreak(scheduledDays: scheduledDays, doneDates: profile.doneDates))",
+                 "Week streak")
+        }
+    }
+
+    private var coachReports: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            SectionHeader(title: "AI Coach Reports")
+            VStack(spacing: 0) {
+                ForEach(Array(plansWithReports.enumerated()), id: \.element.id) { index, plan in
+                    NavigationLink {
+                        CoachReportView(title: plan.headline.isEmpty ? plan.name : plan.headline,
+                                        markdown: plan.reportMarkdown)
+                    } label: {
+                        HStack(spacing: 12) {
+                            icon("sparkles")
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(plan.name).font(.rounded(15, .heavy)).foregroundStyle(Color.textPrimary)
+                                Text("The science behind your plan")
+                                    .font(.rounded(12, .semibold)).foregroundStyle(Color.text2)
+                            }
+                            Spacer()
+                            Image(systemName: "chevron.right").font(.system(size: 13, weight: .bold))
+                                .foregroundStyle(Color.text3)
+                        }
+                        .padding(14)
+                    }
+                    .buttonStyle(.plain)
+                    if index < plansWithReports.count - 1 { Divider().padding(.leading, 56) }
+                }
+            }
+            .cardSurface()
         }
     }
 
@@ -141,7 +176,9 @@ struct ProfileView: View {
         let sessions = (try? context.fetch(FetchDescriptor<ActiveSession>())) ?? []
         for session in sessions { context.delete(session) }
         profile.onboardingDone = false
+        profile.name = ""
         profile.streak = 0
+        profile.weekStreak = 0
         profile.totalWorkouts = 0
         profile.doneDates = []
         try? context.save()

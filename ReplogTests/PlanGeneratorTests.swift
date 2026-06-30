@@ -23,7 +23,7 @@ struct PlanGeneratorTests {
     }
 
     @Test func daysPerWeekDrivesWorkoutCount() {
-        for days in 2...6 {
+        for days in 2...7 {
             var answers = QuizAnswers()
             answers.daysPerWeek = days
             let plan = generator.generate(answers)
@@ -32,6 +32,16 @@ struct PlanGeneratorTests {
             // Every workout has a distinct nonzero set of exercises.
             #expect(plan.workouts.allSatisfy { !$0.items.isEmpty })
         }
+    }
+
+    @Test func sevenDaysFillsEveryWeekdayWithNoRestDay() {
+        var answers = QuizAnswers()
+        answers.daysPerWeek = 7
+        let plan = generator.generate(answers)
+        #expect(plan.workouts.count == 7)
+        let days = plan.workouts.map(\.day)
+        #expect(Set(days).count == 7)                 // 7 distinct weekdays
+        #expect(Set(days) == Set(Weekday.allCases))   // every day used, no rest day
     }
 
     @Test func threeDaysProducesPushPullLegs() {

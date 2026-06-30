@@ -21,6 +21,32 @@ enum Muscle: String, Codable, CaseIterable, Identifiable, Sendable {
     var displayName: String {
         rawValue.split(separator: " ").map(\.capitalized).joined(separator: " ")
     }
+
+    /// Best-effort mapping from a free-text muscle name (e.g. from the AI blueprint) onto
+    /// the catalog taxonomy. Handles common synonyms and plurals; nil if unrecognized.
+    static func lenient(_ raw: String) -> Muscle? {
+        let s = raw.lowercased().trimmingCharacters(in: .whitespaces)
+        if let exact = Muscle(rawValue: s) { return exact }
+        switch s {
+        case "abs", "ab", "core", "abdominal": return .abdominals
+        case "quads", "quad", "thighs", "legs": return .quadriceps
+        case "hams", "ham", "hamstring": return .hamstrings
+        case "calf": return .calves
+        case "glute", "butt": return .glutes
+        case "back", "upper back", "lat": return .lats
+        case "mid back": return .middleBack
+        case "low back", "lumbar": return .lowerBack
+        case "delts", "delt", "shoulder", "deltoids": return .shoulders
+        case "bi", "bicep": return .biceps
+        case "tri", "tricep": return .triceps
+        case "pecs", "pec", "pectorals": return .chest
+        case "trap", "trapezius": return .traps
+        case "forearm": return .forearms
+        case "abductor": return .abductors
+        case "adductor": return .adductors
+        default: return nil
+        }
+    }
 }
 
 /// Equipment required for an exercise. `nil`/"None" upstream -> `.unknown` is avoided;

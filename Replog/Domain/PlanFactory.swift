@@ -13,9 +13,13 @@ import SwiftData
 enum PlanFactory {
 
     /// Inserts a generated plan (and its full subtree) into the context. Returns the Plan.
+    /// Pass the AI coach report markdown to save it on the plan (re-readable in Profile).
     @discardableResult
-    static func insert(_ gen: GeneratedPlan, into context: ModelContext, order: Int) -> Plan {
+    static func insert(_ gen: GeneratedPlan, into context: ModelContext, order: Int,
+                       reportMarkdown: String = "") -> Plan {
         let plan = Plan(name: gen.name, colorHex: gen.colorHex, order: order)
+        plan.headline = gen.headline
+        plan.reportMarkdown = reportMarkdown
         context.insert(plan)
 
         for (wIndex, gw) in gen.workouts.enumerated() {

@@ -21,6 +21,7 @@ struct OnboardingFlow: View {
     var onGenerated: ((Plan) -> Void)? = nil
 
     @State private var vm = OnboardingViewModel()
+    @State private var showReport = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -35,6 +36,12 @@ struct OnboardingFlow: View {
             if vm.showsPrimaryCTA { ctaBar }
         }
         .background(Color.bg.ignoresSafeArea())
+        .sheet(isPresented: $showReport) {
+            NavigationStack {
+                CoachReportView(title: vm.generated?.headline ?? "Your Plan",
+                                markdown: vm.reportMarkdown, showsDoneButton: true)
+            }
+        }
     }
 
     // MARK: Top bar (progress + back)
@@ -96,11 +103,14 @@ struct OnboardingFlow: View {
     private var stepContent: some View {
         switch vm.current {
         case .welcome:    welcomeStep
+        case .name:       nameStep
         case .goal:       goalStep
         case .sport:      sportStep
         case .experience: experienceStep
         case .sex:        sexStep
         case .age:        ageStep
+        case .height:     heightStep
+        case .weight:     weightStep
         case .days:       daysStep
         case .time:       timeStep
         case .injuries:   injuriesStep
@@ -118,8 +128,47 @@ struct OnboardingFlow: View {
                 .overlay(Image(systemName: "dumbbell.fill").font(.system(size: 30)).foregroundStyle(.white))
                 .padding(.top, 40)
             Text("Welcome to Replog.").font(.screenTitle).foregroundStyle(Color.textPrimary)
-            Text("Answer a few quick questions and we'll build your training plan on-device.")
+            Text("Answer a few quick questions and your on-device AI coach will build a training plan tailored to you.")
                 .font(.bodyText).foregroundStyle(Color.text2)
+        }
+    }
+
+    private var nameStep: some View {
+        OnboardingStepScaffold(eyebrow: "About you", question: "What's your name?",
+                               caption: "We'll personalize your plan and coaching to you.") {
+            VStack(spacing: 12) {
+                nameField("First name", text: $vm.answers.firstName, content: .givenName)
+                nameField("Last name", text: $vm.answers.lastName, content: .familyName)
+            }
+        }
+    }
+
+    private func nameField(_ placeholder: String, text: Binding<String>,
+                           content: UITextContentType) -> some View {
+        TextField(placeholder, text: text)
+            .font(.rounded(17, .heavy))
+            .textContentType(content)
+            .autocorrectionDisabled()
+            .submitLabel(.next)
+            .padding(16)
+            .background(RoundedRectangle(cornerRadius: Radius.card, style: .continuous).fill(Color.surface))
+            .overlay(RoundedRectangle(cornerRadius: Radius.card, style: .continuous)
+                .strokeBorder(Color.border, lineWidth: 1))
+    }
+
+    private var heightStep: some View {
+        OnboardingStepScaffold(eyebrow: "About you", question: "How tall are you?",
+                               caption: "Helps us tailor the science to your body.") {
+            sliderBlock(value: Binding(get: { Double(vm.answers.heightCm) },
+                                       set: { vm.answers.heightCm = Int($0) }),
+                        range: 140...210, unit: "cm")
+        }
+    }
+
+    private var weightStep: some View {
+        OnboardingStepScaffold(eyebrow: "About you", question: "What's your weight?",
+                               caption: "Used to calibrate volume and starting loads.") {
+            sliderBlock(value: $vm.answers.bodyWeightKg, range: 40...160, step: 1, unit: "kg")
         }
     }
 
@@ -181,9 +230,10 @@ struct OnboardingFlow: View {
     }
 
     private var daysStep: some View {
-        OnboardingStepScaffold(eyebrow: "Schedule", question: "Days per week?") {
-            HStack(spacing: 10) {
-                ForEach(2...6, id: \.self) { d in
+        OnboardingStepScaffold(eyebrow: "Schedule", question: "Days per week?",
+                               caption: "Pick anywhere from 2 to a full 7-day week.") {
+            FlowLayout(spacing: 10) {
+                ForEach(2...7, id: \.self) { d in
                     ChoiceChip(label: "\(d)", isSelected: vm.answers.daysPerWeek == d) {
                         vm.answers.daysPerWeek = d
                     }
@@ -233,15 +283,23 @@ struct OnboardingFlow: View {
             Spacer(minLength: 80)
             ProgressView().controlSize(.large).tint(.accent)
             Text("Building your plan").font(.rounded(20, .black)).foregroundStyle(Color.textPrimary)
-            Text("Running on-device…").font(.bodyText).foregroundStyle(Color.text2)
+            Text("Your AI coach is tailoring your program on-device…")
+                .font(.bodyText).foregroundStyle(Color.text2)
+                .multilineTextAlignment(.center)
             Spacer()
         }
         .frame(maxWidth: .infinity)
         .task {
-            vm.runGeneration()
-            try? await Task.sleep(for: .seconds(1.8))
+            // Run generation while guaranteeing a minimum spinner time for a calm UX.
+            async let generation: Void = vm.generate()
+            async let minimumDelay: Void = sleepQuietly(1.5)
+            _ = await (generation, minimumDelay)
             withAnimation(.snappy) { vm.advance() }
         }
+    }
+
+    private func sleepQuietly(_ seconds: Double) async {
+        try? await Task.sleep(for: .seconds(seconds))
     }
 
     private var resultStep: some View {
@@ -255,6 +313,33 @@ struct OnboardingFlow: View {
                 Pill(text: vm.answers.equipment.displayName, style: .soft)
                 Pill(text: vm.answers.goal.shortName, style: .soft)
             }
+
+            if !vm.reportMarkdown.isEmpty {
+                Button { showReport = true } label: {
+                    HStack(spacing: 10) {
+                        Image(systemName: "sparkles")
+                            .font(.system(size: 16, weight: .bold)).foregroundStyle(Color.accent)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Read your coach's report")
+                                .font(.rounded(15, .heavy)).foregroundStyle(Color.textPrimary)
+                            Text(vm.usedAppleIntelligence
+                                 ? "Tailored by Apple Intelligence · the science behind your plan"
+                                 : "The science behind your plan")
+                                .font(.rounded(12, .semibold)).foregroundStyle(Color.text2)
+                                .lineLimit(1)
+                        }
+                        Spacer()
+                        Image(systemName: "chevron.right").font(.system(size: 13, weight: .bold))
+                            .foregroundStyle(Color.text3)
+                    }
+                    .padding(14)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(RoundedRectangle(cornerRadius: Radius.card, style: .continuous)
+                        .fill(Color.accentSoft))
+                }
+                .buttonStyle(.plain)
+            }
+
             ForEach(Array((vm.generated?.workouts ?? []).enumerated()), id: \.offset) { _, workout in
                 HStack {
                     VStack(alignment: .leading, spacing: 2) {
@@ -308,10 +393,16 @@ struct OnboardingFlow: View {
 
     private func finish() {
         let generated = vm.generated ?? PlanGenerator().generate(vm.answers)
-        let plan = PlanFactory.insert(generated, into: context, order: plans.count)
+        let report = vm.reportMarkdown.isEmpty
+            ? ReportComposer.fallbackMarkdown(answers: vm.answers, plan: generated)
+            : vm.reportMarkdown
+        let plan = PlanFactory.insert(generated, into: context, order: plans.count,
+                                      reportMarkdown: report)
         let profile = profiles.first ?? context.userProfile()
+        if !vm.answers.fullName.isEmpty { profile.name = vm.answers.fullName }
         profile.goal = vm.answers.goal
         profile.onboardingDone = true
+        context.recomputeStreaks(profile: profile)
         try? context.save()
         if mode == .generatePlan {
             onGenerated?(plan)

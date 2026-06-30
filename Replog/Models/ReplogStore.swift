@@ -86,6 +86,16 @@ extension ModelContext {
         return (try? fetch(descriptor)) ?? []
     }
 
+    /// Recomputes both streaks on `profile` from the current plan schedule + completed days.
+    /// Call after finishing a workout or whenever the schedule changes.
+    func recomputeStreaks(profile: UserProfile, today: Date = Date()) {
+        let scheduled = StreakEngine.scheduledDays(in: allPlans())
+        profile.streak = StreakEngine.workoutStreak(
+            scheduledDays: scheduled, doneDates: profile.doneDates, today: today)
+        profile.weekStreak = StreakEngine.weekStreak(
+            scheduledDays: scheduled, doneDates: profile.doneDates, today: today)
+    }
+
     /// History entries for one exercise, oldest first.
     func history(forExercise exId: String) -> [HistoryEntry] {
         let descriptor = FetchDescriptor<HistoryEntry>(

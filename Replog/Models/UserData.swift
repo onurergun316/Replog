@@ -17,6 +17,11 @@ final class Plan {
     var colorHex: String = "#FF6A3D"
     var order: Int = 0
     var createdAt: Date = Date()
+    /// The AI coach's saved report explaining the science behind this plan (markdown).
+    /// Empty for manually-built plans. Re-readable from the Profile tab.
+    var reportMarkdown: String = ""
+    /// Display headline from generation, e.g. "Your Hypertrophy Plan".
+    var headline: String = ""
 
     @Relationship(deleteRule: .cascade, inverse: \Workout.plan)
     var workouts: [Workout] = []
@@ -27,6 +32,9 @@ final class Plan {
         self.order = order
         self.createdAt = Date()
     }
+
+    /// Whether this plan has a saved AI coach report.
+    var hasReport: Bool { !reportMarkdown.isEmpty }
 
     /// Workouts in display order.
     var orderedWorkouts: [Workout] { workouts.sorted { $0.order < $1.order } }

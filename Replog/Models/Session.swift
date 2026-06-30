@@ -16,6 +16,10 @@ final class ActiveSession {
     var name: String = ""
     var planName: String = ""
     var startedAt: Date = Date()
+    /// Whether the live session is currently presented. Closing with "X" sets this
+    /// false (paused & persisted) so the workout survives and can be continued; it is
+    /// only deleted on Finish.
+    var isOpen: Bool = true
 
     @Relationship(deleteRule: .cascade, inverse: \SessionExercise.session)
     var exercises: [SessionExercise] = []

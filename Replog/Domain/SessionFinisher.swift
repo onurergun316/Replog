@@ -16,13 +16,20 @@ enum SessionFinisher {
     struct Summary: Equatable {
         var exercisesLogged: Int
         var newStreak: Int
+        var weekStreak: Int
+        /// Whether the workout was fully completed (and therefore counted toward streaks).
+        var countedAsComplete: Bool
     }
 
-    /// Persists history for every exercise with at least one completed set, updates the
-    /// profile (streak, completed day, total workouts), and deletes the session.
+    /// Persists history for every exercise with at least one completed set. Only a *fully
+    /// completed* workout counts toward the streaks and the lifetime total: a partial finish
+    /// still saves progress (history) but does not mark the scheduled day done, so the
+    /// schedule-aware streak can break. Always recomputes both streaks, then deletes the session.
     @discardableResult
     static func finish(_ session: ActiveSession, profile: UserProfile,
                        context: ModelContext, date: Date = Date()) -> Summary {
+        let isComplete = session.isComplete
+
         var logged = 0
         for exercise in session.exercises {
             let doneSets = exercise.sets.filter(\.done)
@@ -42,13 +49,20 @@ enum SessionFinisher {
             logged += 1
         }
 
-        profile.totalWorkouts += 1
-        profile.doneDates = StreakCalendar.recordingCompletion(date, into: profile.doneDates)
-        profile.streak = StreakCalendar.streak(doneDates: profile.doneDates, today: date)
+        if isComplete {
+            profile.totalWorkouts += 1
+            profile.doneDates = StreakCalendar.recordingCompletion(date, into: profile.doneDates)
+        }
+        context.recomputeStreaks(profile: profile, today: date)
 
-        let newStreak = profile.streak
+        let summary = Summary(
+            exercisesLogged: logged,
+            newStreak: profile.streak,
+            weekStreak: profile.weekStreak,
+            countedAsComplete: isComplete
+        )
         context.delete(session)
         try? context.save()
-        return Summary(exercisesLogged: logged, newStreak: newStreak)
+        return summary
     }
 }

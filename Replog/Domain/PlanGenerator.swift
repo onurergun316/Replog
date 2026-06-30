@@ -77,6 +77,22 @@ struct PlanGenerator {
 
     // MARK: Exercise selection
 
+    /// Selects real catalog exercises for an arbitrary set of target muscles, honoring the
+    /// user's equipment/injury constraints. Used by the AI resolver to map a blueprint's
+    /// per-day muscle targets onto valid catalog exercises (guaranteeing images/refs exist).
+    func selectItems(targetMuscles: [Muscle], count: Int, answers: QuizAnswers) -> [GeneratedItem] {
+        let muscles = targetMuscles.isEmpty ? priorityMuscles(answers) : targetMuscles
+        let template = DayTemplate(name: "", muscles: muscles)
+        return buildItems(
+            for: template,
+            priority: priorityMuscles(answers),
+            count: max(1, count),
+            allowedEquipment: answers.equipment.allowedEquipment,
+            avoidMuscles: answers.avoidedMuscles,
+            answers: answers
+        )
+    }
+
     private func buildItems(
         for template: DayTemplate,
         priority: [Muscle],
@@ -219,7 +235,7 @@ struct PlanGenerator {
         }
     }
 
-    private static func planColor(for goal: Goal) -> String {
+    static func planColor(for goal: Goal) -> String {
         switch goal {
         case .buildMuscle: return "#FF6A3D"
         case .loseWeight:  return "#2FA779"
@@ -235,7 +251,8 @@ struct PlanGenerator {
         case 3:    return [.mon, .wed, .fri]
         case 4:    return [.mon, .tue, .thu, .fri]
         case 5:    return [.mon, .tue, .wed, .fri, .sat]
-        default:   return [.mon, .tue, .wed, .thu, .fri, .sat]
+        case 6:    return [.mon, .tue, .wed, .thu, .fri, .sat]
+        default:   return [.mon, .tue, .wed, .thu, .fri, .sat, .sun] // 7 days, no rest day
         }
     }
 }
@@ -257,6 +274,7 @@ struct Split: Equatable, Sendable {
     static let upper = DayTemplate(name: "Upper Day", muscles: [.chest, .lats, .shoulders, .biceps, .triceps])
     static let lower = DayTemplate(name: "Lower Day", muscles: [.quadriceps, .hamstrings, .glutes, .calves])
     static let full = DayTemplate(name: "Full Body", muscles: [.chest, .lats, .quadriceps, .shoulders, .hamstrings])
+    static let arms = DayTemplate(name: "Arms & Core", muscles: [.biceps, .triceps, .forearms, .abdominals])
 
     /// Picks a split appropriate to the number of training days.
     static func choose(forDays days: Int) -> Split {
@@ -270,9 +288,13 @@ struct Split: Equatable, Sendable {
         case 5:
             return Split(planName: "Push · Pull · Legs + Upper / Lower",
                          dayTemplates: [push, pull, legs, upper, lower])
-        default:
+        case 6:
             return Split(planName: "Push · Pull · Legs ×2",
                          dayTemplates: [push, pull, legs, push, pull, legs])
+        default:
+            // 7 days, no rest day: high-frequency week touching every region.
+            return Split(planName: "Push · Pull · Legs + Upper / Lower + Arms",
+                         dayTemplates: [push, pull, legs, upper, lower, arms, full])
         }
     }
 }

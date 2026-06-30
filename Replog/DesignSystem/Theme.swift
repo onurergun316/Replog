@@ -57,6 +57,15 @@ enum Radius {
 }
 
 extension View {
+    /// Transparent, separator-free list row with the standard horizontal inset — lets a
+    /// `List` (for native swipe-to-delete) keep the app's custom card look on the warm bg.
+    func plainListRow(top: CGFloat = 6, bottom: CGFloat = 6) -> some View {
+        self
+            .listRowInsets(EdgeInsets(top: top, leading: 20, bottom: bottom, trailing: 20))
+            .listRowBackground(Color.clear)
+            .listRowSeparator(.hidden)
+    }
+
     /// Standard card surface: rounded, bordered, subtle shadow.
     func cardSurface(radius: CGFloat = Radius.card, fill: Color = .surface) -> some View {
         self
