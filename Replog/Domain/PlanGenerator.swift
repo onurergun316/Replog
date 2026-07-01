@@ -50,7 +50,7 @@ struct PlanGenerator {
         let split = Split.choose(forDays: answers.daysPerWeek)
         let days = Self.weekdays(count: split.dayTemplates.count)
         let perWorkout = exercisesPerWorkout(minutes: answers.minutesPerSession)
-        let allowed = answers.equipment.allowedEquipment
+        let allowed = answers.allowedEquipment
         let avoid = answers.avoidedMuscles
         let priority = priorityMuscles(answers)
 
@@ -87,10 +87,47 @@ struct PlanGenerator {
             for: template,
             priority: priorityMuscles(answers),
             count: max(1, count),
-            allowedEquipment: answers.equipment.allowedEquipment,
+            allowedEquipment: answers.allowedEquipment,
             avoidMuscles: answers.avoidedMuscles,
             answers: answers
         )
+    }
+
+    /// Real catalog exercises the AI can choose from for a day's target muscles, honoring the
+    /// user's equipment/injury constraints. Interleaves across muscles for balance and ranks
+    /// compound-first; capped at `limit`. The model picks from (and justifies) this list.
+    func candidates(forMuscles muscles: [Muscle], answers: QuizAnswers, limit: Int = 14) -> [Exercise] {
+        let allowed = answers.allowedEquipment
+        let avoid = answers.avoidedMuscles
+        let target = muscles.isEmpty ? priorityMuscles(answers) : muscles
+
+        var perMuscle: [[Exercise]] = target.map { muscle in
+            catalog.exercises(forMuscle: muscle)
+                .filter { ex in
+                    guard ex.primaryMuscles.contains(muscle) else { return false }
+                    if let eq = ex.equipment, !allowed.contains(eq) { return false }
+                    if !avoid.isEmpty, ex.primaryMuscles.contains(where: avoid.contains) { return false }
+                    return true
+                }
+                .sorted { a, b in
+                    let ra = rank(a, preferCompound: true), rb = rank(b, preferCompound: true)
+                    if ra != rb { return ra < rb }
+                    return a.name.localizedCaseInsensitiveCompare(b.name) == .orderedAscending
+                }
+        }
+
+        var seen = Set<String>()
+        var result: [Exercise] = []
+        var i = 0
+        while result.count < limit, perMuscle.contains(where: { !$0.isEmpty }) {
+            let m = i % perMuscle.count
+            if !perMuscle[m].isEmpty {
+                let ex = perMuscle[m].removeFirst()
+                if seen.insert(ex.id).inserted { result.append(ex) }
+            }
+            i += 1
+        }
+        return result
     }
 
     private func buildItems(
@@ -196,12 +233,12 @@ struct PlanGenerator {
             case .advanced: return 9
             }
         }()
-        let weight = startingWeight(for: ex)
+        let weight = Self.startingWeight(for: ex)
         return Array(repeating: GeneratedSet(weightKg: weight, reps: reps, rpe: rpe), count: setCount)
     }
 
     /// A sensible starting prescription (kg) the user can tune. Bodyweight = 0.
-    private func startingWeight(for ex: Exercise) -> Double {
+    static func startingWeight(for ex: Exercise) -> Double {
         switch ex.equipment {
         case .none, .bodyOnly, .bands, .foamRoll, .exerciseBall: return 0
         case .barbell, .ezCurlBar: return ex.mechanic == .compound ? 40 : 20

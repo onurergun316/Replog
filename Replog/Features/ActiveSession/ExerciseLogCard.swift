@@ -50,13 +50,15 @@ struct ExerciseLogCard: View {
     }
 
     private var header: some View {
-        HStack(spacing: 12) {
-            ExerciseImageView(resourceName: imageName, cornerRadius: 10).frame(width: 40, height: 40)
-            VStack(alignment: .leading, spacing: 2) {
+        HStack(spacing: 14) {
+            ExerciseImageView(resourceName: imageName, cornerRadius: 12).frame(width: 46, height: 46)
+                .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .strokeBorder(Color.border, lineWidth: 1))
+            VStack(alignment: .leading, spacing: 3) {
                 Text(name).font(.rounded(15, .heavy)).foregroundStyle(Color.textPrimary).lineLimit(1)
                 Text("\(exercise.sets.count) sets · \(muscle)").font(.rounded(12, .semibold)).foregroundStyle(Color.text2)
             }
-            Spacer()
+            Spacer(minLength: 8)
             Button(action: onInfo) {
                 Image(systemName: "info.circle").font(.system(size: 15, weight: .bold)).foregroundStyle(Color.text3)
             }

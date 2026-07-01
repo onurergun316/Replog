@@ -16,7 +16,7 @@ enum OnboardingMode: Equatable {
 }
 
 enum OnboardingStep: Hashable {
-    case welcome, name, goal, sport, experience, sex, age, height, weight, days, time, injuries, equipment, generating, result
+    case welcome, goal, sport, experience, sex, age, height, weight, days, time, injuries, equipment, equipmentTypes, name, generating, result
 }
 
 @MainActor
@@ -38,10 +38,11 @@ final class OnboardingViewModel {
 
     /// The active step list, omitting Sport unless the goal requires it.
     var steps: [OnboardingStep] {
-        var s: [OnboardingStep] = [.welcome, .name, .goal]
+        var s: [OnboardingStep] = [.welcome, .goal]
         if answers.goal == .sport { s.append(.sport) }
+        // Name & surname are asked last, just before generating.
         s.append(contentsOf: [.experience, .sex, .age, .height, .weight, .days, .time,
-                              .injuries, .equipment, .generating, .result])
+                              .injuries, .equipment, .equipmentTypes, .name, .generating, .result])
         return s
     }
 
@@ -60,6 +61,7 @@ final class OnboardingViewModel {
         switch current {
         case .name: return !answers.firstName.trimmingCharacters(in: .whitespaces).isEmpty
         case .sport: return answers.sport != nil
+        case .equipmentTypes: return !answers.equipmentTypes.isEmpty
         default: return true
         }
     }

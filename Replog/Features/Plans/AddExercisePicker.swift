@@ -32,6 +32,7 @@ struct AddExercisePicker: View {
                         row(ex)
                             .listRowBackground(Color.surface)
                             .listRowSeparatorTint(Color.border)
+                            .listRowInsets(EdgeInsets(top: 8, leading: 20, bottom: 8, trailing: 16))
                     }
                 }
                 .listStyle(.plain)
@@ -61,14 +62,16 @@ struct AddExercisePicker: View {
 
     private func row(_ ex: Exercise) -> some View {
         let isAdded = existingIDs.contains(ex.id) || added.contains(ex.id)
-        return HStack(spacing: 12) {
-            ExerciseImageView(exercise: ex, cornerRadius: 10)
-                .frame(width: 48, height: 48)
-            VStack(alignment: .leading, spacing: 2) {
+        return HStack(spacing: 14) {
+            ExerciseImageView(exercise: ex, cornerRadius: 12)
+                .frame(width: 52, height: 52)
+                .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .strokeBorder(Color.border, lineWidth: 1))
+            VStack(alignment: .leading, spacing: 4) {
                 Text(ex.name).font(.rounded(15, .heavy)).foregroundStyle(Color.textPrimary).lineLimit(1)
                 Text(subtitle(ex)).font(.rounded(12, .semibold)).foregroundStyle(Color.text2).lineLimit(1)
             }
-            Spacer()
+            Spacer(minLength: 8)
             Button {
                 added.insert(ex.id)
                 onAdd(ex.id)
@@ -80,7 +83,7 @@ struct AddExercisePicker: View {
             .buttonStyle(.plain)
             .disabled(isAdded)
         }
-        .padding(.vertical, 4)
+        .padding(.vertical, 6)
     }
 
     private func subtitle(_ ex: Exercise) -> String {

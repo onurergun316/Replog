@@ -55,4 +55,44 @@ struct QuizAnswersTests {
         #expect(a.avoidedMuscles.contains(.quadriceps))
         #expect(a.avoidedMuscles.contains(.shoulders))
     }
+
+    @Test func allowedEquipmentUsesSelectedTypesWhenSet() {
+        var a = QuizAnswers()
+        // Empty selection → falls back to the access level's default set.
+        #expect(a.allowedEquipment == EquipmentAccess.fullGym.allowedEquipment)
+        // Explicit selection restricts to exactly those types.
+        a.equipmentTypes = [.dumbbell, .bodyOnly]
+        #expect(a.allowedEquipment == [.dumbbell, .bodyOnly])
+        #expect(a.equipmentDescription.contains("Dumbbell"))
+        #expect(a.equipmentDescription.contains("Bodyweight"))
+    }
+}
+
+@MainActor
+struct EquipmentRestrictionTests {
+    private let catalog = ExerciseCatalog(bundle: .main)
+
+    @Test func candidatesOnlyUseSelectedEquipment() {
+        var a = QuizAnswers()
+        a.equipmentTypes = [.machine, .bodyOnly]
+        let cands = PlanGenerator(catalog: catalog)
+            .candidates(forMuscles: [.chest, .quadriceps], answers: a, limit: 14)
+        #expect(!cands.isEmpty)
+        for ex in cands {
+            if let eq = ex.equipment { #expect(eq == .machine || eq == .bodyOnly) }
+        }
+    }
+
+    @Test func deterministicPlanOnlyUsesSelectedEquipment() {
+        var a = QuizAnswers()
+        a.equipmentTypes = [.dumbbell, .bodyOnly]
+        let plan = PlanGenerator(catalog: catalog).generate(a)
+        for workout in plan.workouts {
+            for item in workout.items {
+                if let eq = catalog.exercise(id: item.exId)?.equipment {
+                    #expect(eq == .dumbbell || eq == .bodyOnly)
+                }
+            }
+        }
+    }
 }

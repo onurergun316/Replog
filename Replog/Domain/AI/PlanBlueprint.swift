@@ -2,26 +2,28 @@
 //  PlanBlueprint.swift
 //  Replog
 //
-//  The structured output Apple Intelligence produces for a training plan. The model
-//  decides the *programming* (split, per-day muscle focus, volume, rep/RPE schemes) and
-//  the rationale; the deterministic `PlanResolver` then maps each day's muscle targets
-//  onto real catalog exercises so images/refs are always valid (the "hybrid" approach).
+//  Structured output types for Apple Intelligence plan generation. Generation happens in
+//  two stages so the model genuinely drives the plan and can justify every choice:
 //
-//  `@Generable` makes these types usable with FoundationModels guided generation. They
-//  are plain value types otherwise, so the resolver, report composer, and unit tests use
-//  them without any model at runtime.
+//   1. PlanFraming — the model designs the split: per-day muscle focus, volume, rep/RPE
+//      scheme, plus the report's overall sections (philosophy, why-this-split, science…).
+//   2. DaySelection — for each day, the model picks SPECIFIC exercises (by candidate number)
+//      from a list of real catalog exercises and gives a reason for each.
+//
+//  `@Generable` makes these usable with FoundationModels guided generation. They are plain
+//  value types otherwise, so the resolver, report composer, and tests use them with no model.
 //
 
 import Foundation
 import FoundationModels
 
-/// One training day as decided by the model.
+/// One training day's programming, as designed by the model (no exercises yet).
 @Generable
-struct WorkoutBlueprint: Equatable, Sendable {
+struct DayFraming: Equatable, Sendable {
     @Guide(description: "Name of the training day, e.g. 'Push Day' or 'Upper Body'.")
     var name: String
 
-    @Guide(description: "Primary muscle groups trained this day, lowercase single words like 'chest', 'shoulders', 'triceps', 'quadriceps', 'lats'. 2 to 4 groups.")
+    @Guide(description: "This day's 2-4 primary muscle groups, lowercase single words like 'chest', 'shoulders', 'triceps', 'quadriceps', 'lats'.")
     var targetMuscles: [String]
 
     @Guide(description: "How many exercises this day should contain, between 3 and 6.")
@@ -35,14 +37,11 @@ struct WorkoutBlueprint: Equatable, Sendable {
 
     @Guide(description: "Number of working sets per exercise, typically 3 or 4.")
     var sets: Int
-
-    @Guide(description: "One or two sentences explaining why this day is grouped this way and which muscles are trained together.")
-    var rationale: String
 }
 
-/// The full plan blueprint plus the coach's report sections.
+/// The overall plan framing + report sections.
 @Generable
-struct PlanBlueprint: Equatable, Sendable {
+struct PlanFraming: Equatable, Sendable {
     @Guide(description: "A short, catchy plan name, e.g. 'Push · Pull · Legs' or 'Upper / Lower'.")
     var planName: String
 
@@ -50,34 +49,60 @@ struct PlanBlueprint: Equatable, Sendable {
     var headline: String
 
     @Guide(description: "The training days in order. Exactly one entry per scheduled training day.")
-    var workouts: [WorkoutBlueprint]
+    var workouts: [DayFraming]
 
-    @Guide(description: "2-3 sentences on the overall training philosophy tailored to this person's goal and level.")
+    @Guide(description: "3-4 sentences on the overall training philosophy, tailored to this person's goal, level, and body.")
     var philosophy: String
 
-    @Guide(description: "2-3 sentences explaining why this particular split/structure was chosen for their schedule, with the science (e.g. weekly frequency, recovery, muscle protein synthesis).")
+    @Guide(description: "3-5 sentences explaining WHY this split and WHY these muscles are paired on the same day, with the science (weekly frequency, recovery, antagonist pairing, muscle protein synthesis).")
     var whyThisSplit: String
 
-    @Guide(description: "2-4 sentences citing the evidence-based principles behind the plan (progressive overload, volume landmarks, rep ranges, RPE autoregulation), written in plain language.")
+    @Guide(description: "3-5 sentences on the evidence-based principles (progressive overload, weekly volume landmarks, rep ranges, RPE autoregulation), in plain language.")
     var scienceNotes: String
 
-    @Guide(description: "1-3 sentences on safety, recovery, and any adaptations made for stated injuries or limitations. If none, give general joint-friendly guidance.")
+    @Guide(description: "2-4 sentences on safety, recovery, and adaptations for any stated injuries or limitations. If none, give joint-friendly guidance.")
     var safetyNotes: String
 
-    @Guide(description: "1-2 warm, encouraging sentences that show you care about this person's health and progress.")
+    @Guide(description: "2-3 warm, encouraging sentences showing genuine care for this person's health and progress.")
     var encouragement: String
+}
+
+/// One exercise the model chose for a day, by candidate number, with its reasoning.
+@Generable
+struct ExercisePick: Equatable, Sendable {
+    @Guide(description: "The number of the chosen exercise from the provided candidate list.")
+    var number: Int
+
+    @Guide(description: "One or two sentences: why you chose this exercise, what it trains, and how it fits this day.")
+    var reason: String
+}
+
+/// The model's exercise selection for a single day.
+@Generable
+struct DaySelection: Equatable, Sendable {
+    @Guide(description: "2-3 sentences on why these exercises are grouped and ordered this way (e.g. compound first, antagonist pairing, fatigue management).")
+    var dayRationale: String
+
+    @Guide(description: "The chosen exercises by candidate number, in the order they should be performed.")
+    var picks: [ExercisePick]
 }
 
 // MARK: - Render-ready report (decoupled from FoundationModels)
 
-/// A per-day rationale entry in the report.
+/// One exercise's explanation in the report.
+struct ExerciseNote: Equatable, Sendable {
+    var name: String
+    var reason: String
+}
+
+/// A training day in the report: its rationale plus a per-exercise breakdown.
 struct PerDayNote: Equatable, Sendable {
     var dayName: String
     var text: String
+    var exercises: [ExerciseNote]
 }
 
-/// A plan report ready to render to markdown. Built either from an AI `PlanBlueprint` or
-/// from the deterministic fallback, so a report always exists.
+/// A plan report ready to render to markdown (from Apple Intelligence or the fallback).
 struct PlanReport: Equatable, Sendable {
     var philosophy: String
     var whyThisSplit: String
@@ -85,24 +110,4 @@ struct PlanReport: Equatable, Sendable {
     var scienceNotes: String
     var safetyNotes: String
     var encouragement: String
-
-    /// Builds a report from an AI blueprint (per-day notes come from each day's rationale).
-    init(blueprint: PlanBlueprint) {
-        philosophy = blueprint.philosophy
-        whyThisSplit = blueprint.whyThisSplit
-        perDay = blueprint.workouts.map { PerDayNote(dayName: $0.name, text: $0.rationale) }
-        scienceNotes = blueprint.scienceNotes
-        safetyNotes = blueprint.safetyNotes
-        encouragement = blueprint.encouragement
-    }
-
-    init(philosophy: String, whyThisSplit: String, perDay: [PerDayNote],
-         scienceNotes: String, safetyNotes: String, encouragement: String) {
-        self.philosophy = philosophy
-        self.whyThisSplit = whyThisSplit
-        self.perDay = perDay
-        self.scienceNotes = scienceNotes
-        self.safetyNotes = safetyNotes
-        self.encouragement = encouragement
-    }
 }

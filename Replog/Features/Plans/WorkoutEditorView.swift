@@ -168,16 +168,18 @@ private struct ExerciseEditRow: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            HStack(spacing: 12) {
-                ExerciseImageView(resourceName: exercise?.imageResourceNames.first, cornerRadius: 10)
-                    .frame(width: 44, height: 44)
-                VStack(alignment: .leading, spacing: 2) {
+            HStack(spacing: 14) {
+                ExerciseImageView(resourceName: exercise?.imageResourceNames.first, cornerRadius: 12)
+                    .frame(width: 48, height: 48)
+                    .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .strokeBorder(Color.border, lineWidth: 1))
+                VStack(alignment: .leading, spacing: 3) {
                     Text(exercise?.name ?? item.exId).font(.rounded(15, .heavy))
                         .foregroundStyle(Color.textPrimary).lineLimit(1)
                     Text("\(item.sets.count) Sets · \(exercise?.primaryMuscles.first?.displayName ?? "—")")
                         .font(.rounded(12, .semibold)).foregroundStyle(Color.text2)
                 }
-                Spacer()
+                Spacer(minLength: 8)
                 iconButton("info.circle", action: onInfo)
                 iconButton("minus", tint: .down, action: onRemove)
             }

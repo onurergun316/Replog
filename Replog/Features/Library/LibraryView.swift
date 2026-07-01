@@ -37,6 +37,7 @@ struct LibraryView: View {
                         }
                         .listRowBackground(Color.bg)
                         .listRowSeparatorTint(Color.border)
+                        .listRowInsets(EdgeInsets(top: 8, leading: 20, bottom: 8, trailing: 16))
                     }
                 }
                 .listStyle(.plain)
@@ -107,17 +108,19 @@ private struct LibraryRow: View {
     let exercise: Exercise
 
     var body: some View {
-        HStack(spacing: 12) {
-            ExerciseImageView(exercise: exercise, cornerRadius: 12)
+        HStack(spacing: 14) {
+            ExerciseImageView(exercise: exercise, cornerRadius: 14)
                 .frame(width: 60, height: 60)
-            VStack(alignment: .leading, spacing: 3) {
+                .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .strokeBorder(Color.border, lineWidth: 1))
+            VStack(alignment: .leading, spacing: 5) {
                 Text(exercise.name).font(.rounded(15, .heavy)).foregroundStyle(Color.textPrimary).lineLimit(1)
                 Text(subtitle).font(.rounded(12, .semibold)).foregroundStyle(Color.text2).lineLimit(1)
                 LevelBadge(level: exercise.level)
             }
-            Spacer()
+            Spacer(minLength: 8)
         }
-        .padding(.vertical, 4)
+        .padding(.vertical, 6)
     }
 
     private var subtitle: String {

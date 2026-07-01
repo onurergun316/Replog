@@ -82,7 +82,7 @@ struct OnboardingFlow: View {
     private var ctaTitle: String {
         switch vm.current {
         case .welcome: return "Get started"
-        case .equipment: return "Build my plan"
+        case .name: return "Build my plan"   // name is the last question before generating
         case .result: return mode == .firstRun ? "Start Replog" : "Use this plan"
         default: return "Continue"
         }
@@ -102,21 +102,22 @@ struct OnboardingFlow: View {
     @ViewBuilder
     private var stepContent: some View {
         switch vm.current {
-        case .welcome:    welcomeStep
-        case .name:       nameStep
-        case .goal:       goalStep
-        case .sport:      sportStep
-        case .experience: experienceStep
-        case .sex:        sexStep
-        case .age:        ageStep
-        case .height:     heightStep
-        case .weight:     weightStep
-        case .days:       daysStep
-        case .time:       timeStep
-        case .injuries:   injuriesStep
-        case .equipment:  equipmentStep
-        case .generating: generatingStep
-        case .result:     resultStep
+        case .welcome:        welcomeStep
+        case .name:           nameStep
+        case .goal:           goalStep
+        case .sport:          sportStep
+        case .experience:     experienceStep
+        case .sex:            sexStep
+        case .age:            ageStep
+        case .height:         heightStep
+        case .weight:         weightStep
+        case .days:           daysStep
+        case .time:           timeStep
+        case .injuries:       injuriesStep
+        case .equipment:      equipmentStep
+        case .equipmentTypes: equipmentTypesStep
+        case .generating:     generatingStep
+        case .result:         resultStep
         }
     }
 
@@ -267,12 +268,39 @@ struct OnboardingFlow: View {
     }
 
     private var equipmentStep: some View {
-        OnboardingStepScaffold(eyebrow: "Equipment", question: "What can you train with?") {
+        OnboardingStepScaffold(eyebrow: "Equipment", question: "Where do you train?") {
             VStack(spacing: 10) {
                 ForEach(EquipmentAccess.allCases) { access in
                     OptionCard(title: access.displayName, isSelected: vm.answers.equipment == access) {
                         vm.answers.equipment = access
+                        // Pre-select the equipment this access level implies; refined next step.
+                        vm.answers.equipmentTypes = access.allowedEquipment
+                            .intersection(Set(Equipment.selectable))
                     }
+                }
+            }
+        }
+    }
+
+    private var equipmentTypesStep: some View {
+        OnboardingStepScaffold(eyebrow: "Equipment", question: "What can you train with?",
+                               caption: "Pick everything you have — your plan will only use these.") {
+            FlowLayout(spacing: 10) {
+                ForEach(Equipment.selectable) { eq in
+                    ChoiceChip(label: eq.displayName, isSelected: vm.answers.equipmentTypes.contains(eq)) {
+                        if vm.answers.equipmentTypes.contains(eq) {
+                            vm.answers.equipmentTypes.remove(eq)
+                        } else {
+                            vm.answers.equipmentTypes.insert(eq)
+                        }
+                    }
+                }
+            }
+            .onAppear {
+                // Seed from the access level if the user hasn't chosen any types yet.
+                if vm.answers.equipmentTypes.isEmpty {
+                    vm.answers.equipmentTypes = vm.answers.equipment.allowedEquipment
+                        .intersection(Set(Equipment.selectable))
                 }
             }
         }

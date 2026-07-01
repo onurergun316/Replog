@@ -64,6 +64,13 @@ enum Injury: String, Codable, CaseIterable, Identifiable, Sendable {
     }
 }
 
+extension Equipment {
+    /// The primary training equipment types offered as onboarding choices (bodyweight last).
+    static let selectable: [Equipment] = [
+        .barbell, .dumbbell, .machine, .cable, .kettlebells, .bands, .ezCurlBar, .bodyOnly
+    ]
+}
+
 enum EquipmentAccess: String, Codable, CaseIterable, Identifiable, Sendable {
     case fullGym, home, bodyweight
     var id: String { rawValue }
@@ -104,6 +111,20 @@ struct QuizAnswers: Equatable, Sendable {
     var minutesPerSession: Int = 45
     var injuries: Set<Injury> = []
     var equipment: EquipmentAccess = .fullGym
+    /// Specific equipment types the user trains with. Empty means "use whatever my access
+    /// level allows"; non-empty restricts the plan to exactly these types.
+    var equipmentTypes: Set<Equipment> = []
+
+    /// The equipment the plan may use — the chosen types, or the access level's default set.
+    var allowedEquipment: Set<Equipment> {
+        equipmentTypes.isEmpty ? equipment.allowedEquipment : equipmentTypes
+    }
+
+    /// Human-readable list of the equipment the plan may use (for the AI prompt & report).
+    var equipmentDescription: String {
+        let names = Equipment.selectable.filter { allowedEquipment.contains($0) }.map(\.displayName)
+        return names.isEmpty ? equipment.displayName : names.joined(separator: ", ")
+    }
 
     /// All muscle regions to avoid, derived from selected injuries.
     var avoidedMuscles: Set<Muscle> {

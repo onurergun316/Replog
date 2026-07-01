@@ -2,8 +2,8 @@
 //  PlanResolverTests.swift
 //  ReplogTests
 //
-//  The AI hybrid resolver: an AI blueprint must map onto REAL catalog exercises with
-//  valid ids, honoring equipment/injury constraints and the blueprint's rep scheme.
+//  The AI per-day resolver: the model's numbered picks must map onto REAL catalog exercises,
+//  carry their reasons, drop invalid/duplicate picks, and fill any shortfall.
 //
 
 import Testing
@@ -14,78 +14,75 @@ import Foundation
 struct PlanResolverTests {
 
     private let catalog = ExerciseCatalog(bundle: .main)
+    private func generator() -> PlanGenerator { PlanGenerator(catalog: catalog) }
 
-    private func resolver() -> PlanResolver {
-        PlanResolver(generator: PlanGenerator(catalog: catalog))
+    @Test func resolvesModelPicksToCatalogExercisesWithReasons() {
+        let candidates = generator().candidates(forMuscles: [.chest, .shoulders, .triceps],
+                                                answers: QuizAnswers(), limit: 14)
+        #expect(candidates.count >= 5)
+        let day = DayFraming(name: "Push", targetMuscles: ["chest", "shoulders", "triceps"],
+                             exerciseCount: 4, reps: 10, rpe: 8, sets: 4)
+        let selection = DaySelection(dayRationale: "Compound first.", picks: [
+            ExercisePick(number: 1, reason: "Main chest press."),
+            ExercisePick(number: 2, reason: "Shoulder work."),
+            ExercisePick(number: 3, reason: "Triceps."),
+            ExercisePick(number: 5, reason: "More volume."),
+        ])
+        let (items, notes) = PlanResolver().resolveDay(day: day, selection: selection, candidates: candidates)
+
+        #expect(items.count == 4)
+        #expect(items[0].exId == candidates[0].id)
+        #expect(items[3].exId == candidates[4].id)
+        #expect(items.allSatisfy { catalog.exercise(id: $0.exId) != nil })
+        #expect(items.allSatisfy { $0.sets.count == 4 && $0.sets.allSatisfy { $0.reps == 10 && $0.rpe == 8 } })
+        #expect(notes.count == 4)
+        #expect(notes[0].reason == "Main chest press.")
     }
 
-    private func sampleBlueprint() -> PlanBlueprint {
-        PlanBlueprint(
-            planName: "Push · Pull · Legs",
-            headline: "Your Hypertrophy Plan",
-            workouts: [
-                WorkoutBlueprint(name: "Push Day", targetMuscles: ["chest", "shoulders", "triceps"],
-                                 exerciseCount: 4, reps: 10, rpe: 8, sets: 4, rationale: "Press synergists together."),
-                WorkoutBlueprint(name: "Pull Day", targetMuscles: ["lats", "biceps"],
-                                 exerciseCount: 3, reps: 12, rpe: 7, sets: 3, rationale: "Pull synergists together."),
-                WorkoutBlueprint(name: "Leg Day", targetMuscles: ["quadriceps", "hamstrings", "glutes"],
-                                 exerciseCount: 5, reps: 8, rpe: 9, sets: 4, rationale: "Lower body."),
-            ],
-            philosophy: "p", whyThisSplit: "w", scienceNotes: "s", safetyNotes: "sf", encouragement: "e"
-        )
+    @Test func invalidAndDuplicatePicksDroppedAndGapsFilled() {
+        let candidates = generator().candidates(forMuscles: [.chest], answers: QuizAnswers(), limit: 14)
+        let day = DayFraming(name: "X", targetMuscles: ["chest"], exerciseCount: 3, reps: 10, rpe: 8, sets: 3)
+        let selection = DaySelection(dayRationale: "", picks: [
+            ExercisePick(number: 999, reason: "out of range"),
+            ExercisePick(number: 1, reason: "valid"),
+            ExercisePick(number: 1, reason: "duplicate"),
+        ])
+        let (items, notes) = PlanResolver().resolveDay(day: day, selection: selection, candidates: candidates)
+
+        #expect(items.count == 3)                       // gap-filled up to the requested count
+        #expect(Set(items.map(\.exId)).count == 3)      // all unique
+        #expect(notes.first?.reason == "valid")
+        #expect(items.allSatisfy { catalog.exercise(id: $0.exId) != nil })
     }
 
-    @Test func resolvesToValidCatalogExercises() {
-        let plan = resolver().resolve(sampleBlueprint(), answers: QuizAnswers())
-        #expect(plan.workouts.count == 3)
-        for workout in plan.workouts {
-            #expect(!workout.items.isEmpty)
-            for item in workout.items {
-                // Every resolved exercise must be a real catalog entry (so images/refs exist).
-                #expect(catalog.exercise(id: item.exId) != nil)
-            }
-        }
+    @Test func emptyReasonFallsBackToDefault() {
+        let candidates = generator().candidates(forMuscles: [.chest], answers: QuizAnswers(), limit: 14)
+        let day = DayFraming(name: "X", targetMuscles: ["chest"], exerciseCount: 3, reps: 10, rpe: 8, sets: 3)
+        let selection = DaySelection(dayRationale: "", picks: [ExercisePick(number: 1, reason: "  ")])
+        let (_, notes) = PlanResolver().resolveDay(day: day, selection: selection, candidates: candidates)
+        #expect(notes.first?.reason == PlanResolver.defaultReason)
     }
 
-    @Test func appliesBlueprintRepScheme() {
-        let plan = resolver().resolve(sampleBlueprint(), answers: QuizAnswers())
-        let push = plan.workouts.first { $0.name == "Push Day" }!
-        let item = push.items.first!
-        #expect(item.sets.count == 4)           // sets from blueprint
-        #expect(item.sets.allSatisfy { $0.reps == 10 })
-        #expect(item.sets.allSatisfy { $0.rpe == 8 })
+    @Test func emptyCandidatesYieldsEmpty() {
+        let day = DayFraming(name: "X", targetMuscles: [], exerciseCount: 3, reps: 10, rpe: 8, sets: 3)
+        let (items, notes) = PlanResolver().resolveDay(
+            day: day, selection: DaySelection(dayRationale: "", picks: []), candidates: [])
+        #expect(items.isEmpty)
+        #expect(notes.isEmpty)
     }
 
-    @Test func weekdaysAreDistinctAcrossWorkouts() {
-        let plan = resolver().resolve(sampleBlueprint(), answers: QuizAnswers())
-        let days = plan.workouts.map(\.day)
-        #expect(Set(days).count == days.count)
+    @Test func candidatesRespectBodyweightEquipment() {
+        var answers = QuizAnswers(); answers.equipment = .bodyweight
+        let cands = generator().candidates(forMuscles: [.chest, .abdominals], answers: answers, limit: 14)
+        #expect(!cands.isEmpty)
+        let allowed = EquipmentAccess.bodyweight.allowedEquipment
+        for ex in cands { if let eq = ex.equipment { #expect(allowed.contains(eq)) } }
     }
 
-    @Test func unrecognizedMusclesFallBackToPriorityAndStillResolve() {
-        var bp = sampleBlueprint()
-        bp.workouts = [WorkoutBlueprint(name: "Mystery", targetMuscles: ["xyz", "qwerty"],
-                                        exerciseCount: 4, reps: 10, rpe: 8, sets: 3, rationale: "?")]
-        let plan = resolver().resolve(bp, answers: QuizAnswers())
-        #expect(plan.workouts.count == 1)
-        #expect(!plan.workouts[0].items.isEmpty) // resolver recovered using priority muscles
-    }
-
-    @Test func bodyweightEquipmentStillProducesAPlan() {
-        var answers = QuizAnswers()
-        answers.equipment = .bodyweight
-        let plan = resolver().resolve(sampleBlueprint(), answers: answers)
-        for workout in plan.workouts {
-            #expect(!workout.items.isEmpty)
-            for item in workout.items { #expect(catalog.exercise(id: item.exId) != nil) }
-        }
-    }
-
-    @Test func clampsOutOfRangeExerciseCount() {
-        var bp = sampleBlueprint()
-        bp.workouts = [WorkoutBlueprint(name: "Push", targetMuscles: ["chest"],
-                                        exerciseCount: 99, reps: 10, rpe: 8, sets: 3, rationale: "x")]
-        let plan = resolver().resolve(bp, answers: QuizAnswers())
-        #expect(plan.workouts[0].items.count <= 6)
+    @Test func candidatesAvoidInjuredRegions() {
+        var answers = QuizAnswers(); answers.injuries = [.knee]
+        let cands = generator().candidates(forMuscles: [.quadriceps, .hamstrings], answers: answers, limit: 14)
+        let avoid: Set<Muscle> = [.quadriceps, .hamstrings, .calves]
+        for ex in cands { #expect(Set(ex.primaryMuscles).isDisjoint(with: avoid)) }
     }
 }

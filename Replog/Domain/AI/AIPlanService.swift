@@ -2,12 +2,17 @@
 //  AIPlanService.swift
 //  Replog
 //
-//  The Apple Intelligence boundary. When the on-device model is available it produces a
-//  structured `PlanBlueprint` via guided generation; `PlanResolver` maps that onto real
-//  catalog exercises and `ReportComposer` renders the saved report. When the model is
-//  unavailable (or errors), it falls back to the deterministic engine + a templated report,
-//  so the app always produces a valid plan + report. The pure fallback is unit-tested
-//  directly; the live model call is a thin, non-deterministic seam verified on-device.
+//  The Apple Intelligence boundary. Generation is genuinely model-driven and two-stage:
+//
+//   1. Framing call — the model designs the split (per-day muscle focus, volume, rep/RPE
+//      scheme) and writes the report's overall sections.
+//   2. Per-day selection calls — for each day the model is given a numbered list of REAL
+//      catalog exercises (filtered to the user's equipment/injuries) and picks specific ones,
+//      justifying each. Picks are validated against the catalog so refs/images stay valid.
+//
+//  A non-zero sampling temperature means the same answers can yield different, equally-valid
+//  plans across sessions — as the user expects from an AI. If the model is unavailable or
+//  errors, it falls back to the deterministic engine (clearly flagged via `usedAppleIntelligence`).
 //
 
 import Foundation
@@ -27,12 +32,14 @@ struct AIPlanService {
     let resolver: PlanResolver
     /// Forces the deterministic path (used by tests so they never invoke the live model).
     let forceFallback: Bool
+    /// Sampling temperature — higher means more run-to-run variety.
+    let temperature: Double
 
-    nonisolated init(catalog: ExerciseCatalog = .shared, forceFallback: Bool = false) {
-        let generator = PlanGenerator(catalog: catalog)
-        self.generator = generator
-        self.resolver = PlanResolver(generator: generator)
+    nonisolated init(catalog: ExerciseCatalog = .shared, forceFallback: Bool = false, temperature: Double = 1.0) {
+        self.generator = PlanGenerator(catalog: catalog)
+        self.resolver = PlanResolver()
         self.forceFallback = forceFallback
+        self.temperature = temperature
     }
 
     /// Whether Apple Intelligence can generate on this device right now.
@@ -47,51 +54,149 @@ struct AIPlanService {
             return Self.fallback(answers: answers, generator: generator)
         }
         do {
-            let session = LanguageModelSession(instructions: Self.instructions)
-            let response = try await session.respond(
-                to: Self.prompt(for: answers),
-                generating: PlanBlueprint.self
-            )
-            let blueprint = response.content
-            let plan = resolver.resolve(blueprint, answers: answers)
-            // Reject a degenerate model result and use the deterministic engine instead.
-            guard !plan.workouts.isEmpty, plan.workouts.allSatisfy({ !$0.items.isEmpty }) else {
-                return Self.fallback(answers: answers, generator: generator)
-            }
-            let report = ReportComposer.markdown(
-                report: PlanReport(blueprint: blueprint), answers: answers, plan: plan)
-            return Result(plan: plan, reportMarkdown: report, usedAppleIntelligence: true)
+            return try await generateWithAI(answers)
         } catch {
             return Self.fallback(answers: answers, generator: generator)
         }
     }
 
-    /// Pure deterministic fallback (no model). Directly unit-tested.
+    // MARK: - Live two-stage generation
+
+    private func generateWithAI(_ answers: QuizAnswers) async throws -> Result {
+        let options = GenerationOptions(temperature: temperature)
+
+        // 1) Framing: the model designs the split + report sections.
+        let framingSession = LanguageModelSession(instructions: Self.framingInstructions)
+        let framing = try await framingSession.respond(
+            to: Self.framingPrompt(for: answers),
+            generating: PlanFraming.self,
+            options: options
+        ).content
+
+        guard !framing.workouts.isEmpty else {
+            return Self.fallback(answers: answers, generator: generator)
+        }
+
+        // 2) Per-day: the model selects + justifies specific real exercises.
+        let weekdays = PlanGenerator.weekdays(count: framing.workouts.count)
+        var workouts: [GeneratedWorkout] = []
+        var reportDays: [PerDayNote] = []
+
+        for (index, day) in framing.workouts.enumerated() {
+            let muscles = day.targetMuscles.compactMap { Muscle.lenient($0) }
+            let candidates = generator.candidates(forMuscles: muscles, answers: answers, limit: 14)
+            guard !candidates.isEmpty else { continue }
+
+            let count = max(3, min(6, day.exerciseCount))
+            let selectionSession = LanguageModelSession(instructions: Self.selectionInstructions)
+            let selection = try await selectionSession.respond(
+                to: Self.selectionPrompt(day: day, candidates: candidates, count: count, answers: answers),
+                generating: DaySelection.self,
+                options: options
+            ).content
+
+            let resolved = resolver.resolveDay(day: day, selection: selection, candidates: candidates)
+            guard !resolved.items.isEmpty else { continue }
+
+            let weekday = index < weekdays.count ? weekdays[index] : Weekday.allCases[index % 7]
+            let name = day.name.trimmingCharacters(in: .whitespaces).isEmpty ? "Day \(index + 1)" : day.name
+            workouts.append(GeneratedWorkout(name: name, day: weekday, items: resolved.items))
+            reportDays.append(PerDayNote(
+                dayName: name,
+                text: selection.dayRationale.trimmingCharacters(in: .whitespacesAndNewlines),
+                exercises: resolved.notes
+            ))
+        }
+
+        guard !workouts.isEmpty else {
+            return Self.fallback(answers: answers, generator: generator)
+        }
+
+        let planName = framing.planName.trimmingCharacters(in: .whitespaces)
+        let headline = framing.headline.trimmingCharacters(in: .whitespaces)
+        let plan = GeneratedPlan(
+            name: planName.isEmpty ? "Your Plan" : planName,
+            colorHex: PlanGenerator.planColor(for: answers.goal),
+            workouts: workouts,
+            headline: headline.isEmpty ? "Your Plan" : headline
+        )
+        let report = PlanReport(
+            philosophy: framing.philosophy,
+            whyThisSplit: framing.whyThisSplit,
+            perDay: reportDays,
+            scienceNotes: framing.scienceNotes,
+            safetyNotes: framing.safetyNotes,
+            encouragement: framing.encouragement
+        )
+        return Result(plan: plan, reportMarkdown: ReportComposer.markdown(report: report, plan: plan),
+                      usedAppleIntelligence: true)
+    }
+
+    // MARK: - Deterministic fallback (no model). Directly unit-tested.
+
     static func fallback(answers: QuizAnswers, generator: PlanGenerator = PlanGenerator()) -> Result {
         let plan = generator.generate(answers)
         let report = ReportComposer.fallbackMarkdown(answers: answers, plan: plan)
         return Result(plan: plan, reportMarkdown: report, usedAppleIntelligence: false)
     }
 
-    // MARK: - Prompt
+    // MARK: - Prompts
 
-    static let instructions = """
-    You are an elite, caring strength & conditioning coach and exercise scientist. You design \
-    safe, evidence-based resistance-training programs tailored to the individual. Ground every \
-    decision in established science — progressive overload, ~10–20 weekly sets per muscle, \
-    training each muscle about twice weekly, appropriate rep ranges and RPE autoregulation, and \
-    adequate recovery. Use warm, plain, encouraging language that shows genuine care for the \
-    person's health and well-being. Always return exactly the requested number of training days, \
-    each with its primary muscle groups, exercise count, and rep/RPE/set scheme.
-    """
+    static let framingInstructions = CoachingKnowledge.grounded("""
+    You are an elite, caring strength & conditioning coach and exercise scientist who designs \
+    safe, evidence-based resistance-training programs tailored to the individual. Use warm, plain, \
+    encouraging language. Design the split and explain your reasoning thoroughly, citing the \
+    principles below in plain words.
+    """)
 
-    static func prompt(for answers: QuizAnswers) -> String {
+    static let selectionInstructions = CoachingKnowledge.grounded("""
+    You are an elite exercise scientist selecting specific exercises for one training day from a \
+    provided list of real, available exercises. Choose the best mix of compound and isolation \
+    movements for the day's muscles and the person's level and equipment. For EACH exercise, \
+    explain in plain language what it trains and why it earns its place in this session. Only \
+    choose from the numbered candidates given.
+    """)
+
+    static func framingPrompt(for answers: QuizAnswers) -> String {
+        """
+        Design a personalized resistance-training plan for this person:
+
+        \(profileLines(answers))
+
+        Produce exactly \(answers.daysPerWeek) training day(s). For each day give a name, its 2-4 \
+        primary muscle groups (lowercase single words), the number of exercises (3-6), and the rep, \
+        RPE, and set scheme. Then write the report sections: philosophy, why this split and why these \
+        muscles are paired together, the science, safety adaptations, and an encouraging note.
+        """
+    }
+
+    static func selectionPrompt(day: DayFraming, candidates: [Exercise], count: Int, answers: QuizAnswers) -> String {
+        let list = candidates.enumerated().map { i, ex in
+            let muscle = ex.primaryMuscles.first?.displayName ?? "—"
+            let equip = ex.equipment?.displayName ?? "Bodyweight"
+            let mech = ex.mechanic?.displayName ?? ""
+            return "\(i + 1). \(ex.name) — \(muscle), \(equip)\(mech.isEmpty ? "" : ", \(mech)")"
+        }.joined(separator: "\n")
+
+        return """
+        Training day: "\(day.name)" focusing on \(day.targetMuscles.joined(separator: ", ")).
+        Person: \(answers.goal.displayName), \(answers.experience.displayName), equipment: \
+        \(answers.equipmentDescription)\(answers.injuries.isEmpty ? "" : ", limitations: \(answers.injuries.map(\.displayName).joined(separator: ", "))").
+
+        Choose exactly \(count) exercises for this day from the candidates below, in the order they \
+        should be performed (compound movements first). Give the candidate number and a clear reason \
+        for each.
+
+        Candidates:
+        \(list)
+        """
+    }
+
+    private static func profileLines(_ answers: QuizAnswers) -> String {
         var lines: [String] = []
         if !answers.fullName.isEmpty { lines.append("Name: \(answers.fullName)") }
         lines.append("Goal: \(answers.goal.displayName)")
-        if answers.goal == .sport, let sport = answers.sport {
-            lines.append("Sport: \(sport.displayName)")
-        }
+        if answers.goal == .sport, let sport = answers.sport { lines.append("Sport: \(sport.displayName)") }
         lines.append("Experience: \(answers.experience.displayName)")
         lines.append("Sex: \(answers.sex.displayName)")
         lines.append("Age: \(answers.age)")
@@ -102,20 +207,8 @@ struct AIPlanService {
         }
         lines.append("Training days per week: \(answers.daysPerWeek)")
         lines.append("Time per session: ~\(answers.minutesPerSession) min")
-        lines.append("Equipment: \(answers.equipment.displayName)")
-        let injuries = answers.injuries.isEmpty
-            ? "none" : answers.injuries.map(\.displayName).joined(separator: ", ")
-        lines.append("Injuries / limitations: \(injuries)")
-
-        return """
-        Design a personalized resistance-training plan for this person:
-
-        \(lines.joined(separator: "\n"))
-
-        Produce exactly \(answers.daysPerWeek) training day(s). For each day give a name, its 2–4 \
-        primary muscle groups (lowercase single words), how many exercises (3–6), and the rep, \
-        RPE, and set scheme. Then write the coach's report sections explaining your reasoning, the \
-        science, safety adaptations for any injuries, and an encouraging note.
-        """
+        lines.append("Equipment available (use ONLY these): \(answers.equipmentDescription)")
+        lines.append("Injuries / limitations: \(answers.injuries.isEmpty ? "none" : answers.injuries.map(\.displayName).joined(separator: ", "))")
+        return lines.joined(separator: "\n")
     }
 }

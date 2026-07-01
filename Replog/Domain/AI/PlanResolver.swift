@@ -2,63 +2,54 @@
 //  PlanResolver.swift
 //  Replog
 //
-//  Turns an AI `PlanBlueprint` into a concrete `GeneratedPlan` of REAL catalog exercises.
-//  The model decides programming (split, per-day muscles, volume, rep/RPE); this resolver
-//  maps each day's muscle targets onto catalog exercises via the deterministic selector,
-//  so every exercise has a valid id and bundled image. Pure & fully unit-testable.
+//  Turns the model's per-day `DaySelection` (picks by candidate number, with reasons) into
+//  concrete `GeneratedItem`s of REAL catalog exercises plus per-exercise report notes.
+//  Invalid/duplicate picks are dropped and any shortfall is filled from the best unused
+//  candidates, so the day is always complete. Pure & fully unit-testable.
 //
 
 import Foundation
 
 struct PlanResolver {
-    let generator: PlanGenerator
 
-    init(generator: PlanGenerator = PlanGenerator()) {
-        self.generator = generator
-    }
+    static let defaultReason = "Chosen to add balanced, effective volume for this day's focus."
 
-    /// Resolves a blueprint into a plan of catalog exercises honoring the user's constraints.
-    func resolve(_ blueprint: PlanBlueprint, answers: QuizAnswers) -> GeneratedPlan {
-        let dayCount = max(1, blueprint.workouts.count)
-        // Normalize to distinct, sensibly spread weekdays regardless of what the model suggested.
-        let days = PlanGenerator.weekdays(count: dayCount)
+    nonisolated init() {}
 
-        var workouts: [GeneratedWorkout] = []
-        for (i, wb) in blueprint.workouts.enumerated() {
-            let muscles = wb.targetMuscles.compactMap { Muscle.lenient($0) }
-            let count = clamp(wb.exerciseCount, 3, 6, default: 4)
+    /// Resolves one day's model selection against its candidate list.
+    func resolveDay(day: DayFraming, selection: DaySelection, candidates: [Exercise])
+        -> (items: [GeneratedItem], notes: [ExerciseNote]) {
+        guard !candidates.isEmpty else { return ([], []) }
+        let count = min(clamp(day.exerciseCount, 3, 6, default: 4), candidates.count)
+        let reps = clamp(day.reps, 1, 30, default: 10)
+        let rpe = clamp(day.rpe, 5, 10, default: 8)
+        let setCount = clamp(day.sets, 1, 6, default: 3)
 
-            // Map this day's muscles to real catalog exercises; fall back to global priority
-            // muscles if the AI's targets yielded nothing under the equipment/injury filters.
-            var items = generator.selectItems(targetMuscles: muscles, count: count, answers: answers)
-            if items.isEmpty {
-                items = generator.selectItems(targetMuscles: [], count: count, answers: answers)
-            }
+        var chosen: [(ex: Exercise, reason: String)] = []
+        var used = Set<Int>()
 
-            // Apply the model's rep/RPE/set scheme, keeping the selector's starting weights.
-            let reps = clamp(wb.reps, 1, 30, default: 10)
-            let rpe = clamp(wb.rpe, 5, 10, default: 8)
-            let setCount = clamp(wb.sets, 1, 6, default: 3)
-            let scheduled = items.map { item -> GeneratedItem in
-                let weight = item.sets.first?.weightKg ?? 0
-                let sets = Array(repeating: GeneratedSet(weightKg: weight, reps: reps, rpe: rpe),
-                                 count: setCount)
-                return GeneratedItem(exId: item.exId, sets: sets)
-            }
-
-            let day = i < days.count ? days[i] : Weekday.allCases[i % Weekday.allCases.count]
-            let name = wb.name.trimmingCharacters(in: .whitespaces).isEmpty ? "Day \(i + 1)" : wb.name
-            workouts.append(GeneratedWorkout(name: name, day: day, items: scheduled))
+        // The model's picks, in order, validated against the candidate list.
+        for pick in selection.picks where chosen.count < count {
+            let idx = pick.number - 1
+            guard candidates.indices.contains(idx), !used.contains(idx) else { continue }
+            used.insert(idx)
+            let reason = pick.reason.trimmingCharacters(in: .whitespacesAndNewlines)
+            chosen.append((candidates[idx], reason.isEmpty ? Self.defaultReason : reason))
+        }
+        // Fill any shortfall from the best unused candidates (deterministic).
+        var ci = 0
+        while chosen.count < count, ci < candidates.count {
+            if !used.contains(ci) { used.insert(ci); chosen.append((candidates[ci], Self.defaultReason)) }
+            ci += 1
         }
 
-        let planName = blueprint.planName.trimmingCharacters(in: .whitespaces)
-        let headline = blueprint.headline.trimmingCharacters(in: .whitespaces)
-        return GeneratedPlan(
-            name: planName.isEmpty ? "Your Plan" : planName,
-            colorHex: PlanGenerator.planColor(for: answers.goal),
-            workouts: workouts,
-            headline: headline.isEmpty ? "Your Plan" : headline
-        )
+        let items = chosen.map { entry -> GeneratedItem in
+            let weight = PlanGenerator.startingWeight(for: entry.ex)
+            let sets = Array(repeating: GeneratedSet(weightKg: weight, reps: reps, rpe: rpe), count: setCount)
+            return GeneratedItem(exId: entry.ex.id, sets: sets)
+        }
+        let notes = chosen.map { ExerciseNote(name: $0.ex.name, reason: $0.reason) }
+        return (items, notes)
     }
 
     private func clamp(_ value: Int, _ lo: Int, _ hi: Int, default def: Int) -> Int {

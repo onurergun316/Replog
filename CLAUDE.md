@@ -7,14 +7,21 @@ SwiftUI, iOS 26.5, on-device only (no backend, no network).
 ## ⚠️ Working agreement (do this every time)
 - **Never commit.** Make changes only; the owner reviews the diff and commits.
 - Work only on the **`development`** branch.
-- Write professional unit tests alongside code; keep the **logic layer ≥70% covered**.
+- Write professional unit tests alongside code; keep the **logic layer ≥80% covered**.
 - The product spec is the source of truth: `../README.md` and `../design_handoff_replog/`
   (per-screen notes + `screenshots/`). The bundled HTML prototype is **reference only**.
 
 ## Locked technical decisions
 - **Persistence: SwiftData** (the spec says "Core Data"; we use its modern successor).
-- **AI planner: a deterministic rule-based engine** (`PlanGenerator`) that picks real catalog
-  exercises from the quiz answers, shown behind a ~1.8 s "Building your plan" spinner. No LLM, no network.
+- **AI planner: on-device Apple Intelligence** (`FoundationModels`), in `Domain/AI/`. Two-stage,
+  genuinely model-driven & non-deterministic (temperature 1.0): a **framing** call designs the split
+  + per-day muscle/volume/rep scheme + report sections, then **per-day** calls pick specific exercises
+  from a numbered list of real catalog candidates (already filtered to the user's equipment/injuries)
+  and justify each. `PlanResolver` validates picks against the catalog (valid refs/images guaranteed);
+  `ReportComposer` renders the saved report. The model is grounded in `CoachingKnowledge` (an
+  evidence-based prompt cheat-sheet — edit it to steer the science). Still **on-device, no network**.
+  `AIPlanService` falls back to the **deterministic `PlanGenerator`** (+ templated report) when the
+  model is unavailable, flagged via `usedAppleIntelligence`. No raw-paper RAG yet (context is ~4k tokens).
 - **Font: SF Rounded** (`.system(design: .rounded)`), no bundled fonts.
 - **Images: HEIC**, ~420 px, q42 — the full Free Exercise DB (1746 photos) ships at ~18 MB.
 
@@ -25,16 +32,26 @@ Plan ──< Workout ──< PlanItem(exId) ──< SetTemplate {weightKg, reps,
 - **Static catalog** (read-only, bundled): `Exercise` + enums in `Catalog/`; 873 exercises loaded
   from `Resources/exercises.json` by `ExerciseCatalog`. User data references exercises by `exId`.
 - **Live logging**: `ActiveSession ──< SessionExercise ──< LoggedSet` (with `done`, `prevWeight/Reps`).
+  `ActiveSession.isOpen` drives pause/continue: closing with "X" sets it false (paused & persisted,
+  resumable from Today); only Finish deletes the session. The active-session cover is bound to the
+  first session where `isOpen`.
+- **Plan report**: each AI-generated `Plan` stores `reportMarkdown` + `headline` (re-readable in Profile).
 - **History**: `HistoryEntry` per exId, appended on Finish (drives Progress + next session's "previous").
-- **Singletons**: `UserProfile` (name, goal, streak, doneDates, onboardingDone), `AppSettings`
-  (units, darkMode, restTimerAuto, restSeconds). Fetch-or-create via `ModelContext` extensions
-  in `Models/ReplogStore.swift`. Relationships cascade-delete.
+- **Singletons**: `UserProfile` (full `name`, goal, `streak` = workout streak, `weekStreak`, doneDates,
+  onboardingDone, totalWorkouts), `AppSettings` (units, darkMode, restTimerAuto, restSeconds).
+  Fetch-or-create via `ModelContext` extensions in `Models/ReplogStore.swift` (incl. `recomputeStreaks`).
+  Relationships cascade-delete.
 
 ## Key formulas (Domain/)
 - Est. 1RM (Epley): `weight * (1 + reps/30)` — `Formulas.e1rm`.
 - Units: store kg; display kg or lb (`kg*2.20462`, lb rounded to nearest 5). Steps: +2.5 kg / +5 lb.
 - Trend arrows: a logged value vs the **same set index last session** → up/down/flat (`TrendCalculator`).
-- Streak: consecutive completed days ending today, with a same-day grace period (`StreakCalendar`).
+- Streaks: **schedule-aware**, two of them (`StreakEngine`, derived from the plans' scheduled weekdays):
+  **workout streak** = consecutive scheduled workouts completed (a scheduled day that ends undone
+  resets it; today's still-due workout gets grace); **week streak** = consecutive "perfect weeks"
+  (every scheduled workout that week done) — a missed workout breaks both. `StreakCalendar` still
+  provides the Today week-strip + completed-day recording. Finish only counts a **fully complete**
+  workout toward streaks/history-day; a partial Finish saves history but warns and doesn't count.
 
 ## Project layout (`Replog/`)
 - `App/` — entry, `RootView` (onboarding vs main + dark mode + active-session cover), `MainTabView`,
@@ -44,9 +61,18 @@ Plan ──< Workout ──< PlanItem(exId) ──< SetTemplate {weightKg, reps,
 - `Catalog/` — `Exercise` + enums (lenient decoding), `ExerciseCatalog`, `ExerciseImageView` (HEIC + cache).
 - `Models/` — SwiftData `@Model` types + `ReplogStore` (schema, containers, singleton helpers).
 - `Domain/` — pure logic: `Formulas`, `PlanGenerator`/`PlanFactory`, `QuizAnswers`, `TrendCalculator`,
-  `ProgressAggregator`, `StreakCalendar`, `Scheduling`, `SessionBuilder`, `SessionFinisher`.
-- `Features/` — `Onboarding`, `Today`, `Plans` (list/detail/editor/picker), `Library`,
-  `ExerciseDetail`, `Progress`, `Profile`, `ActiveSession`.
+  `ProgressAggregator`, `StreakCalendar`, `StreakEngine`, `Scheduling`, `SessionBuilder`, `SessionFinisher`.
+  - `Domain/AI/` — Apple Intelligence: `AIPlanService` (the FoundationModels boundary + fallback),
+    `PlanBlueprint` (`@Generable` framing/selection + report value types), `PlanResolver`
+    (picks → real catalog items), `ReportComposer` (markdown + fallback report), `CoachingKnowledge`
+    (science prompt block). The pure resolver/composer/prompts are fully tested; the live model call
+    is a non-deterministic seam (not unit-tested) — verified on-device.
+- `Features/` — `Onboarding` (quiz incl. name/surname **last**, height, weight, equipment-type
+  multi-select that restricts the plan; real AI "Building your plan" + result/report), `Today`
+  (streaks + Continue), `Plans` (list/detail/editor/picker; native swipe-to-delete), `Library`,
+  `ExerciseDetail`, `Progress`, `Profile` (saved AI Coach Reports via `CoachReportView`), `ActiveSession`.
+- Design: native iOS 26 controls + Liquid Glass + `.sensoryFeedback` haptics, over the warm brand
+  (`DesignSystem/`). New files auto-join the targets (Xcode **synchronized file-system groups**).
 - `Resources/` — `exercises.json` + `ExerciseImages/<id>__<n>.heic` (flat, unique names).
 - `Scripts/build-exercise-db.sh` — one-shot dev tool that compresses the source DB (lives one level
   up at `../../free-exercise-db-main`, not committed) into `Resources/`. Re-run if you re-tune size.

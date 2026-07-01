@@ -2,8 +2,9 @@
 //  AIPlanServiceTests.swift
 //  ReplogTests
 //
-//  The Apple Intelligence boundary's deterministic surfaces: the prompt builder embeds
-//  the user's profile, and the fallback always yields a valid plan + report.
+//  The Apple Intelligence boundary's deterministic surfaces: prompts embed the user's
+//  profile and the real candidate list, instructions are science-grounded, and the fallback
+//  always yields a valid plan + report.
 //
 
 import Testing
@@ -13,27 +14,39 @@ import Foundation
 @MainActor
 struct AIPlanServiceTests {
 
-    @Test func promptEmbedsUserProfile() {
+    @Test func framingPromptEmbedsUserProfile() {
         var a = QuizAnswers()
         a.firstName = "Sam"; a.lastName = "Lee"
         a.goal = .sport; a.sport = .running
         a.heightCm = 178; a.bodyWeightKg = 72
         a.daysPerWeek = 4
         a.injuries = [.knee]
-        let prompt = AIPlanService.prompt(for: a)
+        let prompt = AIPlanService.framingPrompt(for: a)
 
         #expect(prompt.contains("Sam Lee"))
         #expect(prompt.contains("Running"))
         #expect(prompt.contains("178 cm"))
-        #expect(prompt.contains("4"))
-        #expect(prompt.contains("Knee"))
         #expect(prompt.contains("exactly 4"))
+        #expect(prompt.contains("Knee"))
     }
 
-    @Test func promptHandlesNoNameAndNoInjuries() {
-        let prompt = AIPlanService.prompt(for: QuizAnswers())
-        #expect(prompt.contains("Injuries / limitations: none"))
-        #expect(!AIPlanService.instructions.isEmpty)
+    @Test func selectionPromptListsNumberedCandidates() {
+        let g = PlanGenerator(catalog: ExerciseCatalog(bundle: .main))
+        let candidates = g.candidates(forMuscles: [.chest], answers: QuizAnswers(), limit: 6)
+        #expect(candidates.count >= 3)
+        let day = DayFraming(name: "Push", targetMuscles: ["chest"], exerciseCount: 4, reps: 10, rpe: 8, sets: 4)
+        let prompt = AIPlanService.selectionPrompt(day: day, candidates: candidates, count: 4, answers: QuizAnswers())
+
+        #expect(prompt.contains("1. "))
+        #expect(prompt.contains("Choose exactly 4"))
+        #expect(prompt.contains(candidates[0].name))
+    }
+
+    @Test func instructionsAreGroundedInScience() {
+        #expect(AIPlanService.framingInstructions.contains("Volume"))
+        #expect(AIPlanService.framingInstructions.contains("Frequency"))
+        #expect(AIPlanService.selectionInstructions.contains("compound"))
+        #expect(CoachingKnowledge.principles.contains("Progressive overload"))
     }
 
     @Test func fallbackAlwaysProducesValidPlanAndReport() async {
