@@ -223,9 +223,10 @@ struct ActiveWorkoutView: View {
         } else {
             exercise.doneOrder = -1
         }
-        // Auto-start (and renew) the rest timer on *every* set completion, using this
-        // exercise's own rest duration when set, otherwise the app default.
-        if justCompleted && settings.restTimerAuto {
+        // (Re)start the rest timer on every set completion — when auto-start is on, or
+        // whenever a timer is already running (so checking a set resets the active
+        // countdown). Uses this exercise's own rest duration when set, else the app default.
+        if justCompleted && (settings.restTimerAuto || restTimer.isRunning) {
             restTimer.start(seconds: exercise.restSeconds ?? settings.restSeconds)
         }
         try? context.save()

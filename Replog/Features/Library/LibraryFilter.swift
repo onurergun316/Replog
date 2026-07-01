@@ -12,6 +12,19 @@
 import Foundation
 import Observation
 
+/// Whether a muscle selection matches primary movers only, or primary + secondary.
+enum MuscleScope: String, CaseIterable, Sendable {
+    case anyRole    // primary OR secondary
+    case primary    // primary only
+
+    var label: String {
+        switch self {
+        case .anyRole: return "Primary + Secondary"
+        case .primary: return "Primary only"
+        }
+    }
+}
+
 /// The user's active Library filter selection.
 struct LibraryFilter: Equatable, Sendable {
     var levels: Set<Level> = []
@@ -19,8 +32,10 @@ struct LibraryFilter: Equatable, Sendable {
     var forces: Set<Force> = []
     var categories: Set<ExerciseCategory> = []
     var mechanics: Set<Mechanic> = []
-    /// Matches an exercise's primary OR secondary muscles.
+    /// Muscles to match, subject to `muscleScope`.
     var muscles: Set<Muscle> = []
+    /// Whether `muscles` match primary movers only, or primary + secondary.
+    var muscleScope: MuscleScope = .anyRole
 
     var isEmpty: Bool {
         levels.isEmpty && equipment.isEmpty && forces.isEmpty
@@ -49,9 +64,11 @@ struct LibraryFilter: Equatable, Sendable {
             guard let mech = exercise.mechanic, mechanics.contains(mech) else { return false }
         }
         if !muscles.isEmpty {
-            // AND within the muscles facet: the exercise must train EVERY selected muscle
-            // (as a primary or secondary mover), not just any one of them.
-            let worked = Set(exercise.primaryMuscles).union(exercise.secondaryMuscles)
+            // AND within the muscles facet: the exercise must train EVERY selected muscle,
+            // in the role dictated by `muscleScope` (primary-only, or primary+secondary).
+            let worked = muscleScope == .primary
+                ? Set(exercise.primaryMuscles)
+                : Set(exercise.primaryMuscles).union(exercise.secondaryMuscles)
             if !muscles.isSubset(of: worked) { return false }
         }
         return true

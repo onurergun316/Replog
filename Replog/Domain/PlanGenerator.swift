@@ -105,7 +105,9 @@ struct PlanGenerator {
             catalog.exercises(forMuscle: muscle)
                 .filter { ex in
                     guard ex.primaryMuscles.contains(muscle) else { return false }
-                    if let eq = ex.equipment, !allowed.contains(eq) { return false }
+                    // Missing equipment counts as bodyweight, so a machine-only user never
+                    // gets a bodyweight exercise slipped in.
+                    if !allowed.contains(ex.equipment ?? .bodyOnly) { return false }
                     if !avoid.isEmpty, ex.primaryMuscles.contains(where: avoid.contains) { return false }
                     return true
                 }
@@ -185,8 +187,8 @@ struct PlanGenerator {
     ) -> Exercise? {
         let candidates = catalog.exercises(forMuscle: muscle).filter { ex in
             guard !usedIDs.contains(ex.id) else { return false }
-            // Equipment must be permitted (nil equipment = bodyweight, always allowed).
-            if let eq = ex.equipment, !allowedEquipment.contains(eq) { return false }
+            // Equipment must be permitted; missing equipment counts as bodyweight.
+            if !allowedEquipment.contains(ex.equipment ?? .bodyOnly) { return false }
             // Don't load an avoided region as a primary mover.
             if !avoidMuscles.isEmpty, ex.primaryMuscles.contains(where: avoidMuscles.contains) { return false }
             // Must actually target this muscle as primary for a strong stimulus.

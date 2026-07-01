@@ -69,6 +69,17 @@ struct LibraryFilterTests {
         #expect(!f.matches(makeExercise(primary: [.chest], secondary: [.shoulders])))
     }
 
+    @Test func muscleScopePrimaryOnlyIgnoresSecondary() {
+        var f = LibraryFilter()
+        f.muscles = [.triceps]
+        f.muscleScope = .primary
+        #expect(!f.matches(makeExercise(primary: [.chest], secondary: [.triceps])))  // secondary ignored
+        #expect(f.matches(makeExercise(primary: [.triceps], secondary: [])))
+        // Default scope still counts secondary movers.
+        f.muscleScope = .anyRole
+        #expect(f.matches(makeExercise(primary: [.chest], secondary: [.triceps])))
+    }
+
     @Test func muscleFacetIsANDAcrossSelections() {
         var f = LibraryFilter()
         f.muscles = [.chest, .triceps]

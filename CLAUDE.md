@@ -60,8 +60,9 @@ numbered the request.
 - **AI planner: on-device Apple Intelligence** (`FoundationModels`), in `Domain/AI/`. Two-stage,
   genuinely model-driven & non-deterministic (temperature 1.0): a **framing** call designs the split
   + per-day muscle/volume/rep scheme + report sections, then **per-day** calls pick specific exercises
-  from a numbered list of real catalog candidates (already filtered to the user's equipment/injuries)
-  and justify each. `PlanResolver` validates picks against the catalog (valid refs/images guaranteed);
+  from a numbered list of real catalog candidates (already filtered to the user's equipment/injuries —
+  an exercise's **missing equipment counts as bodyweight**, so a machine-only user never gets a
+  bodyweight movement) and justify each. `PlanResolver` validates picks against the catalog;
   `ReportComposer` renders the saved report. The model is grounded in `CoachingKnowledge` (an
   evidence-based prompt cheat-sheet — edit it to steer the science). Still **on-device, no network**.
   `AIPlanService` falls back to the **deterministic `PlanGenerator`** (+ templated report) when the
@@ -92,9 +93,9 @@ Plan ──< Workout ──< PlanItem(exId, restSeconds?) ──< SetTemplate {w
   per-exercise rest; `SessionBuilder` copies plan → session. The default `AppSettings.restSeconds` is
   editable in Profile; the Workout Editor ("Rest for all exercises") and Plan Detail ("whole plan")
   toolbar buttons open `SetRestSheet` — a `NumericStepperField` (matching Profile's Rest duration) that
-  bulk-applies. In the live workout, completing **any** set auto-starts/renews the timer when
-  `restTimerAuto` is on (`RestTimerModel`). Profile Preferences order: Rest duration → auto-start →
-  Units → Dark mode.
+  bulk-applies. In the live workout, completing **any** set (re)starts the timer when `restTimerAuto`
+  is on **or a timer is already running** (so checking a set resets the active countdown) —
+  `RestTimerModel`. Profile Preferences order: Rest duration → auto-start → Units → Dark mode.
 - **Static catalog** (read-only, bundled): `Exercise` + enums in `Catalog/`; 873 exercises loaded
   from `Resources/exercises.json` by `ExerciseCatalog`. User data references exercises by `exId`.
 - **Live logging**: `ActiveSession ──< SessionExercise ──< LoggedSet` (with `done`, `prevWeight/Reps`).
@@ -145,7 +146,8 @@ Plan ──< Workout ──< PlanItem(exId, restSeconds?) ──< SetTemplate {w
   "Add another" cards tap through to the workout; the three stat cards open `StatDetailSheet` history
   sheets), `Plans` (list/detail/editor/picker; native swipe-to-delete), `Library` (search + a
   multi-facet `LibraryFilter`/`LibraryFilterSheet` — level, equipment, force, type, mechanic, muscles;
-  the **muscles facet is AND** (must train every selected muscle), the rest OR-within/AND-across;
+  the **muscles facet is AND** (must train every selected muscle) with a **scope toggle**
+  (`MuscleScope`: primary-only vs primary+secondary), the rest OR-within/AND-across;
   driven by `LibraryViewModel`. Swipe a row **or** "Select" → multi-pick → `AddToWorkoutSheet(exIds:)`
   to add one/many exercises to one/many workouts), `ExerciseDetail` (tag grid = Equipment/Level/Force/
   Type only — **mechanic is a filter, not shown here**; "In your workouts" grouped by plan via pure

@@ -116,4 +116,28 @@ struct EquipmentRestrictionTests {
             }
         }
     }
+
+    @Test func machineOnlyNeverIncludesBodyweight() {
+        // Regression: exercises with missing equipment (shown as "Bodyweight") used to leak
+        // into a machine-only plan.
+        var a = QuizAnswers()
+        a.equipmentTypes = [.machine]
+        let plan = PlanGenerator(catalog: catalog).generate(a)
+        var machineCount = 0
+        for workout in plan.workouts {
+            for item in workout.items {
+                #expect(catalog.exercise(id: item.exId)?.equipment == .machine)  // never nil/bodyweight/other
+                machineCount += 1
+            }
+        }
+        #expect(machineCount > 0)   // machine-only still produces a usable plan
+    }
+
+    @Test func machineOnlyCandidatesExcludeMissingEquipment() {
+        var a = QuizAnswers()
+        a.equipmentTypes = [.machine]
+        let cands = PlanGenerator(catalog: catalog)
+            .candidates(forMuscles: [.chest, .quadriceps, .abdominals], answers: a, limit: 20)
+        for ex in cands { #expect(ex.equipment == .machine) }
+    }
 }

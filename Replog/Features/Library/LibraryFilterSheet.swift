@@ -37,11 +37,7 @@ struct LibraryFilterSheet: View {
                             isOn: { model.filter.mechanics.contains($0) },
                             toggle: { model.filter.mechanics.toggleMember($0) },
                             label: { $0.displayName })
-                    section("Muscles Worked", Muscle.allCases,
-                            caption: "Shows exercises that train every selected muscle (primary or secondary).",
-                            isOn: { model.filter.muscles.contains($0) },
-                            toggle: { model.filter.muscles.toggleMember($0) },
-                            label: { $0.displayName })
+                    musclesSection
                 }
                 .padding(20)
             }
@@ -72,6 +68,29 @@ struct LibraryFilterSheet: View {
             }
         }
         .presentationDetents([.medium, .large])
+    }
+
+    // MARK: Muscles (with a primary-only / primary+secondary scope)
+
+    private var musclesSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            SectionHeader(title: "Muscles Worked")
+            SegmentedToggle(options: [(MuscleScope.anyRole, MuscleScope.anyRole.label),
+                                      (MuscleScope.primary, MuscleScope.primary.label)],
+                            selection: $model.filter.muscleScope)
+            Text(model.filter.muscleScope == .primary
+                 ? "Matches exercises whose primary movers include every selected muscle."
+                 : "Matches exercises that train every selected muscle, primary or secondary.")
+                .font(.rounded(12, .semibold)).foregroundStyle(Color.text3)
+                .fixedSize(horizontal: false, vertical: true)
+            FlowLayout(spacing: 8) {
+                ForEach(Muscle.allCases) { muscle in
+                    FilterChip(label: muscle.displayName, isSelected: model.filter.muscles.contains(muscle)) {
+                        model.filter.muscles.toggleMember(muscle)
+                    }
+                }
+            }
+        }
     }
 
     // MARK: Facet section
