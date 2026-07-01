@@ -13,7 +13,11 @@ struct PlanDetailView: View {
     @Environment(\.modelContext) private var context
     @Environment(\.dismiss) private var dismiss
     @Environment(\.exerciseCatalog) private var catalog
+    @Query private var settingsList: [AppSettings]
     @Bindable var plan: Plan
+    @State private var showRestSheet = false
+
+    private var defaultRest: Int { (settingsList.first ?? context.appSettings()).restSeconds }
 
     var body: some View {
         List {
@@ -68,18 +72,14 @@ struct PlanDetailView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
-                Menu {
-                    Section("Rest for the whole plan") {
-                        ForEach(WorkoutEditorView.restPresets, id: \.self) { seconds in
-                            Button(WorkoutEditorView.restLabel(seconds)) { applyRestToPlan(seconds) }
-                        }
-                        Button("Use app default") { applyRestToPlan(nil) }
-                    }
-                } label: {
-                    Image(systemName: "ellipsis.circle").font(.system(size: 17, weight: .semibold))
+                Button { showRestSheet = true } label: {
+                    Image(systemName: "timer").font(.system(size: 16, weight: .semibold))
                         .foregroundStyle(Color.text2)
                 }
             }
+        }
+        .sheet(isPresented: $showRestSheet) {
+            SetRestSheet(title: "Rest for whole plan", initialSeconds: defaultRest) { applyRestToPlan($0) }
         }
     }
 

@@ -18,6 +18,7 @@ struct WorkoutEditorView: View {
 
     @State private var expandedItemID: UUID?
     @State private var showPicker = false
+    @State private var showRestSheet = false
     @State private var detailRef: ExerciseRef?
 
     private var defaultRest: Int { (settingsList.first ?? context.appSettings()).restSeconds }
@@ -77,10 +78,13 @@ struct WorkoutEditorView: View {
         .background(Color.bg.ignoresSafeArea())
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
-            ToolbarItem(placement: .topBarLeading) { restForAllMenu }
+            ToolbarItem(placement: .topBarLeading) { restForAllButton }
             ToolbarItem(placement: .topBarTrailing) {
                 Button("Done") { dismiss() }.font(.rounded(15, .heavy)).foregroundStyle(Color.accent)
             }
+        }
+        .sheet(isPresented: $showRestSheet) {
+            SetRestSheet(title: "Rest for all exercises", initialSeconds: defaultRest) { applyRestToAll($0) }
         }
         .sheet(isPresented: $showPicker) {
             AddExercisePicker(existingIDs: Set(workout.items.map(\.exId))) { exId in
@@ -93,26 +97,11 @@ struct WorkoutEditorView: View {
         }
     }
 
-    /// Presets used by the "set rest for all" menus (seconds).
-    static let restPresets = [30, 45, 60, 90, 120, 180]
-
-    private var restForAllMenu: some View {
-        Menu {
-            Section("Rest for all exercises") {
-                ForEach(Self.restPresets, id: \.self) { seconds in
-                    Button(Self.restLabel(seconds)) { applyRestToAll(seconds) }
-                }
-                Button("Use app default") { applyRestToAll(nil) }
-            }
-        } label: {
-            Image(systemName: "ellipsis.circle").font(.system(size: 17, weight: .semibold))
+    private var restForAllButton: some View {
+        Button { showRestSheet = true } label: {
+            Image(systemName: "timer").font(.system(size: 16, weight: .semibold))
                 .foregroundStyle(Color.text2)
         }
-    }
-
-    /// Formats a rest duration like "1:30" for menus/labels.
-    static func restLabel(_ seconds: Int) -> String {
-        seconds >= 60 ? String(format: "%d:%02d", seconds / 60, seconds % 60) : "\(seconds)s"
     }
 
     private func applyRestToAll(_ seconds: Int?) {

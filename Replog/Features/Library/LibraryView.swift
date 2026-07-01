@@ -13,6 +13,9 @@ struct LibraryView: View {
     @State private var model = LibraryViewModel()
     @State private var showFilters = false
     @State private var addRef: ExerciseRef?
+    @State private var selectionMode = false
+    @State private var selected: Set<String> = []
+    @State private var showMultiAdd = false
 
     private var results: [Exercise] { model.results(in: catalog) }
 
@@ -24,6 +27,7 @@ struct LibraryView: View {
             }
             .background(Color.bg.ignoresSafeArea())
             .toolbar(.hidden, for: .navigationBar)
+            .safeAreaInset(edge: .bottom) { multiAddBar }
             .navigationDestination(for: ExerciseRef.self) { ref in
                 ExerciseDetailView(exId: ref.id, showProgress: false)
             }
@@ -31,7 +35,12 @@ struct LibraryView: View {
                 LibraryFilterSheet(model: model, resultCount: results.count)
             }
             .sheet(item: $addRef) { ref in
-                AddToWorkoutSheet(exId: ref.id)
+                AddToWorkoutSheet(exIds: [ref.id])
+            }
+            .sheet(isPresented: $showMultiAdd, onDismiss: {
+                withAnimation(.snappy) { selectionMode = false; selected.removeAll() }
+            }) {
+                AddToWorkoutSheet(exIds: Array(selected))
             }
         }
     }
@@ -40,7 +49,20 @@ struct LibraryView: View {
 
     private var header: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Library").font(.screenTitle).foregroundStyle(Color.textPrimary)
+            HStack(alignment: .firstTextBaseline) {
+                Text("Library").font(.screenTitle).foregroundStyle(Color.textPrimary)
+                Spacer()
+                Button {
+                    withAnimation(.snappy) {
+                        selectionMode.toggle()
+                        if !selectionMode { selected.removeAll() }
+                    }
+                } label: {
+                    Text(selectionMode ? "Cancel" : "Select")
+                        .font(.rounded(15, .heavy)).foregroundStyle(Color.accent)
+                }
+                .buttonStyle(.plain)
+            }
             searchField
             filterBar
             Text(results.count == 1 ? "1 exercise" : "\(results.count) exercises")
@@ -48,6 +70,21 @@ struct LibraryView: View {
                 .foregroundStyle(Color.text3)
         }
         .padding(.horizontal, 20)
+    }
+
+    @ViewBuilder
+    private var multiAddBar: some View {
+        if selectionMode && !selected.isEmpty {
+            Button { showMultiAdd = true } label: {
+                Text("Add \(selected.count) to workout")
+                    .font(.rounded(16, .heavy)).foregroundStyle(.white)
+                    .frame(maxWidth: .infinity).padding(.vertical, 15)
+                    .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(Color.accent))
+            }
+            .buttonStyle(.plain)
+            .padding(.horizontal, 20).padding(.vertical, 10)
+            .background(.ultraThinMaterial)
+        }
     }
 
     private var searchField: some View {
@@ -97,23 +134,45 @@ struct LibraryView: View {
     private var list: some View {
         List {
             ForEach(results) { ex in
-                NavigationLink(value: ExerciseRef(id: ex.id)) {
-                    LibraryRow(exercise: ex)
-                }
-                .listRowBackground(Color.bg)
-                .listRowSeparatorTint(Color.border.opacity(0.6))
-                .alignmentGuide(.listRowSeparatorLeading) { d in d[.leading] + 86 }  // inset past the thumbnail
-                .listRowInsets(EdgeInsets(top: 8, leading: 20, bottom: 8, trailing: 20))
-                .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-                    Button { addRef = ExerciseRef(id: ex.id) } label: {
-                        Label("Add", systemImage: "plus")
+                row(ex)
+                    .listRowBackground(Color.bg)
+                    .listRowSeparatorTint(Color.border.opacity(0.6))
+                    .alignmentGuide(.listRowSeparatorLeading) { d in d[.leading] + (selectionMode ? 118 : 86) }
+                    .listRowInsets(EdgeInsets(top: 8, leading: 20, bottom: 8, trailing: 20))
+                    .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                        if !selectionMode {
+                            Button { addRef = ExerciseRef(id: ex.id) } label: {
+                                Label("Add", systemImage: "plus")
+                            }
+                            .tint(.accent)
+                        }
                     }
-                    .tint(.accent)
-                }
             }
         }
         .listStyle(.plain)
         .scrollDismissesKeyboard(.immediately)
+    }
+
+    @ViewBuilder
+    private func row(_ ex: Exercise) -> some View {
+        if selectionMode {
+            Button {
+                if selected.contains(ex.id) { selected.remove(ex.id) } else { selected.insert(ex.id) }
+            } label: {
+                HStack(spacing: 12) {
+                    Image(systemName: selected.contains(ex.id) ? "checkmark.circle.fill" : "circle")
+                        .font(.system(size: 22))
+                        .foregroundStyle(selected.contains(ex.id) ? Color.accent : Color.text3)
+                        .contentTransition(.symbolEffect(.replace))
+                    LibraryRow(exercise: ex)
+                }
+            }
+            .buttonStyle(.plain)
+        } else {
+            NavigationLink(value: ExerciseRef(id: ex.id)) {
+                LibraryRow(exercise: ex)
+            }
+        }
     }
 }
 

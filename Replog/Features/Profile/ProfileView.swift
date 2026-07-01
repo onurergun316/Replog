@@ -132,17 +132,17 @@ struct ProfileView: View {
         VStack(alignment: .leading, spacing: 12) {
             SectionHeader(title: "Preferences")
             VStack(spacing: 0) {
-                unitsRow
-                Divider().padding(.leading, 14)
-                toggleRow(icon: "moon.fill", title: "Dark mode",
-                          isOn: Binding(get: { settings.darkMode },
-                                        set: { settings.darkMode = $0; save() }))
+                restDurationRow
                 Divider().padding(.leading, 14)
                 toggleRow(icon: "timer", title: "Rest timer auto-start",
                           isOn: Binding(get: { settings.restTimerAuto },
                                         set: { settings.restTimerAuto = $0; save() }))
                 Divider().padding(.leading, 14)
-                restDurationRow
+                unitsRow
+                Divider().padding(.leading, 14)
+                toggleRow(icon: "moon.fill", title: "Dark mode",
+                          isOn: Binding(get: { settings.darkMode },
+                                        set: { settings.darkMode = $0; save() }))
             }
             .cardSurface()
         }

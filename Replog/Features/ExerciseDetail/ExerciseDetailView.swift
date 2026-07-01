@@ -18,13 +18,13 @@ struct ExerciseDetailView: View {
     let exId: String
     var showProgress: Bool = false
 
-    @State private var tab: DetailTab = .guide
+    @State private var tab: DetailTab = .progress
     @State private var showAddToWorkout = false
 
     enum DetailTab: Hashable { case guide, progress }
 
     private var exercise: Exercise? { catalog.exercise(id: exId) }
-    private var inWorkouts: [Workout] { WorkoutMembership.workouts(containing: exId, in: plans) }
+    private var membership: [PlanWorkouts] { WorkoutMembership.grouped(containing: exId, in: plans) }
 
     var body: some View {
         ScrollView {
@@ -34,7 +34,7 @@ struct ExerciseDetailView: View {
                     Text(exercise.name).font(.rounded(24, .black)).foregroundStyle(Color.textPrimary)
 
                     if showProgress {
-                        SegmentedToggle(options: [(DetailTab.guide, "Guide"), (.progress, "Progress")],
+                        SegmentedToggle(options: [(DetailTab.progress, "Progress"), (.guide, "Guide")],
                                         selection: $tab)
                     }
 
@@ -53,7 +53,7 @@ struct ExerciseDetailView: View {
         .background(Color.bg.ignoresSafeArea())
         .navigationBarTitleDisplayMode(.inline)
         .sheet(isPresented: $showAddToWorkout) {
-            AddToWorkoutSheet(exId: exId)
+            AddToWorkoutSheet(exIds: [exId])
         }
     }
 
@@ -62,19 +62,28 @@ struct ExerciseDetailView: View {
     @ViewBuilder
     private var addToWorkoutSection: some View {
         if !plans.isEmpty {
-            VStack(alignment: .leading, spacing: 10) {
-                if !inWorkouts.isEmpty {
+            VStack(alignment: .leading, spacing: 12) {
+                if !membership.isEmpty {
                     SectionHeader(title: "In Your Workouts")
-                    FlowLayout(spacing: 8) {
-                        ForEach(inWorkouts) { workout in
-                            Pill(text: workout.name, style: .accentSoft)
+                    VStack(alignment: .leading, spacing: 10) {
+                        ForEach(membership) { group in
+                            VStack(alignment: .leading, spacing: 6) {
+                                Text(group.plan.name)
+                                    .font(.rounded(11, .heavy)).textCase(.uppercase).tracking(0.8)
+                                    .foregroundStyle(Color.text3).lineLimit(1)
+                                FlowLayout(spacing: 8) {
+                                    ForEach(group.workouts) { workout in
+                                        Pill(text: workout.name, style: .accentSoft)
+                                    }
+                                }
+                            }
                         }
                     }
                 }
                 Button { showAddToWorkout = true } label: {
                     HStack(spacing: 8) {
                         Image(systemName: "plus.circle.fill")
-                        Text(inWorkouts.isEmpty ? "Add to workout" : "Add to another workout")
+                        Text(membership.isEmpty ? "Add to workout" : "Add to another workout")
                     }
                     .font(.rounded(16, .heavy)).foregroundStyle(.white)
                     .frame(maxWidth: .infinity).padding(.vertical, 14)
@@ -146,7 +155,6 @@ private struct GuideContent: View {
             tag("Level", exercise.level.displayName)
             tag("Force", exercise.force?.displayName ?? "—")
             tag("Type", exercise.category.displayName)
-            tag("Mechanic", exercise.mechanic?.displayName ?? "—")
         }
     }
 

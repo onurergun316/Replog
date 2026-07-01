@@ -34,6 +34,23 @@ struct WorkoutMembershipTests {
         #expect(!WorkoutMembership.contains("Bench", in: b))
     }
 
+    @Test func groupedByPlanKeepsOnlyMatchingPlans() throws {
+        let ctx = makeContext()
+        let p1 = Plan(name: "PPL", order: 0); ctx.insert(p1)
+        let a = Workout(name: "Push", day: .mon, order: 0); a.plan = p1; ctx.insert(a)
+        let b = Workout(name: "Pull", day: .tue, order: 1); b.plan = p1; ctx.insert(b)
+        let p2 = Plan(name: "Empty", order: 1); ctx.insert(p2)
+        let c = Workout(name: "Legs", day: .wed, order: 0); c.plan = p2; ctx.insert(c)
+        PlanFactory.addExercise("Bench", to: a, into: ctx)
+        PlanFactory.addExercise("Bench", to: b, into: ctx)   // p1 has it twice
+        try ctx.save()
+
+        let groups = WorkoutMembership.grouped(containing: "Bench", in: [p1, p2])
+        #expect(groups.count == 1)                            // p2 excluded (no match)
+        #expect(groups.first?.plan.name == "PPL")
+        #expect(groups.first?.workouts.map(\.name) == ["Push", "Pull"])
+    }
+
     @Test func noneWhenExerciseIsAbsent() throws {
         let ctx = makeContext()
         let (plan, _, _) = seedPlan(ctx)

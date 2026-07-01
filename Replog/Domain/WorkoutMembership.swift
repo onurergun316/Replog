@@ -9,11 +9,28 @@
 
 import Foundation
 
+/// A plan and the subset of its workouts that contain a given exercise.
+struct PlanWorkouts: Identifiable {
+    let plan: Plan
+    let workouts: [Workout]
+    var id: UUID { plan.id }
+}
+
 enum WorkoutMembership {
     /// Every workout across `plans` whose items include `exId`, in plan/workout order.
     static func workouts(containing exId: String, in plans: [Plan]) -> [Workout] {
         plans.flatMap(\.orderedWorkouts).filter { workout in
             workout.items.contains { $0.exId == exId }
+        }
+    }
+
+    /// Matching workouts grouped by their plan (plan order preserved). Only plans with at
+    /// least one matching workout are returned — so the UI can label each group with its
+    /// plan and disambiguate similarly-named workouts across plans.
+    static func grouped(containing exId: String, in plans: [Plan]) -> [PlanWorkouts] {
+        plans.compactMap { plan in
+            let matching = plan.orderedWorkouts.filter { contains(exId, in: $0) }
+            return matching.isEmpty ? nil : PlanWorkouts(plan: plan, workouts: matching)
         }
     }
 

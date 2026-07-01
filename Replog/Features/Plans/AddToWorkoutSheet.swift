@@ -11,12 +11,15 @@ import SwiftUI
 import SwiftData
 
 struct AddToWorkoutSheet: View {
-    let exId: String
+    let exIds: [String]
     @Environment(\.exerciseCatalog) private var catalog
     @Environment(\.modelContext) private var context
     @Query(sort: \Plan.order) private var plans: [Plan]
 
-    private var exercise: Exercise? { catalog.exercise(id: exId) }
+    /// The single exercise when exactly one is being added (drives the thumbnail header).
+    private var singleExercise: Exercise? {
+        exIds.count == 1 ? catalog.exercise(id: exIds[0]) : nil
+    }
 
     var body: some View {
         NavigationStack {
@@ -41,18 +44,23 @@ struct AddToWorkoutSheet: View {
         .presentationDragIndicator(.visible)
     }
 
-    @ViewBuilder
     private var exerciseHeader: some View {
-        if let ex = exercise {
-            HStack(spacing: 12) {
+        HStack(spacing: 12) {
+            if let ex = singleExercise {
                 ExerciseThumbnail(resourceName: ex.imageResourceNames.first, size: 48, cornerRadius: 12)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(ex.name).font(.cardTitle).foregroundStyle(Color.textPrimary).lineLimit(1)
-                    Text("Tap a workout to add or remove it")
-                        .font(.rounded(12, .semibold)).foregroundStyle(Color.text3)
-                }
-                Spacer(minLength: 8)
+            } else {
+                RoundedRectangle(cornerRadius: 12, style: .continuous).fill(Color.accentSoft)
+                    .frame(width: 48, height: 48)
+                    .overlay(Image(systemName: "square.stack.3d.up.fill")
+                        .font(.system(size: 18, weight: .bold)).foregroundStyle(Color.accent))
             }
+            VStack(alignment: .leading, spacing: 2) {
+                Text(singleExercise?.name ?? "\(exIds.count) exercises")
+                    .font(.cardTitle).foregroundStyle(Color.textPrimary).lineLimit(1)
+                Text("Tap a workout to add or remove")
+                    .font(.rounded(12, .semibold)).foregroundStyle(Color.text3)
+            }
+            Spacer(minLength: 8)
         }
     }
 
@@ -76,7 +84,7 @@ struct AddToWorkoutSheet: View {
     }
 
     private func workoutRow(_ workout: Workout) -> some View {
-        let isIn = WorkoutMembership.contains(exId, in: workout)
+        let allIn = exIds.allSatisfy { WorkoutMembership.contains($0, in: workout) }
         return Button { toggle(workout) } label: {
             HStack(spacing: 12) {
                 Pill(text: workout.day.short, style: .accentSoft)
@@ -86,15 +94,15 @@ struct AddToWorkoutSheet: View {
                         .font(.rounded(12, .semibold)).foregroundStyle(Color.text3)
                 }
                 Spacer(minLength: 8)
-                Image(systemName: isIn ? "checkmark.circle.fill" : "plus.circle")
-                    .font(.system(size: 22)).foregroundStyle(isIn ? Color.up : Color.accent)
+                Image(systemName: allIn ? "checkmark.circle.fill" : "plus.circle")
+                    .font(.system(size: 22)).foregroundStyle(allIn ? Color.up : Color.accent)
                     .contentTransition(.symbolEffect(.replace))
             }
             .padding(14)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .sensoryFeedback(.selection, trigger: isIn)
+        .sensoryFeedback(.selection, trigger: allIn)
     }
 
     private var emptyState: some View {
@@ -109,10 +117,15 @@ struct AddToWorkoutSheet: View {
     }
 
     private func toggle(_ workout: Workout) {
-        if WorkoutMembership.contains(exId, in: workout) {
-            PlanFactory.removeExercise(exId, from: workout, into: context)
+        let allIn = exIds.allSatisfy { WorkoutMembership.contains($0, in: workout) }
+        if allIn {
+            // Every selected exercise is already here → remove them all.
+            exIds.forEach { PlanFactory.removeExercise($0, from: workout, into: context) }
         } else {
-            PlanFactory.addExercise(exId, to: workout, into: context)
+            // Add only the ones that aren't in this workout yet.
+            for id in exIds where !WorkoutMembership.contains(id, in: workout) {
+                PlanFactory.addExercise(id, to: workout, into: context)
+            }
         }
         try? context.save()
     }

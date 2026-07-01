@@ -90,9 +90,11 @@ Plan ──< Workout ──< PlanItem(exId, restSeconds?) ──< SetTemplate {w
 ```
 - **Rest timer**: `PlanItem.restSeconds`/`SessionExercise.restSeconds` (nil = app default) set the
   per-exercise rest; `SessionBuilder` copies plan → session. The default `AppSettings.restSeconds` is
-  editable in Profile; the Workout Editor ("set for all exercises") and Plan Detail ("whole plan")
-  menus bulk-apply. In the live workout, completing **any** set auto-starts/renews the timer when
-  `restTimerAuto` is on (`RestTimerModel`).
+  editable in Profile; the Workout Editor ("Rest for all exercises") and Plan Detail ("whole plan")
+  toolbar buttons open `SetRestSheet` — a `NumericStepperField` (matching Profile's Rest duration) that
+  bulk-applies. In the live workout, completing **any** set auto-starts/renews the timer when
+  `restTimerAuto` is on (`RestTimerModel`). Profile Preferences order: Rest duration → auto-start →
+  Units → Dark mode.
 - **Static catalog** (read-only, bundled): `Exercise` + enums in `Catalog/`; 873 exercises loaded
   from `Resources/exercises.json` by `ExerciseCatalog`. User data references exercises by `exId`.
 - **Live logging**: `ActiveSession ──< SessionExercise ──< LoggedSet` (with `done`, `prevWeight/Reps`).
@@ -144,9 +146,11 @@ Plan ──< Workout ──< PlanItem(exId, restSeconds?) ──< SetTemplate {w
   sheets), `Plans` (list/detail/editor/picker; native swipe-to-delete), `Library` (search + a
   multi-facet `LibraryFilter`/`LibraryFilterSheet` — level, equipment, force, type, mechanic, muscles;
   the **muscles facet is AND** (must train every selected muscle), the rest OR-within/AND-across;
-  driven by `LibraryViewModel`. Swipe a row → `AddToWorkoutSheet` to add the exercise to any workouts),
-  `ExerciseDetail` (shows every JSON facet incl. mechanic; "In your workouts" + "Add to workout" via
-  pure `Domain/WorkoutMembership` + `PlanFactory.add/removeExercise`), `Progress`,
+  driven by `LibraryViewModel`. Swipe a row **or** "Select" → multi-pick → `AddToWorkoutSheet(exIds:)`
+  to add one/many exercises to one/many workouts), `ExerciseDetail` (tag grid = Equipment/Level/Force/
+  Type only — **mechanic is a filter, not shown here**; "In your workouts" grouped by plan via pure
+  `Domain/WorkoutMembership.grouped`; "Add to workout" → `AddToWorkoutSheet`; when opened from Progress
+  it defaults to the **Progress** tab (left)), `Progress`,
   `Profile` (saved AI Coach Reports via `CoachReportView`; the three
   lifetime-stat cards open `StatDetailSheet`), `ActiveSession` (typeable weight/reps via
   `NumericStepperField`; `RestTimerModel`; a native confetti+haptics `CelebrationOverlay` when every
