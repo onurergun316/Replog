@@ -251,7 +251,9 @@ struct PlanGenerator {
     // MARK: Priorities & cosmetics
 
     private func priorityMuscles(_ answers: QuizAnswers) -> [Muscle] {
-        if answers.goal == .sport, let sport = answers.sport {
+        // A known sport biases the plan; "Other"/custom sports have no fixed mapping
+        // (empty priorities) and fall through to the general list below.
+        if answers.goal == .sport, let sport = answers.sport, !sport.priorityMuscles.isEmpty {
             return sport.priorityMuscles
         }
         // General hypertrophy / recomp / fat-loss: big movers first.

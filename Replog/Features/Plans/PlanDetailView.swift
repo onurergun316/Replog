@@ -66,6 +66,28 @@ struct PlanDetailView: View {
         .scrollContentBackground(.hidden)
         .background(Color.bg.ignoresSafeArea())
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Menu {
+                    Section("Rest for the whole plan") {
+                        ForEach(WorkoutEditorView.restPresets, id: \.self) { seconds in
+                            Button(WorkoutEditorView.restLabel(seconds)) { applyRestToPlan(seconds) }
+                        }
+                        Button("Use app default") { applyRestToPlan(nil) }
+                    }
+                } label: {
+                    Image(systemName: "ellipsis.circle").font(.system(size: 17, weight: .semibold))
+                        .foregroundStyle(Color.text2)
+                }
+            }
+        }
+    }
+
+    private func applyRestToPlan(_ seconds: Int?) {
+        for workout in plan.workouts {
+            for item in workout.items { item.restSeconds = seconds }
+        }
+        try? context.save()
     }
 
     private func deleteWorkout(_ workout: Workout) {
@@ -136,17 +158,45 @@ struct WorkoutCard: View {
             Text("\(workout.items.count) exercises · \(workout.setCount) sets")
                 .font(.rounded(13, .semibold)).foregroundStyle(Color.text2)
             if !workout.orderedItems.isEmpty {
-                HStack(spacing: 6) {
-                    ForEach(workout.orderedItems.prefix(4)) { item in
-                        ExerciseImageView(resourceName: catalog.exercise(id: item.exId)?.imageResourceNames.first,
-                                          cornerRadius: 8)
-                            .frame(width: 36, height: 36)
-                    }
-                }
+                ExerciseFilmStrip(items: workout.orderedItems, catalog: catalog)
             }
         }
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
         .cardSurface()
+    }
+}
+
+/// An even "35 mm film strip" of exercise photos: equal-size frames, equal gaps,
+/// filling the card width, with a "+N" tail when the workout has more exercises.
+struct ExerciseFilmStrip: View {
+    let items: [PlanItem]
+    let catalog: ExerciseCatalog
+    var maxFrames: Int = 5
+    var height: CGFloat = 46
+    var cornerRadius: CGFloat = 8
+
+    private var shown: [PlanItem] { Array(items.prefix(maxFrames)) }
+    private var overflow: Int { max(0, items.count - maxFrames) }
+
+    var body: some View {
+        HStack(spacing: 4) {
+            ForEach(Array(shown.enumerated()), id: \.element.id) { idx, item in
+                let isLast = idx == shown.count - 1
+                ExerciseImageView(resourceName: catalog.exercise(id: item.exId)?.imageResourceNames.first,
+                                  cornerRadius: cornerRadius)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: height)
+                    .overlay {
+                        if isLast && overflow > 0 {
+                            ZStack {
+                                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                                    .fill(.black.opacity(0.55))
+                                Text("+\(overflow)").font(.rounded(15, .black)).foregroundStyle(.white)
+                            }
+                        }
+                    }
+            }
+        }
     }
 }

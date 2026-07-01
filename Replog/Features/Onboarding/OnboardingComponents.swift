@@ -11,14 +11,12 @@ import SwiftUI
 struct OptionCard: View {
     let title: String
     var subtitle: String? = nil
-    var emoji: String? = nil
     let isSelected: Bool
     let action: () -> Void
 
     var body: some View {
         Button(action: action) {
             HStack(spacing: 12) {
-                if let emoji { Text(emoji).font(.system(size: 22)) }
                 VStack(alignment: .leading, spacing: 2) {
                     Text(title).font(.rounded(16, .heavy)).foregroundStyle(Color.textPrimary)
                     if let subtitle {

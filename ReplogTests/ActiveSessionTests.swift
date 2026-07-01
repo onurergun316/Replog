@@ -136,6 +136,39 @@ struct ActiveSessionTests {
         #expect(profile.doneDates.isEmpty)               // day not marked complete
     }
 
+    @Test func sessionInheritsPerExerciseRestFromPlan() throws {
+        let ctx = makeContext()
+        let workout = seedWorkout(ctx)
+        let items = workout.orderedItems
+        items[0].restSeconds = 45     // Bench: custom rest
+        items[1].restSeconds = nil    // Press: use app default
+        try ctx.save()
+
+        let session = SessionBuilder.start(workout: workout, into: ctx)
+        let bench = session.orderedExercises.first { $0.exId == "Bench" }!
+        let press = session.orderedExercises.first { $0.exId == "Press" }!
+        #expect(bench.restSeconds == 45)
+        #expect(press.restSeconds == nil)
+    }
+
+    @Test func pausingKeepsSessionResumable() throws {
+        let ctx = makeContext()
+        let workout = seedWorkout(ctx)
+        let session = SessionBuilder.start(workout: workout, into: ctx)
+        session.orderedExercises.first?.orderedSets.first?.done = true
+        try ctx.save()
+
+        // "Save for later" pauses instead of finishing: the session persists (not deleted)
+        // and stays resumable with its progress intact.
+        session.isOpen = false
+        try ctx.save()
+
+        let stored = try ctx.fetch(FetchDescriptor<ActiveSession>())
+        #expect(stored.count == 1)
+        #expect(stored.first?.isOpen == false)
+        #expect(stored.first?.completedSets == 1)
+    }
+
     @Test func finishWithNoCompletedSetsCountsNothing() throws {
         let ctx = makeContext()
         let workout = seedWorkout(ctx)

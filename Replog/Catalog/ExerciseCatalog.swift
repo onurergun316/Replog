@@ -64,6 +64,16 @@ nonisolated final class ExerciseCatalog: Sendable {
         }
     }
 
+    /// Library search/filter: free-text name match AND a structured multi-facet filter.
+    func search(_ query: String, filter: LibraryFilter) -> [Exercise] {
+        let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        return all.filter { ex in
+            guard filter.matches(ex) else { return false }
+            guard !trimmed.isEmpty else { return true }
+            return ex.name.localizedCaseInsensitiveContains(trimmed)
+        }
+    }
+
     // MARK: Loading
 
     private static func load(from bundle: Bundle) -> [Exercise] {

@@ -97,6 +97,18 @@ struct OnboardingViewModelTests {
         #expect(vm.canProceed)
     }
 
+    @Test func otherSportRequiresTypedNameToProceed() {
+        let vm = OnboardingViewModel()
+        vm.answers.goal = .sport
+        while vm.current != .sport { vm.advance() }
+        vm.answers.sport = .other
+        #expect(!vm.canProceed)          // "Other" with no text can't proceed
+        vm.answers.customSport = "  "
+        #expect(!vm.canProceed)          // whitespace doesn't count
+        vm.answers.customSport = "Fencing"
+        #expect(vm.canProceed)
+    }
+
     @Test func backFromExperienceSkipsSportWhenGoalIsNotSport() {
         let vm = OnboardingViewModel()
         vm.answers.goal = .buildMuscle

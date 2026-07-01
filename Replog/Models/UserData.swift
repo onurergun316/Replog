@@ -82,6 +82,8 @@ final class PlanItem {
     /// References `Exercise.id` in the static catalog.
     var exId: String = ""
     var order: Int = 0
+    /// Rest between sets for this exercise, in seconds. `nil` = use the app default.
+    var restSeconds: Int?
     var workout: Workout?
 
     @Relationship(deleteRule: .cascade, inverse: \SetTemplate.item)

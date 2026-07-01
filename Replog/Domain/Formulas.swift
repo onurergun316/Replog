@@ -58,4 +58,20 @@ enum Formulas {
             : String(format: "%.1f", value)
         return includeUnit ? "\(text)\(units.label)" : text
     }
+
+    /// Parses user-typed weight text (entered in `units`) into clamped kilograms.
+    /// Accepts "," or "." decimals; returns nil when the text isn't a number.
+    static func parseWeightKg(_ raw: String, units: Units) -> Double? {
+        let normalized = raw.replacingOccurrences(of: ",", with: ".")
+            .trimmingCharacters(in: .whitespaces)
+        guard let value = Double(normalized) else { return nil }
+        let kg = units == .kg ? value : lbToKg(value)
+        return max(0, kg)
+    }
+
+    /// Parses user-typed reps text into a clamped positive integer (nil if non-numeric).
+    static func parseReps(_ raw: String) -> Int? {
+        guard let value = Int(raw.filter(\.isNumber)) else { return nil }
+        return max(1, value)
+    }
 }

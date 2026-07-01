@@ -11,17 +11,38 @@ import Foundation
 
 struct QuizAnswersTests {
 
-    @Test func fullNameTrimsAndJoins() {
+    @Test func fullNameUsesTrimmedFirstNameOnly() {
         var a = QuizAnswers()
         a.firstName = "  Alex "
-        a.lastName = " Carter "
-        #expect(a.fullName == "Alex Carter")
-
-        a.lastName = ""
         #expect(a.fullName == "Alex")
 
         a.firstName = "   "
         #expect(a.fullName == "")
+    }
+
+    @Test func genderDefaultsToMale() {
+        #expect(QuizAnswers().gender == .male)
+    }
+
+    @Test func sportLabelUsesCustomTextForOther() {
+        var a = QuizAnswers()
+        #expect(a.sportLabel == "")            // no sport selected
+
+        a.sport = .boxing
+        #expect(a.sportLabel == "Boxing")
+
+        a.sport = .other
+        a.customSport = "  Fencing "
+        #expect(a.sportLabel == "Fencing")     // trimmed free text
+
+        a.sport = .running
+        #expect(a.sportLabel == "Running")
+    }
+
+    @Test func otherSportHasNoFixedMuscleBias() {
+        #expect(Sport.other.priorityMuscles.isEmpty)
+        #expect(Sport.boxing.priorityMuscles.contains(.shoulders))
+        #expect(Sport.volleyball.priorityMuscles.contains(.calves))
     }
 
     @Test func bmiAndCategory() {

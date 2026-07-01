@@ -119,6 +119,17 @@ struct PlanGeneratorTests {
         #expect(!workedPrimaries.isDisjoint(with: runningKey))
     }
 
+    @Test func customOtherSportStillGeneratesFullPlan() {
+        var answers = QuizAnswers()
+        answers.goal = .sport
+        answers.sport = .other            // no fixed muscle bias → general fallback
+        answers.customSport = "Fencing"
+        answers.daysPerWeek = 3
+        let plan = generator.generate(answers)
+        #expect(plan.workouts.count == 3)
+        for workout in plan.workouts { #expect(!workout.items.isEmpty) }
+    }
+
     @Test func noDuplicateExercisesWithinAWorkout() {
         var answers = QuizAnswers()
         answers.daysPerWeek = 4

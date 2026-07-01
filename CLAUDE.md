@@ -10,6 +10,50 @@ SwiftUI, iOS 26.5, on-device only (no backend, no network).
 - Write professional unit tests alongside code; keep the **logic layer ≥80% covered**.
 - The product spec is the source of truth: `../README.md` and `../design_handoff_replog/`
   (per-screen notes + `screenshots/`). The bundled HTML prototype is **reference only**.
+- **Build clean** (0 errors / 0 warnings) and run the tests on **iPhone 17** before calling
+  anything done. (The mid-edit "Cannot find type … in scope" SourceKit diagnostics are cross-file
+  indexing noise; trust `xcodebuild`, not the live diagnostics.)
+
+## ⚙️ Delivery standard — the 4-pass method (apply to every numbered task list)
+Whenever the owner hands over a **numbered** list of bugfixes/improvements (1, 2, 3, … n), take each
+item through four internal passes before presenting the work — think of it as one engineer wearing
+four hats, or four teams in sequence:
+1. **Engineer** — implement to senior-iOS standard: clear architecture, performant, idiomatic
+   SwiftUI/SwiftData, matching the surrounding conventions and DesignSystem tokens.
+2. **Reviewer** — re-read the diff as a second iOS engineer: correctness, edge cases, retain cycles,
+   `@MainActor` isolation, SwiftData relationship/save correctness, naming, dead code.
+3. **QA/Testing** — verify behavior: add/update/delete unit tests (meaningful, no filler), build
+   clean, run the suite, and DEBUG-seed launch for anything visual.
+4. **PM** — confirm every numbered requirement is fully satisfied, then hand the diff to the owner as
+   the final reviewer before they commit.
+Keep the build green between items; number your own status back to the owner the same way they
+numbered the request.
+
+## Architecture conventions (senior iOS / SwiftUI)
+- **MVVM where it earns its keep.** Feature UI state + intent + non-trivial logic live in a
+  `@MainActor @Observable` view model (e.g. `LibraryViewModel`, `RestTimerModel`,
+  `OnboardingViewModel`). Views stay declarative.
+- **SwiftData stays in the View.** `@Query` and `@Bindable` model access belong in the View (Apple's
+  guidance); don't smuggle them into view models. Persistence *writes* go through the pure Domain API
+  (`SessionBuilder`, `SessionFinisher`, `PlanFactory`) which view models/views call. Simple derived
+  values over `@Query` results can stay as computed properties on the View — that's idiomatic, not a
+  reason to spin up a VM.
+- **Reuse components, don't re-roll them.** Shared building blocks live in `DesignSystem/`
+  (`NumericStepperField`, `StepperControl`, `Pill`, `FlowLayout`, `SegmentedToggle`, …) and
+  `Catalog/` (`ExerciseThumbnail` for every list thumbnail, `ExerciseImageView` for raw photos).
+- **Responsive & accessible.** Prefer flexible frames / `FlowLayout` / `ViewThatFits` over magic
+  widths; keep SF Rounded fonts Dynamic-Type friendly; respect safe areas. Verify on a small
+  (SE-class) and large (Pro Max) simulator.
+- **Pure logic is testable.** Anything with branching (parsing, filtering, streaks, timers) gets a
+  pure function/type in `Domain/` or a VM, covered by Swift Testing.
+- **Keyboards dismiss everywhere.** Number/decimal pads have no return key, so: scroll containers use
+  `.scrollDismissesKeyboard(.immediately)`, text screens use `.hideKeyboardOnTap()`
+  (`DesignSystem/KeyboardDismiss.swift` — a *simultaneous* tap that never steals button taps), and
+  `NumericStepperField` carries a keyboard-toolbar "Done".
+- **Dismiss-only sheets** rely on the grabber / swipe-down (`.presentationDragIndicator(.visible)`),
+  no "Done" button (e.g. `StatDetailSheet`). Keep "Done"/primary buttons only where they *do* something.
+- **See `ARCHITECTURE.md`** (repo root) for the full architecture, patterns, naming, folder rationale,
+  and ASCII diagrams.
 
 ## Locked technical decisions
 - **Persistence: SwiftData** (the spec says "Core Data"; we use its modern successor).
@@ -24,21 +68,43 @@ SwiftUI, iOS 26.5, on-device only (no backend, no network).
   model is unavailable, flagged via `usedAppleIntelligence`. No raw-paper RAG yet (context is ~4k tokens).
 - **Font: SF Rounded** (`.system(design: .rounded)`), no bundled fonts.
 - **Images: HEIC**, ~420 px, q42 — the full Free Exercise DB (1746 photos) ships at ~18 MB.
+  `ExerciseImageView(contentMode:)` — thumbnails use `.fill` (uniform square crop, via
+  `ExerciseThumbnail`); the ExerciseDetail hero uses `.fit` (whole movement, never cropped) with
+  pinch/double-tap zoom. Plan cards render an even "film strip" (`ExerciseFilmStrip`).
+  **Image layout rule:** `ExerciseImageView` uses `Color.clear.overlay { image }.clipShape(…)` so a
+  `.fill` image is constrained to (and cropped by) its frame. Never wrap a `.fill` image in a bare
+  `ZStack`+frame — it overflows and any border overlay lands on a mismatched, inset rect (the old
+  "white square on the thumbnail" bug). One frame → one clip → one hairline, all on the same rect.
+
+### External data (one level up, not committed)
+The repo lives at `Project-Replog/Replog`. One level up (`../`) sit the source assets:
+`../free-exercise-db-main/` — the raw Free Exercise DB (`exercises/*.json`, images, and
+`schema.json`, the taxonomy source the bundled `Resources/exercises.json` is built from);
+`../README.md` (product spec); `../design_handoff_replog/` (per-screen notes + `screenshots/`).
+The catalog facets (level, equipment, force, category, mechanic, primary/secondary muscles) mirror
+`schema.json` and drive the Library filter.
 
 ## Data model — the "onion"
 ```
-Plan ──< Workout ──< PlanItem(exId) ──< SetTemplate {weightKg, reps, rpe}
+Plan ──< Workout ──< PlanItem(exId, restSeconds?) ──< SetTemplate {weightKg, reps, rpe}
 ```
+- **Rest timer**: `PlanItem.restSeconds`/`SessionExercise.restSeconds` (nil = app default) set the
+  per-exercise rest; `SessionBuilder` copies plan → session. The default `AppSettings.restSeconds` is
+  editable in Profile; the Workout Editor ("set for all exercises") and Plan Detail ("whole plan")
+  menus bulk-apply. In the live workout, completing **any** set auto-starts/renews the timer when
+  `restTimerAuto` is on (`RestTimerModel`).
 - **Static catalog** (read-only, bundled): `Exercise` + enums in `Catalog/`; 873 exercises loaded
   from `Resources/exercises.json` by `ExerciseCatalog`. User data references exercises by `exId`.
 - **Live logging**: `ActiveSession ──< SessionExercise ──< LoggedSet` (with `done`, `prevWeight/Reps`).
   `ActiveSession.isOpen` drives pause/continue: closing with "X" sets it false (paused & persisted,
-  resumable from Today); only Finish deletes the session. The active-session cover is bound to the
-  first session where `isOpen`.
+  resumable from Today); only a real Finish deletes the session. Finishing an **incomplete** workout
+  offers "Save for later" (same pause path → Today shows "Continue") alongside "Finish anyway". The
+  active-session cover is bound to the first session where `isOpen`.
 - **Plan report**: each AI-generated `Plan` stores `reportMarkdown` + `headline` (re-readable in Profile).
 - **History**: `HistoryEntry` per exId, appended on Finish (drives Progress + next session's "previous").
-- **Singletons**: `UserProfile` (full `name`, goal, `streak` = workout streak, `weekStreak`, doneDates,
-  onboardingDone, totalWorkouts), `AppSettings` (units, darkMode, restTimerAuto, restSeconds).
+- **Singletons**: `UserProfile` (`name` = first name only, goal, `streak` = workout streak,
+  `weekStreak`, doneDates, onboardingDone, totalWorkouts), `AppSettings` (units, darkMode,
+  restTimerAuto, `restSeconds` = default rest, editable in Profile).
   Fetch-or-create via `ModelContext` extensions in `Models/ReplogStore.swift` (incl. `recomputeStreaks`).
   Relationships cascade-delete.
 
@@ -57,8 +123,10 @@ Plan ──< Workout ──< PlanItem(exId) ──< SetTemplate {weightKg, reps,
 - `App/` — entry, `RootView` (onboarding vs main + dark mode + active-session cover), `MainTabView`,
   navigation, environment, `DebugSeed` (DEBUG-only launch-env seeding — see below).
 - `DesignSystem/` — color tokens (`Theme`), SF Rounded typography, reusable components
-  (Pill, StepperControl, TrendArrow, SegmentedToggle, WeekStripView, Sparkline, FlowLayout, …).
-- `Catalog/` — `Exercise` + enums (lenient decoding), `ExerciseCatalog`, `ExerciseImageView` (HEIC + cache).
+  (Pill, StepperControl, `NumericStepperField` (typeable +/- field), TrendArrow, SegmentedToggle,
+  WeekStripView, Sparkline, FlowLayout, …).
+- `Catalog/` — `Exercise` + enums (lenient decoding), `ExerciseCatalog` (incl. `search(_:filter:)`),
+  `ExerciseImageView` (HEIC + cache, `contentMode`) + `ExerciseThumbnail` (uniform list thumbnail).
 - `Models/` — SwiftData `@Model` types + `ReplogStore` (schema, containers, singleton helpers).
 - `Domain/` — pure logic: `Formulas`, `PlanGenerator`/`PlanFactory`, `QuizAnswers`, `TrendCalculator`,
   `ProgressAggregator`, `StreakCalendar`, `StreakEngine`, `Scheduling`, `SessionBuilder`, `SessionFinisher`.
@@ -67,10 +135,18 @@ Plan ──< Workout ──< PlanItem(exId) ──< SetTemplate {weightKg, reps,
     (picks → real catalog items), `ReportComposer` (markdown + fallback report), `CoachingKnowledge`
     (science prompt block). The pure resolver/composer/prompts are fully tested; the live model call
     is a non-deterministic seam (not unit-tested) — verified on-device.
-- `Features/` — `Onboarding` (quiz incl. name/surname **last**, height, weight, equipment-type
-  multi-select that restricts the plan; real AI "Building your plan" + result/report), `Today`
-  (streaks + Continue), `Plans` (list/detail/editor/picker; native swipe-to-delete), `Library`,
-  `ExerciseDetail`, `Progress`, `Profile` (saved AI Coach Reports via `CoachReportView`), `ActiveSession`.
+- `Features/` — `Onboarding` (quiz: **first name only, asked last**; `Gender` (default `.male`),
+  goal (no emojis), sport when goal is Sport (running/swimming/football/basketball/cycling/boxing/
+  volleyball/**Other + free-text** `customSport`), height, weight, equipment-type multi-select that
+  restricts the plan; real AI "Building your plan" + result/report — each generated day on the result
+  screen opens a read-only `GeneratedWorkoutPreview`), `Today` (streak flame is an orange SF Symbol;
+  "Add another" cards tap through to the workout; the three stat cards open `StatDetailSheet` history
+  sheets), `Plans` (list/detail/editor/picker; native swipe-to-delete), `Library` (search + quick
+  equipment chips + a multi-facet `LibraryFilter`/`LibraryFilterSheet`, driven by `LibraryViewModel`),
+  `ExerciseDetail`, `Progress`, `Profile` (saved AI Coach Reports via `CoachReportView`; the three
+  lifetime-stat cards open `StatDetailSheet`), `ActiveSession` (typeable weight/reps via
+  `NumericStepperField`; `RestTimerModel`; a native confetti+haptics `CelebrationOverlay` when every
+  set is complete). `StatDetailSheet` reconstructs completed workouts via pure `Domain/WorkoutHistory`.
 - Design: native iOS 26 controls + Liquid Glass + `.sensoryFeedback` haptics, over the warm brand
   (`DesignSystem/`). New files auto-join the targets (Xcode **synchronized file-system groups**).
 - `Resources/` — `exercises.json` + `ExerciseImages/<id>__<n>.heic` (flat, unique names).

@@ -51,9 +51,7 @@ struct ExerciseLogCard: View {
 
     private var header: some View {
         HStack(spacing: 14) {
-            ExerciseImageView(resourceName: imageName, cornerRadius: 12).frame(width: 46, height: 46)
-                .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .strokeBorder(Color.border, lineWidth: 1))
+            ExerciseThumbnail(resourceName: imageName, size: 46, cornerRadius: 12)
             VStack(alignment: .leading, spacing: 3) {
                 Text(name).font(.rounded(15, .heavy)).foregroundStyle(Color.textPrimary).lineLimit(1)
                 Text("\(exercise.sets.count) sets · \(muscle)").font(.rounded(12, .semibold)).foregroundStyle(Color.text2)
@@ -176,11 +174,19 @@ private struct SetLogRow: View {
             HStack(spacing: 16) {
                 editorColumn(title: "WEIGHT (\(units.label))",
                              value: Formulas.formatWeight(kg: set.weightKg, units: units, includeUnit: false),
+                             keyboard: .decimalPad,
                              onMinus: { set.weightKg = max(0, set.weightKg - Formulas.weightStepKg(units: units)); onChange() },
-                             onPlus: { set.weightKg += Formulas.weightStepKg(units: units); onChange() })
+                             onPlus: { set.weightKg += Formulas.weightStepKg(units: units); onChange() },
+                             onCommit: { raw in
+                                 if let kg = Formulas.parseWeightKg(raw, units: units) { set.weightKg = kg; onChange() }
+                             })
                 editorColumn(title: "REPS", value: "\(set.reps)",
+                             keyboard: .numberPad,
                              onMinus: { set.reps = max(1, set.reps - 1); onChange() },
-                             onPlus: { set.reps += 1; onChange() })
+                             onPlus: { set.reps += 1; onChange() },
+                             onCommit: { raw in
+                                 if let reps = Formulas.parseReps(raw) { set.reps = reps; onChange() }
+                             })
             }
             VStack(spacing: 6) {
                 Text("RPE — how hard did it feel?").font(.rounded(11, .bold)).foregroundStyle(Color.text3)
@@ -204,11 +210,13 @@ private struct SetLogRow: View {
         .padding(.top, 6)
     }
 
-    private func editorColumn(title: String, value: String,
-                             onMinus: @escaping () -> Void, onPlus: @escaping () -> Void) -> some View {
+    private func editorColumn(title: String, value: String, keyboard: UIKeyboardType,
+                             onMinus: @escaping () -> Void, onPlus: @escaping () -> Void,
+                             onCommit: @escaping (String) -> Void) -> some View {
         VStack(spacing: 4) {
             Text(title).font(.rounded(10, .heavy)).foregroundStyle(Color.text3)
-            StepperControl(value: value, onMinus: onMinus, onPlus: onPlus)
+            NumericStepperField(display: value, keyboard: keyboard,
+                                onMinus: onMinus, onPlus: onPlus, onCommit: onCommit)
         }
         .frame(maxWidth: .infinity)
     }

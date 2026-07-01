@@ -21,6 +21,7 @@ enum SessionBuilder {
 
         for (exIndex, item) in workout.orderedItems.enumerated() {
             let sessionExercise = SessionExercise(exId: item.exId, order: exIndex)
+            sessionExercise.restSeconds = item.restSeconds
             sessionExercise.session = session
             context.insert(sessionExercise)
 

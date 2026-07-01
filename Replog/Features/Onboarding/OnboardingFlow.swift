@@ -20,8 +20,10 @@ struct OnboardingFlow: View {
     var mode: OnboardingMode = .firstRun
     var onGenerated: ((Plan) -> Void)? = nil
 
+    @Environment(\.exerciseCatalog) private var catalog
     @State private var vm = OnboardingViewModel()
     @State private var showReport = false
+    @State private var previewRef: GeneratedWorkoutRef?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -35,12 +37,17 @@ struct OnboardingFlow: View {
             }
             if vm.showsPrimaryCTA { ctaBar }
         }
+        .scrollDismissesKeyboard(.immediately)
+        .hideKeyboardOnTap()
         .background(Color.bg.ignoresSafeArea())
         .sheet(isPresented: $showReport) {
             NavigationStack {
                 CoachReportView(title: vm.generated?.headline ?? "Your Plan",
                                 markdown: vm.reportMarkdown, showsDoneButton: true)
             }
+        }
+        .sheet(item: $previewRef) { ref in
+            GeneratedWorkoutPreview(workout: ref.workout, catalog: catalog)
         }
     }
 
@@ -107,7 +114,7 @@ struct OnboardingFlow: View {
         case .goal:           goalStep
         case .sport:          sportStep
         case .experience:     experienceStep
-        case .sex:            sexStep
+        case .gender:         genderStep
         case .age:            ageStep
         case .height:         heightStep
         case .weight:         weightStep
@@ -137,15 +144,12 @@ struct OnboardingFlow: View {
     private var nameStep: some View {
         OnboardingStepScaffold(eyebrow: "About you", question: "What's your name?",
                                caption: "We'll personalize your plan and coaching to you.") {
-            VStack(spacing: 12) {
-                nameField("First name", text: $vm.answers.firstName, content: .givenName)
-                nameField("Last name", text: $vm.answers.lastName, content: .familyName)
-            }
+            nameField("First name", text: $vm.answers.firstName, content: .givenName)
         }
     }
 
     private func nameField(_ placeholder: String, text: Binding<String>,
-                           content: UITextContentType) -> some View {
+                           content: UITextContentType?) -> some View {
         TextField(placeholder, text: text)
             .font(.rounded(17, .heavy))
             .textContentType(content)
@@ -178,7 +182,7 @@ struct OnboardingFlow: View {
                                caption: "We'll tailor your plan to this.") {
             VStack(spacing: 10) {
                 ForEach(Goal.allCases) { goal in
-                    OptionCard(title: goal.displayName, subtitle: goalSubtitle(goal), emoji: goalEmoji(goal),
+                    OptionCard(title: goal.displayName, subtitle: goalSubtitle(goal),
                                isSelected: vm.answers.goal == goal) { vm.answers.goal = goal }
                 }
             }
@@ -194,7 +198,12 @@ struct OnboardingFlow: View {
                         vm.answers.sport = sport
                     }
                 }
+                if vm.answers.sport == .other {
+                    nameField("Type your sport", text: $vm.answers.customSport, content: .none)
+                        .transition(.opacity.combined(with: .move(edge: .top)))
+                }
             }
+            .animation(.snappy, value: vm.answers.sport)
         }
     }
 
@@ -210,12 +219,12 @@ struct OnboardingFlow: View {
         }
     }
 
-    private var sexStep: some View {
-        OnboardingStepScaffold(eyebrow: "About you", question: "Sex") {
+    private var genderStep: some View {
+        OnboardingStepScaffold(eyebrow: "About you", question: "Gender") {
             VStack(spacing: 10) {
-                ForEach(Sex.allCases) { sex in
-                    OptionCard(title: sex.displayName, isSelected: vm.answers.sex == sex) {
-                        vm.answers.sex = sex
+                ForEach(Gender.allCases) { gender in
+                    OptionCard(title: gender.displayName, isSelected: vm.answers.gender == gender) {
+                        vm.answers.gender = gender
                     }
                 }
             }
@@ -369,16 +378,23 @@ struct OnboardingFlow: View {
             }
 
             ForEach(Array((vm.generated?.workouts ?? []).enumerated()), id: \.offset) { _, workout in
-                HStack {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(workout.name).font(.cardTitle).foregroundStyle(Color.textPrimary)
-                        Text("\(workout.items.count) exercises · \(workout.items.reduce(0) { $0 + $1.sets.count }) sets")
-                            .font(.rounded(12, .semibold)).foregroundStyle(Color.text2)
+                Button {
+                    previewRef = GeneratedWorkoutRef(workout: workout)
+                } label: {
+                    HStack(spacing: 10) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(workout.name).font(.cardTitle).foregroundStyle(Color.textPrimary)
+                            Text("\(workout.items.count) exercises · \(workout.items.reduce(0) { $0 + $1.sets.count }) sets")
+                                .font(.rounded(12, .semibold)).foregroundStyle(Color.text2)
+                        }
+                        Spacer()
+                        Pill(text: workout.day.short, style: .accentSoft)
+                        Image(systemName: "chevron.right").font(.system(size: 13, weight: .bold))
+                            .foregroundStyle(Color.text3)
                     }
-                    Spacer()
-                    Pill(text: workout.day.short, style: .accentSoft)
+                    .padding(14).cardSurface()
                 }
-                .padding(14).cardSurface()
+                .buttonStyle(.plain)
             }
         }
     }
@@ -402,14 +418,6 @@ struct OnboardingFlow: View {
         else { vm.answers.injuries.insert(injury) }
     }
 
-    private func goalEmoji(_ g: Goal) -> String {
-        switch g {
-        case .buildMuscle: return "💪"
-        case .loseWeight: return "🔥"
-        case .recomp: return "⚖️"
-        case .sport: return "🏃"
-        }
-    }
     private func goalSubtitle(_ g: Goal) -> String {
         switch g {
         case .buildMuscle: return "Hypertrophy & strength"

@@ -11,16 +11,24 @@ import SwiftData
 
 struct ProfileView: View {
     @Environment(\.modelContext) private var context
+    @Environment(\.exerciseCatalog) private var catalog
     @Query private var profiles: [UserProfile]
     @Query private var settingsList: [AppSettings]
     @Query private var plans: [Plan]
     @Query private var history: [HistoryEntry]
     @State private var showResetConfirm = false
+    @State private var selectedStat: StatKind?
 
     private var profile: UserProfile { profiles.first ?? context.userProfile() }
     private var settings: AppSettings { settingsList.first ?? context.appSettings() }
     private var scheduledDays: Set<Weekday> { StreakEngine.scheduledDays(in: plans) }
     private var plansWithReports: [Plan] { plans.filter(\.hasReport) }
+    private var workoutStreak: Int {
+        StreakEngine.workoutStreak(scheduledDays: scheduledDays, doneDates: profile.doneDates)
+    }
+    private var weekStreak: Int {
+        StreakEngine.weekStreak(scheduledDays: scheduledDays, doneDates: profile.doneDates)
+    }
 
     var body: some View {
         NavigationStack {
@@ -35,6 +43,8 @@ struct ProfileView: View {
                 }
                 .padding(20)
             }
+            .scrollDismissesKeyboard(.immediately)
+            .hideKeyboardOnTap()
             .background(Color.bg.ignoresSafeArea())
             .toolbar(.hidden, for: .navigationBar)
             .confirmationDialog("Reset all data?", isPresented: $showResetConfirm, titleVisibility: .visible) {
@@ -42,6 +52,12 @@ struct ProfileView: View {
                 Button("Cancel", role: .cancel) {}
             } message: {
                 Text("This deletes all plans, history, and settings, and restarts onboarding.")
+            }
+            .sheet(item: $selectedStat) { kind in
+                StatDetailSheet(kind: kind, doneDates: profile.doneDates, history: history,
+                                catalog: catalog, scheduledCount: scheduledDays.count,
+                                workoutStreakValue: workoutStreak, weekStreakValue: weekStreak,
+                                totalWorkouts: profile.totalWorkouts)
             }
         }
     }
@@ -65,11 +81,9 @@ struct ProfileView: View {
 
     private var statsRow: some View {
         HStack(spacing: 12) {
-            stat("\(profile.totalWorkouts)", "Workouts")
-            stat("\(StreakEngine.workoutStreak(scheduledDays: scheduledDays, doneDates: profile.doneDates))",
-                 "Workout streak")
-            stat("\(StreakEngine.weekStreak(scheduledDays: scheduledDays, doneDates: profile.doneDates))",
-                 "Week streak")
+            stat("\(profile.totalWorkouts)", "Workouts") { selectedStat = .workouts }
+            stat("\(workoutStreak)", "Workout streak") { selectedStat = .workoutStreak }
+            stat("\(weekStreak)", "Week streak") { selectedStat = .weekStreak }
         }
     }
 
@@ -103,12 +117,15 @@ struct ProfileView: View {
         }
     }
 
-    private func stat(_ value: String, _ label: String) -> some View {
-        VStack(spacing: 2) {
-            Text(value).font(.metric).foregroundStyle(Color.textPrimary).tabularNumbers()
-            Text(label).font(.rounded(12, .bold)).foregroundStyle(Color.text2)
+    private func stat(_ value: String, _ label: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            VStack(spacing: 2) {
+                Text(value).font(.metric).foregroundStyle(Color.textPrimary).tabularNumbers()
+                Text(label).font(.rounded(12, .bold)).foregroundStyle(Color.text2)
+            }
+            .frame(maxWidth: .infinity).padding(.vertical, 16).cardSurface()
         }
-        .frame(maxWidth: .infinity).padding(.vertical, 16).cardSurface()
+        .buttonStyle(.plain)
     }
 
     private var preferences: some View {
@@ -124,9 +141,30 @@ struct ProfileView: View {
                 toggleRow(icon: "timer", title: "Rest timer auto-start",
                           isOn: Binding(get: { settings.restTimerAuto },
                                         set: { settings.restTimerAuto = $0; save() }))
+                Divider().padding(.leading, 14)
+                restDurationRow
             }
             .cardSurface()
         }
+    }
+
+    /// The app-wide default rest between sets (per-exercise overrides win in a workout).
+    private var restDurationRow: some View {
+        HStack(spacing: 12) {
+            icon("clock.arrow.circlepath")
+            Text("Rest duration").font(.rounded(15, .heavy)).foregroundStyle(Color.textPrimary)
+            Spacer()
+            NumericStepperField(display: "\(settings.restSeconds)", keyboard: .numberPad,
+                                onMinus: { settings.restSeconds = max(5, settings.restSeconds - 15); save() },
+                                onPlus: { settings.restSeconds = min(600, settings.restSeconds + 15); save() },
+                                onCommit: {
+                                    if let v = Int($0.filter(\.isNumber)) {
+                                        settings.restSeconds = min(600, max(5, v)); save()
+                                    }
+                                })
+            Text("sec").font(.rounded(11, .bold)).foregroundStyle(Color.text3)
+        }
+        .padding(14)
     }
 
     private var unitsRow: some View {

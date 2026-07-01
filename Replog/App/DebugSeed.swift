@@ -41,7 +41,6 @@ enum DebugSeed {
 
         var answers = QuizAnswers()
         answers.firstName = "Alex"
-        answers.lastName = "Carter"
         answers.daysPerWeek = 3
         let generated = PlanGenerator().generate(answers)
         let report = ReportComposer.fallbackMarkdown(answers: answers, plan: generated)
@@ -60,7 +59,7 @@ enum DebugSeed {
             }
         }
 
-        profile.name = "Alex Carter"
+        profile.name = "Alex"
         profile.streak = 3
         profile.weekStreak = 2
         profile.totalWorkouts = 12
@@ -72,8 +71,11 @@ enum DebugSeed {
         if ProcessInfo.processInfo.environment["REPLOG_ACTIVE"] == "1",
            let workout = plan.orderedWorkouts.first {
             let session = SessionBuilder.start(workout: workout, into: context)
-            // Mark the first exercise's first set done so the "crossing" state is visible.
-            if let firstSet = session.orderedExercises.first?.orderedSets.first {
+            if ProcessInfo.processInfo.environment["REPLOG_COMPLETE"] == "1" {
+                // Mark everything done to preview the completion celebration.
+                session.exercises.forEach { $0.sets.forEach { $0.done = true } }
+            } else if let firstSet = session.orderedExercises.first?.orderedSets.first {
+                // Mark the first exercise's first set done so the "crossing" state is visible.
                 firstSet.done = true
             }
             try? context.save()

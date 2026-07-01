@@ -60,14 +60,34 @@ private struct PhotoCarousel: View {
     var body: some View {
         TabView(selection: $index) {
             ForEach(Array(resourceNames.enumerated()), id: \.offset) { i, name in
-                ExerciseImageView(resourceName: name, cornerRadius: Radius.card)
-                    .tag(i)
+                ZoomablePhoto(resourceName: name).tag(i)
             }
         }
         .tabViewStyle(.page(indexDisplayMode: resourceNames.count > 1 ? .always : .never))
-        .frame(height: 300)
+        .frame(height: 320)
         .background(RoundedRectangle(cornerRadius: Radius.card, style: .continuous).fill(Color.surface2))
         .clipShape(RoundedRectangle(cornerRadius: Radius.card, style: .continuous))
+    }
+}
+
+/// A single photo shown in full (aspect-fit, never cropped) with pinch- and
+/// double-tap-to-zoom for close inspection of the movement.
+private struct ZoomablePhoto: View {
+    let resourceName: String
+    @State private var scale: CGFloat = 1
+    @GestureState private var pinch: CGFloat = 1
+
+    var body: some View {
+        ExerciseImageView(resourceName: resourceName, cornerRadius: Radius.card, contentMode: .fit)
+            .scaleEffect(scale * pinch)
+            .gesture(
+                MagnifyGesture()
+                    .updating($pinch) { value, state, _ in state = value.magnification }
+                    .onEnded { value in scale = min(max(1, scale * value.magnification), 4) }
+            )
+            .onTapGesture(count: 2) {
+                withAnimation(.snappy) { scale = scale > 1 ? 1 : 2 }
+            }
     }
 }
 

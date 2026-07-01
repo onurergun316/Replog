@@ -18,6 +18,7 @@ struct TodayView: View {
     @Query private var activeSessions: [ActiveSession]
 
     @State private var path = NavigationPath()
+    @State private var selectedStat: StatKind?
 
     private var profile: UserProfile { profiles.first ?? context.userProfile() }
 
@@ -87,6 +88,12 @@ struct TodayView: View {
             .background(Color.bg.ignoresSafeArea())
             .toolbar(.hidden, for: .navigationBar)
             .planNavigationDestinations()
+            .sheet(item: $selectedStat) { kind in
+                StatDetailSheet(kind: kind, doneDates: profile.doneDates, history: history,
+                                catalog: catalog, scheduledCount: scheduledDays.count,
+                                workoutStreakValue: streak, weekStreakValue: weekStreak,
+                                totalWorkouts: profile.totalWorkouts)
+            }
         }
     }
 
@@ -100,7 +107,8 @@ struct TodayView: View {
             }
             Spacer()
             HStack(spacing: 5) {
-                Text("🔥").font(.system(size: 16))
+                Image(systemName: "flame.fill").font(.system(size: 15, weight: .bold))
+                    .foregroundStyle(Color.accent)
                 Text("\(streak)").font(.rounded(16, .black)).foregroundStyle(Color.textPrimary)
             }
             .padding(.horizontal, 12).padding(.vertical, 8)
@@ -138,12 +146,15 @@ struct TodayView: View {
 
     // MARK: Stats
 
+    private var thisWeekCount: Int {
+        profile.doneDates.filter { Calendar.current.isDate($0, equalTo: Date(), toGranularity: .weekOfYear) }.count
+    }
+
     private var quickStats: some View {
         HStack(spacing: 12) {
-            StatCard(value: "\(weekStreak)", label: "Week streak")
-            StatCard(value: "\(profile.doneDates.filter { Calendar.current.isDate($0, equalTo: Date(), toGranularity: .weekOfYear) }.count)",
-                     label: "This week")
-            StatCard(value: "\(profile.totalWorkouts)", label: "Workouts")
+            StatCard(value: "\(weekStreak)", label: "Week streak") { selectedStat = .weekStreak }
+            StatCard(value: "\(thisWeekCount)", label: "This week") { selectedStat = .thisWeek }
+            StatCard(value: "\(profile.totalWorkouts)", label: "Workouts") { selectedStat = .workouts }
         }
     }
 
@@ -184,8 +195,7 @@ struct TodayView: View {
             VStack(alignment: .leading, spacing: 8) {
                 SectionHeader(title: "Recent Highlight")
                 HStack(spacing: 12) {
-                    ExerciseImageView(exercise: ex, cornerRadius: 12)
-                        .frame(width: 48, height: 48)
+                    ExerciseThumbnail(exercise: ex, size: 48, cornerRadius: 12)
                     VStack(alignment: .leading, spacing: 2) {
                         Text(ex.name).font(.cardTitle).foregroundStyle(Color.textPrimary)
                         Text("\(best.e1rm) est. 1RM").font(.rounded(13, .bold)).foregroundStyle(Color.accent)
@@ -298,34 +308,45 @@ private struct TodayHeroCard: View {
 
 // MARK: - Other-workout & new cards
 
+/// Tapping the card body opens the workout's detail (editor); the Start button is an
+/// independent tap target overlaid at the bottom.
 private struct OtherWorkoutCard: View {
     let workout: Workout
     var isResuming: Bool = false
     let onStart: () -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 5) {
-                Circle().fill(Color(hex: workout.plan?.colorHex ?? "#FF6A3D")).frame(width: 7, height: 7)
-                Text(workout.day.short).font(.rounded(11, .heavy)).foregroundStyle(Color.text3)
-            }
-            Text(workout.name).font(.cardTitle).foregroundStyle(Color.textPrimary)
-            Text(workout.plan?.name ?? "").font(.rounded(12, .semibold)).foregroundStyle(Color.text3)
-                .lineLimit(1)
-            Spacer(minLength: 4)
-            Button(action: onStart) {
+        NavigationLink(value: workout) {
+            VStack(alignment: .leading, spacing: 8) {
                 HStack(spacing: 5) {
-                    Image(systemName: isResuming ? "arrow.forward.circle.fill" : "play.fill")
-                        .font(.system(size: 10, weight: .black))
-                    Text(isResuming ? "Continue" : "Start now").font(.rounded(13, .heavy))
+                    Circle().fill(Color(hex: workout.plan?.colorHex ?? "#FF6A3D")).frame(width: 7, height: 7)
+                    Text(workout.day.short).font(.rounded(11, .heavy)).foregroundStyle(Color.text3)
                 }
-                .foregroundStyle(Color.accent)
+                Text(workout.name).font(.cardTitle).foregroundStyle(Color.textPrimary)
+                Text(workout.plan?.name ?? "").font(.rounded(12, .semibold)).foregroundStyle(Color.text3)
+                    .lineLimit(1)
+                Spacer(minLength: 4)
+                startLabel.hidden()   // reserves layout space for the overlaid button
             }
-            .buttonStyle(.plain)
+            .padding(14)
+            .frame(width: 150, height: 130, alignment: .topLeading)
+            .cardSurface()
         }
-        .padding(14)
-        .frame(width: 150, height: 130, alignment: .topLeading)
-        .cardSurface()
+        .buttonStyle(.plain)
+        .overlay(alignment: .bottomLeading) {
+            Button(action: onStart) { startLabel }
+                .buttonStyle(.plain)
+                .padding(14)
+        }
+    }
+
+    private var startLabel: some View {
+        HStack(spacing: 5) {
+            Image(systemName: isResuming ? "arrow.forward.circle.fill" : "play.fill")
+                .font(.system(size: 10, weight: .black))
+            Text(isResuming ? "Continue" : "Start now").font(.rounded(13, .heavy))
+        }
+        .foregroundStyle(Color.accent)
     }
 }
 
@@ -351,13 +372,17 @@ private struct NewWorkoutCard: View {
 private struct StatCard: View {
     let value: String
     let label: String
+    let action: () -> Void
     var body: some View {
-        VStack(spacing: 2) {
-            Text(value).font(.metric).foregroundStyle(Color.textPrimary).tabularNumbers()
-            Text(label).font(.rounded(12, .bold)).foregroundStyle(Color.text2)
+        Button(action: action) {
+            VStack(spacing: 2) {
+                Text(value).font(.metric).foregroundStyle(Color.textPrimary).tabularNumbers()
+                Text(label).font(.rounded(12, .bold)).foregroundStyle(Color.text2)
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 16)
+            .cardSurface()
         }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 16)
-        .cardSurface()
+        .buttonStyle(.plain)
     }
 }

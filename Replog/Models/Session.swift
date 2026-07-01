@@ -55,6 +55,9 @@ final class SessionExercise {
     var order: Int = 0
     /// Monotonic counter set when the exercise becomes fully done (drives reorder). -1 = not done.
     var doneOrder: Int = -1
+    /// Rest between sets for this exercise, in seconds. `nil` = use the app default.
+    /// Copied from the plan's `PlanItem.restSeconds` when the session is built.
+    var restSeconds: Int?
     var session: ActiveSession?
 
     @Relationship(deleteRule: .cascade, inverse: \LoggedSet.exercise)

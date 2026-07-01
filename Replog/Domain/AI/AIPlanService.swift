@@ -196,9 +196,9 @@ struct AIPlanService {
         var lines: [String] = []
         if !answers.fullName.isEmpty { lines.append("Name: \(answers.fullName)") }
         lines.append("Goal: \(answers.goal.displayName)")
-        if answers.goal == .sport, let sport = answers.sport { lines.append("Sport: \(sport.displayName)") }
+        if answers.goal == .sport, !answers.sportLabel.isEmpty { lines.append("Sport: \(answers.sportLabel)") }
         lines.append("Experience: \(answers.experience.displayName)")
-        lines.append("Sex: \(answers.sex.displayName)")
+        lines.append("Gender: \(answers.gender.displayName)")
         lines.append("Age: \(answers.age)")
         lines.append("Height: \(answers.heightCm) cm")
         lines.append("Body weight: \(Int(answers.bodyWeightKg)) kg")

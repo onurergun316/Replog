@@ -47,14 +47,15 @@ struct Pill: View {
 struct LevelBadge: View {
     let level: Level
     var body: some View {
-        Text(level.displayName)
-            .font(.rounded(11, .heavy))
-            .textCase(.uppercase)
-            .tracking(0.8)
-            .foregroundStyle(color)
-            .padding(.horizontal, 8)
-            .padding(.vertical, 4)
-            .background(Capsule().fill(color.opacity(0.16)))
+        HStack(spacing: 5) {
+            Circle().fill(color).frame(width: 5, height: 5)
+            Text(level.displayName)
+                .font(.rounded(11, .bold))
+                .foregroundStyle(color)
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 4)
+        .background(Capsule().fill(color.opacity(0.12)))
     }
     private var color: Color {
         switch level {
@@ -123,6 +124,68 @@ struct StepperControl: View {
             stepButton("plus", action: onPlus)
         }
         .sensoryFeedback(.selection, trigger: taps)
+    }
+
+    private func stepButton(_ symbol: String, action: @escaping () -> Void) -> some View {
+        Button { taps += 1; action() } label: {
+            Image(systemName: symbol)
+                .font(.system(size: 13, weight: .black))
+                .foregroundStyle(Color.text2)
+                .frame(width: 34, height: 34)
+                .background(RoundedRectangle(cornerRadius: 10, style: .continuous).fill(Color.surface2))
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+/// A −/+ stepper whose centre value is also directly typeable. The field mirrors the
+/// external `display` value except while focused; on submit/blur it parses the typed
+/// text via `onCommit`. Used for weight/reps entry so users can type or tap.
+struct NumericStepperField: View {
+    let display: String
+    var keyboard: UIKeyboardType = .numberPad
+    let onMinus: () -> Void
+    let onPlus: () -> Void
+    let onCommit: (String) -> Void
+
+    @State private var draft = ""
+    @State private var taps = 0
+    @FocusState private var focused: Bool
+
+    var body: some View {
+        HStack(spacing: 8) {
+            stepButton("minus", action: onMinus)
+            TextField("", text: $draft)
+                .keyboardType(keyboard)
+                .multilineTextAlignment(.center)
+                .font(.rounded(17, .heavy)).tabularNumbers()
+                .foregroundStyle(Color.textPrimary)
+                .frame(minWidth: 52)
+                .focused($focused)
+                .submitLabel(.done)
+                .onSubmit { commit() }
+                .onAppear { draft = display }
+                .onChange(of: display) { _, new in if !focused { draft = new } }
+                .onChange(of: focused) { _, isFocused in if !isFocused { commit() } }
+                .toolbar {
+                    // Number/decimal pads have no return key — give focus a way out.
+                    if focused {
+                        ToolbarItemGroup(placement: .keyboard) {
+                            Spacer()
+                            Button("Done") { focused = false }
+                                .font(.rounded(15, .heavy)).foregroundStyle(Color.accent)
+                        }
+                    }
+                }
+            stepButton("plus", action: onPlus)
+        }
+        .sensoryFeedback(.selection, trigger: taps)
+    }
+
+    private func commit() {
+        onCommit(draft)
+        // Re-sync to canonical formatting (parent may clamp/round the value).
+        draft = display
     }
 
     private func stepButton(_ symbol: String, action: @escaping () -> Void) -> some View {

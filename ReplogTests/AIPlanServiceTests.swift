@@ -16,14 +16,14 @@ struct AIPlanServiceTests {
 
     @Test func framingPromptEmbedsUserProfile() {
         var a = QuizAnswers()
-        a.firstName = "Sam"; a.lastName = "Lee"
+        a.firstName = "Sam"
         a.goal = .sport; a.sport = .running
         a.heightCm = 178; a.bodyWeightKg = 72
         a.daysPerWeek = 4
         a.injuries = [.knee]
         let prompt = AIPlanService.framingPrompt(for: a)
 
-        #expect(prompt.contains("Sam Lee"))
+        #expect(prompt.contains("Name: Sam"))
         #expect(prompt.contains("Running"))
         #expect(prompt.contains("178 cm"))
         #expect(prompt.contains("exactly 4"))

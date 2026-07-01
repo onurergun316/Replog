@@ -19,10 +19,11 @@ struct ActiveWorkoutView: View {
     @Bindable var session: ActiveSession
 
     @State private var expandedSetID: UUID?
-    @State private var restEndDate: Date?
-    @State private var restTotal: Int = 90
+    @State private var restTimer = RestTimerModel()
     @State private var detailRef: ExerciseRef?
     @State private var showFinishConfirm = false
+    @State private var showCelebration = false
+    @State private var didCelebrate = false
 
     private var profile: UserProfile { profiles.first ?? context.userProfile() }
     private var settings: AppSettings { settingsList.first ?? context.appSettings() }
@@ -52,16 +53,46 @@ struct ActiveWorkoutView: View {
                 .padding(16)
                 .animation(.spring(response: 0.5, dampingFraction: 0.8), value: session.orderedExercises.map(\.id))
             }
+            .scrollDismissesKeyboard(.immediately)
         }
+        .hideKeyboardOnTap()
         .background(Color.bg.ignoresSafeArea())
         .sheet(item: $detailRef) { ref in
             NavigationStack { ExerciseDetailView(exId: ref.id, showProgress: true) }
         }
         .confirmationDialog("Finish workout?", isPresented: $showFinishConfirm, titleVisibility: .visible) {
             Button("Finish anyway", role: .destructive) { finish() }
+            Button("Save for later") { close() }
             Button("Keep training", role: .cancel) {}
         } message: {
             Text(finishWarningMessage)
+        }
+        .overlay {
+            if showCelebration {
+                CelebrationOverlay(
+                    sets: session.completedSets,
+                    exercises: session.exercises.count,
+                    onFinish: { showCelebration = false; finish() },
+                    onKeepGoing: { withAnimation(.snappy) { showCelebration = false } }
+                )
+                .transition(.opacity)
+            }
+        }
+        // Auto-celebrate the moment the final set is checked (Duolingo-style).
+        .onChange(of: session.isComplete) { _, complete in
+            if complete && !didCelebrate {
+                didCelebrate = true
+                withAnimation(.snappy) { showCelebration = true }
+            } else if !complete {
+                didCelebrate = false
+            }
+        }
+        .onAppear {
+            // Handles resuming a session that is already fully complete.
+            if session.isComplete && !didCelebrate {
+                didCelebrate = true
+                showCelebration = true
+            }
         }
     }
 
@@ -70,10 +101,11 @@ struct ActiveWorkoutView: View {
         var msg = "You still have \(remaining) set\(remaining == 1 ? "" : "s") to go. "
         if profile.streak > 0 {
             msg += "Finishing now won't count this workout, and you'll lose your "
-                + "\(profile.streak)-workout streak."
+                + "\(profile.streak)-workout streak. "
         } else {
-            msg += "Finishing now won't count this workout toward your streak."
+            msg += "Finishing now won't count this workout toward your streak. "
         }
+        msg += "Save it for later to pick up where you left off."
         return msg
     }
 
@@ -91,7 +123,7 @@ struct ActiveWorkoutView: View {
                     }
                 }
                 Spacer()
-                circleButton("timer") { startRest() }
+                circleButton("timer") { restTimer.start(seconds: settings.restSeconds) }
                 Button { attemptFinish() } label: {
                     Text("Finish").font(.rounded(14, .heavy)).foregroundStyle(.white)
                         .padding(.horizontal, 14).padding(.vertical, 8)
@@ -102,7 +134,7 @@ struct ActiveWorkoutView: View {
 
             progressBar
 
-            if restEndDate != nil { restBar }
+            if restTimer.isRunning { restBar }
         }
         .padding(.horizontal, 16).padding(.top, 8).padding(.bottom, 12)
         .background(Color.surface.ignoresSafeArea(edges: .top))
@@ -126,24 +158,24 @@ struct ActiveWorkoutView: View {
 
     private var restBar: some View {
         TimelineView(.periodic(from: .now, by: 1)) { context in
-            let remaining = max(0, Int((restEndDate ?? context.date).timeIntervalSince(context.date).rounded(.up)))
+            let remaining = restTimer.remaining(at: context.date)
             HStack(spacing: 12) {
                 ZStack {
                     Circle().stroke(Color.accent.opacity(0.25), lineWidth: 3)
-                    Circle().trim(from: 0, to: restTotal > 0 ? CGFloat(remaining) / CGFloat(restTotal) : 0)
+                    Circle().trim(from: 0, to: restTimer.fraction(at: context.date))
                         .stroke(Color.accent, style: StrokeStyle(lineWidth: 3, lineCap: .round))
                         .rotationEffect(.degrees(-90))
                 }
                 .frame(width: 26, height: 26)
                 Text(timeString(remaining)).font(.rounded(15, .heavy)).foregroundStyle(Color.textPrimary).tabularNumbers()
                 Spacer()
-                restButton("−15") { adjustRest(-15) }
-                restButton("+15") { adjustRest(15) }
-                restButton("Skip") { restEndDate = nil }
+                restButton("−15") { restTimer.adjust(-15) }
+                restButton("+15") { restTimer.adjust(15) }
+                restButton("Skip") { restTimer.skip() }
             }
             .padding(.horizontal, 12).padding(.vertical, 8)
             .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(Color.accentSoft))
-            .onChange(of: remaining) { _, new in if new == 0 { restEndDate = nil } }
+            .onChange(of: remaining) { _, new in if new == 0 { restTimer.skip() } }
         }
     }
 
@@ -183,13 +215,18 @@ struct ActiveWorkoutView: View {
 
     private func toggle(_ set: LoggedSet, in exercise: SessionExercise) {
         set.done.toggle()
+        let justCompleted = set.done
         // Maintain doneOrder so finished exercises sort to the bottom in completion order.
         if exercise.isDone {
             let maxOrder = session.exercises.map(\.doneOrder).max() ?? -1
             exercise.doneOrder = maxOrder + 1
-            if settings.restTimerAuto { startRest() }
         } else {
             exercise.doneOrder = -1
+        }
+        // Auto-start (and renew) the rest timer on *every* set completion, using this
+        // exercise's own rest duration when set, otherwise the app default.
+        if justCompleted && settings.restTimerAuto {
+            restTimer.start(seconds: exercise.restSeconds ?? settings.restSeconds)
         }
         try? context.save()
     }
@@ -208,17 +245,6 @@ struct ActiveWorkoutView: View {
         try? context.save()
     }
 
-    private func startRest() {
-        restTotal = settings.restSeconds
-        restEndDate = Date().addingTimeInterval(TimeInterval(settings.restSeconds))
-    }
-
-    private func adjustRest(_ delta: Int) {
-        guard let end = restEndDate else { return }
-        restTotal = max(15, restTotal + delta)
-        restEndDate = end.addingTimeInterval(TimeInterval(delta))
-    }
-
     /// Closes the cover but keeps the session: it's paused & persisted, continuable from Today.
     private func close() {
         session.isOpen = false
@@ -228,7 +254,7 @@ struct ActiveWorkoutView: View {
 
     private func attemptFinish() {
         if session.isComplete {
-            finish()
+            withAnimation(.snappy) { showCelebration = true }
         } else {
             showFinishConfirm = true
         }

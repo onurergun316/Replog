@@ -39,21 +39,30 @@ nonisolated final class ExerciseImageStore: Sendable {
 struct ExerciseImageView: View {
     let resourceName: String?
     var cornerRadius: CGFloat = 0
+    /// `.fill` crops to fill the frame (thumbnails); `.fit` shows the whole photo
+    /// letterboxed (detail hero, so no part of the movement is cropped away).
+    var contentMode: ContentMode = .fill
 
     @State private var image: UIImage?
 
     var body: some View {
-        ZStack {
-            if let image {
-                Image(uiImage: image)
-                    .resizable()
-                    .scaledToFill()
-            } else {
-                placeholder
+        // `Color.clear` establishes the frame the caller proposes; the image is drawn as
+        // an overlay and clipped to that frame. A `.fill` image overflows the overlay but
+        // is cropped by `clipShape` to the exact bounds — so it never bleeds past its
+        // frame (the old ZStack let it overflow, which made border overlays land on a
+        // mismatched, inset rectangle — the "white square" artifact).
+        Color.clear
+            .overlay {
+                if let image {
+                    Image(uiImage: image)
+                        .resizable()
+                        .aspectRatio(contentMode: contentMode)
+                } else {
+                    placeholder
+                }
             }
-        }
-        .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
-        .task(id: resourceName) { await load() }
+            .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+            .task(id: resourceName) { await load() }
     }
 
     private var placeholder: some View {
@@ -83,5 +92,32 @@ struct ExerciseImageView: View {
 extension ExerciseImageView {
     init(exercise: Exercise, cornerRadius: CGFloat = 0) {
         self.init(resourceName: exercise.imageResourceNames.first, cornerRadius: cornerRadius)
+    }
+}
+
+/// A uniform square exercise thumbnail. Used everywhere a small photo appears in a
+/// list or row so every thumbnail is identical in size, corner radius, and border —
+/// fill-cropped to a square regardless of the source photo's orientation.
+struct ExerciseThumbnail: View {
+    let resourceName: String?
+    var size: CGFloat = 52
+    var cornerRadius: CGFloat = 12
+
+    var body: some View {
+        // Frame → fill-cropped image (clipped to the same rounded rect inside
+        // ExerciseImageView) → one hairline on the exact same edge. Everything shares the
+        // frame, so nothing is inset or mismatched.
+        ExerciseImageView(resourceName: resourceName, cornerRadius: cornerRadius, contentMode: .fill)
+            .frame(width: size, height: size)
+            .overlay(
+                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                    .strokeBorder(Color.border.opacity(0.6), lineWidth: 0.5)
+            )
+    }
+}
+
+extension ExerciseThumbnail {
+    init(exercise: Exercise?, size: CGFloat = 52, cornerRadius: CGFloat = 12) {
+        self.init(resourceName: exercise?.imageResourceNames.first, size: size, cornerRadius: cornerRadius)
     }
 }

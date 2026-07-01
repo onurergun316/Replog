@@ -13,7 +13,7 @@ enum Experience: String, Codable, CaseIterable, Identifiable, Sendable {
     var displayName: String { rawValue.capitalized }
 }
 
-enum Sex: String, Codable, CaseIterable, Identifiable, Sendable {
+enum Gender: String, Codable, CaseIterable, Identifiable, Sendable {
     case male, female, preferNotToSay
     var id: String { rawValue }
     var displayName: String {
@@ -26,11 +26,17 @@ enum Sex: String, Codable, CaseIterable, Identifiable, Sendable {
 }
 
 enum Sport: String, Codable, CaseIterable, Identifiable, Sendable {
-    case running, swimming, football, basketball, cycling
+    case running, swimming, football, basketball, cycling, boxing, volleyball, other
     var id: String { rawValue }
-    var displayName: String { rawValue.capitalized }
+    var displayName: String {
+        switch self {
+        case .other: return "Other"
+        default: return rawValue.capitalized
+        }
+    }
 
-    /// Muscles a sport most depends on, highest priority first.
+    /// Muscles a sport most depends on, highest priority first. `.other` has no fixed
+    /// mapping — the plan falls back to general priorities.
     var priorityMuscles: [Muscle] {
         switch self {
         case .running:    return [.quadriceps, .hamstrings, .calves, .glutes, .abdominals]
@@ -38,6 +44,9 @@ enum Sport: String, Codable, CaseIterable, Identifiable, Sendable {
         case .football:   return [.quadriceps, .hamstrings, .glutes, .calves, .abdominals]
         case .basketball: return [.quadriceps, .calves, .glutes, .shoulders, .abdominals]
         case .cycling:    return [.quadriceps, .hamstrings, .glutes, .calves, .abdominals]
+        case .boxing:     return [.shoulders, .lats, .abdominals, .triceps, .calves]
+        case .volleyball: return [.quadriceps, .calves, .shoulders, .glutes, .abdominals]
+        case .other:      return []
         }
     }
 }
@@ -97,11 +106,12 @@ enum EquipmentAccess: String, Codable, CaseIterable, Identifiable, Sendable {
 
 struct QuizAnswers: Equatable, Sendable {
     var firstName: String = ""
-    var lastName: String = ""
     var goal: Goal = .buildMuscle
     var sport: Sport? = nil
+    /// Free-text sport name, used only when `sport == .other`.
+    var customSport: String = ""
     var experience: Experience = .beginner
-    var sex: Sex = .preferNotToSay
+    var gender: Gender = .male
     var age: Int = 28
     /// Body height in centimetres (stored metric; display converts at the edge).
     var heightCm: Int = 175
@@ -131,12 +141,16 @@ struct QuizAnswers: Equatable, Sendable {
         Set(injuries.flatMap(\.avoidMuscles))
     }
 
-    /// Trimmed full name ("First Last"), or empty if no first name given.
+    /// Trimmed first name, or empty if none given. (We only collect a first name.)
     var fullName: String {
-        [firstName, lastName]
-            .map { $0.trimmingCharacters(in: .whitespaces) }
-            .filter { !$0.isEmpty }
-            .joined(separator: " ")
+        firstName.trimmingCharacters(in: .whitespaces)
+    }
+
+    /// Human-facing sport label: the free-text value when "Other", else the enum name.
+    /// Empty when no sport applies.
+    var sportLabel: String {
+        guard let sport else { return "" }
+        return sport == .other ? customSport.trimmingCharacters(in: .whitespaces) : sport.displayName
     }
 
     /// Body-mass index from height & weight, or nil if height is unset.

@@ -49,4 +49,25 @@ struct FormulasTests {
         #expect(Formulas.formatWeight(kg: 2.5, units: .kg) == "2.5kg")
         #expect(Formulas.formatWeight(kg: 60, units: .kg, includeUnit: false) == "60")
     }
+
+    @Test func parseWeightKgAcceptsDecimalsAndConvertsUnits() {
+        #expect(Formulas.parseWeightKg("60", units: .kg) == 60)
+        #expect(Formulas.parseWeightKg("62,5", units: .kg) == 62.5)   // comma decimal
+        #expect(Formulas.parseWeightKg("  70 ", units: .kg) == 70)    // trimmed
+        // In lb, the typed value converts back to kg.
+        #expect(abs((Formulas.parseWeightKg("220", units: .lb) ?? 0) - 99.79) < 0.1)
+    }
+
+    @Test func parseWeightKgClampsAndRejectsGarbage() {
+        #expect(Formulas.parseWeightKg("-10", units: .kg) == 0)       // clamps to ≥ 0
+        #expect(Formulas.parseWeightKg("abc", units: .kg) == nil)
+        #expect(Formulas.parseWeightKg("", units: .kg) == nil)
+    }
+
+    @Test func parseRepsClampsToPositiveInteger() {
+        #expect(Formulas.parseReps("8") == 8)
+        #expect(Formulas.parseReps("0") == 1)      // clamps to ≥ 1
+        #expect(Formulas.parseReps("12reps") == 12) // strips non-digits
+        #expect(Formulas.parseReps("x") == nil)
+    }
 }

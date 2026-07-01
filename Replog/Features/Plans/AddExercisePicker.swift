@@ -63,10 +63,7 @@ struct AddExercisePicker: View {
     private func row(_ ex: Exercise) -> some View {
         let isAdded = existingIDs.contains(ex.id) || added.contains(ex.id)
         return HStack(spacing: 14) {
-            ExerciseImageView(exercise: ex, cornerRadius: 12)
-                .frame(width: 52, height: 52)
-                .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .strokeBorder(Color.border, lineWidth: 1))
+            ExerciseThumbnail(exercise: ex, size: 52, cornerRadius: 12)
             VStack(alignment: .leading, spacing: 4) {
                 Text(ex.name).font(.rounded(15, .heavy)).foregroundStyle(Color.textPrimary).lineLimit(1)
                 Text(subtitle(ex)).font(.rounded(12, .semibold)).foregroundStyle(Color.text2).lineLimit(1)
