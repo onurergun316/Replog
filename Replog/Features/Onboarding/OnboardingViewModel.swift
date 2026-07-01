@@ -24,6 +24,9 @@ enum OnboardingStep: Hashable {
 final class OnboardingViewModel {
     var answers = QuizAnswers()
     var index = 0
+    /// When true, the name step is omitted (the name is already known — e.g. generating
+    /// a second plan from inside the app).
+    var skipName = false
     var generated: GeneratedPlan?
     /// The saved coach report markdown produced alongside the plan.
     var reportMarkdown: String = ""
@@ -40,13 +43,22 @@ final class OnboardingViewModel {
     var steps: [OnboardingStep] {
         var s: [OnboardingStep] = [.welcome, .goal]
         if answers.goal == .sport { s.append(.sport) }
-        // Name & surname are asked last, just before generating.
         s.append(contentsOf: [.experience, .gender, .age, .height, .weight, .days, .time,
-                              .injuries, .equipment, .equipmentTypes, .name, .generating, .result])
+                              .injuries, .equipment, .equipmentTypes])
+        // Name is asked last — but only when we don't already know it.
+        if !skipName { s.append(.name) }
+        s.append(contentsOf: [.generating, .result])
         return s
     }
 
     var current: OnboardingStep { steps[min(index, steps.count - 1)] }
+
+    /// True when advancing from the current step starts plan generation (drives the
+    /// "Build my plan" CTA on whichever step is last before the spinner).
+    var nextIsGenerating: Bool {
+        let next = index + 1
+        return next < steps.count && steps[next] == .generating
+    }
 
     /// Progress 0…1 across the quiz (welcome = first, result = full).
     var progress: Double {

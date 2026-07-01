@@ -74,4 +74,12 @@ enum PlanFactory {
         }
         return item
     }
+
+    /// Removes every occurrence of `exId` from a workout. Returns whether anything was removed.
+    @discardableResult
+    static func removeExercise(_ exId: String, from workout: Workout, into context: ModelContext) -> Bool {
+        let matches = workout.items.filter { $0.exId == exId }
+        matches.forEach { context.delete($0) }
+        return !matches.isEmpty
+    }
 }

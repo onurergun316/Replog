@@ -69,6 +69,16 @@ struct LibraryFilterTests {
         #expect(!f.matches(makeExercise(primary: [.chest], secondary: [.shoulders])))
     }
 
+    @Test func muscleFacetIsANDAcrossSelections() {
+        var f = LibraryFilter()
+        f.muscles = [.chest, .triceps]
+        // Trains BOTH → included.
+        #expect(f.matches(makeExercise(primary: [.chest], secondary: [.triceps])))
+        // Trains only one of the two → excluded (AND, not OR).
+        #expect(!f.matches(makeExercise(primary: [.chest], secondary: [.shoulders])))
+        #expect(!f.matches(makeExercise(primary: [.triceps], secondary: [])))
+    }
+
     @Test func nilEquipmentNeverMatchesAnEquipmentFacet() {
         var f = LibraryFilter()
         f.equipment = [.barbell]

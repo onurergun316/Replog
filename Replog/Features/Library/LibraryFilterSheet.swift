@@ -38,6 +38,7 @@ struct LibraryFilterSheet: View {
                             toggle: { model.filter.mechanics.toggleMember($0) },
                             label: { $0.displayName })
                     section("Muscles Worked", Muscle.allCases,
+                            caption: "Shows exercises that train every selected muscle (primary or secondary).",
                             isOn: { model.filter.muscles.contains($0) },
                             toggle: { model.filter.muscles.toggleMember($0) },
                             label: { $0.displayName })
@@ -77,11 +78,16 @@ struct LibraryFilterSheet: View {
 
     @ViewBuilder
     private func section<T: Identifiable>(_ title: String, _ options: [T],
+                                          caption: String? = nil,
                                           isOn: @escaping (T) -> Bool,
                                           toggle: @escaping (T) -> Void,
                                           label: @escaping (T) -> String) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             SectionHeader(title: title)
+            if let caption {
+                Text(caption).font(.rounded(12, .semibold)).foregroundStyle(Color.text3)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
             FlowLayout(spacing: 8) {
                 ForEach(options) { option in
                     FilterChip(label: label(option), isSelected: isOn(option)) { toggle(option) }

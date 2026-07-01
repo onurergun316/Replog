@@ -14,14 +14,17 @@ import Charts
 struct ExerciseDetailView: View {
     @Environment(\.exerciseCatalog) private var catalog
     @Environment(\.modelContext) private var context
+    @Query(sort: \Plan.order) private var plans: [Plan]
     let exId: String
     var showProgress: Bool = false
 
     @State private var tab: DetailTab = .guide
+    @State private var showAddToWorkout = false
 
     enum DetailTab: Hashable { case guide, progress }
 
     private var exercise: Exercise? { catalog.exercise(id: exId) }
+    private var inWorkouts: [Workout] { WorkoutMembership.workouts(containing: exId, in: plans) }
 
     var body: some View {
         ScrollView {
@@ -37,6 +40,7 @@ struct ExerciseDetailView: View {
 
                     if tab == .guide || !showProgress {
                         GuideContent(exercise: exercise)
+                        addToWorkoutSection
                     } else {
                         ProgressContent(exId: exId, history: context.history(forExercise: exId))
                     }
@@ -48,6 +52,38 @@ struct ExerciseDetailView: View {
         }
         .background(Color.bg.ignoresSafeArea())
         .navigationBarTitleDisplayMode(.inline)
+        .sheet(isPresented: $showAddToWorkout) {
+            AddToWorkoutSheet(exId: exId)
+        }
+    }
+
+    /// "In your workouts" chips + an Add button. Hidden when the user has no plans yet
+    /// (e.g. the read-only preview during onboarding).
+    @ViewBuilder
+    private var addToWorkoutSection: some View {
+        if !plans.isEmpty {
+            VStack(alignment: .leading, spacing: 10) {
+                if !inWorkouts.isEmpty {
+                    SectionHeader(title: "In Your Workouts")
+                    FlowLayout(spacing: 8) {
+                        ForEach(inWorkouts) { workout in
+                            Pill(text: workout.name, style: .accentSoft)
+                        }
+                    }
+                }
+                Button { showAddToWorkout = true } label: {
+                    HStack(spacing: 8) {
+                        Image(systemName: "plus.circle.fill")
+                        Text(inWorkouts.isEmpty ? "Add to workout" : "Add to another workout")
+                    }
+                    .font(.rounded(16, .heavy)).foregroundStyle(.white)
+                    .frame(maxWidth: .infinity).padding(.vertical, 14)
+                    .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(Color.accent))
+                }
+                .buttonStyle(.plain)
+                .padding(.top, 4)
+            }
+        }
     }
 }
 
@@ -110,6 +146,7 @@ private struct GuideContent: View {
             tag("Level", exercise.level.displayName)
             tag("Force", exercise.force?.displayName ?? "—")
             tag("Type", exercise.category.displayName)
+            tag("Mechanic", exercise.mechanic?.displayName ?? "—")
         }
     }
 

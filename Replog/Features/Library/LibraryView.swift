@@ -12,9 +12,7 @@ struct LibraryView: View {
     @Environment(\.exerciseCatalog) private var catalog
     @State private var model = LibraryViewModel()
     @State private var showFilters = false
-
-    /// Equipment types surfaced as quick chips above the list.
-    private let quickEquipment: [Equipment] = [.barbell, .dumbbell, .cable, .machine, .bodyOnly]
+    @State private var addRef: ExerciseRef?
 
     private var results: [Exercise] { model.results(in: catalog) }
 
@@ -31,6 +29,9 @@ struct LibraryView: View {
             }
             .sheet(isPresented: $showFilters) {
                 LibraryFilterSheet(model: model, resultCount: results.count)
+            }
+            .sheet(item: $addRef) { ref in
+                AddToWorkoutSheet(exId: ref.id)
             }
         }
     }
@@ -66,31 +67,9 @@ struct LibraryView: View {
     }
 
     private var filterBar: some View {
-        HStack(spacing: 10) {
+        HStack {
             filtersButton
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 8) {
-                    quickChip("All", isSelected: model.filter.equipment.isEmpty) {
-                        model.filter.equipment = []
-                    }
-                    ForEach(quickEquipment) { eq in
-                        quickChip(eq.displayName, isSelected: model.filter.equipment.contains(eq)) {
-                            model.toggleEquipment(eq)
-                        }
-                    }
-                    Color.clear.frame(width: 4)   // trailing breathing room before the fade
-                }
-            }
-            // Constrain height so the (otherwise greedy) horizontal ScrollView + gradient
-            // mask don't expand vertically and blow out the header spacing.
-            .frame(height: 34)
-            // Fade the chips out at the trailing edge instead of hard-cutting them.
-            .mask(
-                LinearGradient(stops: [.init(color: .black, location: 0),
-                                       .init(color: .black, location: 0.9),
-                                       .init(color: .clear, location: 1)],
-                               startPoint: .leading, endPoint: .trailing)
-            )
+            Spacer()
         }
     }
 
@@ -113,17 +92,6 @@ struct LibraryView: View {
         .buttonStyle(.plain)
     }
 
-    private func quickChip(_ label: String, isSelected: Bool, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            Text(label)
-                .font(.rounded(13, .heavy))
-                .foregroundStyle(isSelected ? .white : Color.text2)
-                .padding(.horizontal, 14).padding(.vertical, 8)
-                .background(Capsule().fill(isSelected ? Color.accent : Color.surface2))
-        }
-        .buttonStyle(.plain)
-    }
-
     // MARK: List
 
     private var list: some View {
@@ -136,6 +104,12 @@ struct LibraryView: View {
                 .listRowSeparatorTint(Color.border.opacity(0.6))
                 .alignmentGuide(.listRowSeparatorLeading) { d in d[.leading] + 86 }  // inset past the thumbnail
                 .listRowInsets(EdgeInsets(top: 8, leading: 20, bottom: 8, trailing: 20))
+                .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                    Button { addRef = ExerciseRef(id: ex.id) } label: {
+                        Label("Add", systemImage: "plus")
+                    }
+                    .tint(.accent)
+                }
             }
         }
         .listStyle(.plain)

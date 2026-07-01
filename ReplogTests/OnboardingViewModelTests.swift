@@ -21,6 +21,16 @@ struct OnboardingViewModelTests {
         #expect(vm.steps.contains(.sport))
     }
 
+    @Test func skipNameOmitsNameAndBuildsAfterEquipment() {
+        let vm = OnboardingViewModel()
+        vm.skipName = true
+        #expect(!vm.steps.contains(.name))          // name step gone
+        // The last input step before generating is now equipmentTypes.
+        #expect(vm.steps.dropLast(2).last == .equipmentTypes)
+        while vm.current != .equipmentTypes { vm.advance() }
+        #expect(vm.nextIsGenerating)                // drives the "Build my plan" CTA
+    }
+
     @Test func advanceAndBackWalkTheSteps() {
         let vm = OnboardingViewModel()
         #expect(vm.current == .welcome)

@@ -141,9 +141,13 @@ Plan ──< Workout ──< PlanItem(exId, restSeconds?) ──< SetTemplate {w
   restricts the plan; real AI "Building your plan" + result/report — each generated day on the result
   screen opens a read-only `GeneratedWorkoutPreview`), `Today` (streak flame is an orange SF Symbol;
   "Add another" cards tap through to the workout; the three stat cards open `StatDetailSheet` history
-  sheets), `Plans` (list/detail/editor/picker; native swipe-to-delete), `Library` (search + quick
-  equipment chips + a multi-facet `LibraryFilter`/`LibraryFilterSheet`, driven by `LibraryViewModel`),
-  `ExerciseDetail`, `Progress`, `Profile` (saved AI Coach Reports via `CoachReportView`; the three
+  sheets), `Plans` (list/detail/editor/picker; native swipe-to-delete), `Library` (search + a
+  multi-facet `LibraryFilter`/`LibraryFilterSheet` — level, equipment, force, type, mechanic, muscles;
+  the **muscles facet is AND** (must train every selected muscle), the rest OR-within/AND-across;
+  driven by `LibraryViewModel`. Swipe a row → `AddToWorkoutSheet` to add the exercise to any workouts),
+  `ExerciseDetail` (shows every JSON facet incl. mechanic; "In your workouts" + "Add to workout" via
+  pure `Domain/WorkoutMembership` + `PlanFactory.add/removeExercise`), `Progress`,
+  `Profile` (saved AI Coach Reports via `CoachReportView`; the three
   lifetime-stat cards open `StatDetailSheet`), `ActiveSession` (typeable weight/reps via
   `NumericStepperField`; `RestTimerModel`; a native confetti+haptics `CelebrationOverlay` when every
   set is complete). `StatDetailSheet` reconstructs completed workouts via pure `Domain/WorkoutHistory`.

@@ -35,18 +35,23 @@ struct GeneratedWorkoutPreview: View {
 
                     ForEach(Array(workout.items.enumerated()), id: \.offset) { _, item in
                         let ex = catalog.exercise(id: item.exId)
-                        HStack(spacing: 14) {
-                            ExerciseThumbnail(resourceName: ex?.imageResourceNames.first, size: 52, cornerRadius: 12)
-                            VStack(alignment: .leading, spacing: 3) {
-                                Text(ex?.name ?? item.exId)
-                                    .font(.rounded(15, .heavy)).foregroundStyle(Color.textPrimary).lineLimit(2)
-                                Text("\(item.sets.count) sets · \(ex?.primaryMuscles.first?.displayName ?? "—")")
-                                    .font(.rounded(12, .semibold)).foregroundStyle(Color.text3)
+                        NavigationLink(value: ExerciseRef(id: item.exId)) {
+                            HStack(spacing: 14) {
+                                ExerciseThumbnail(resourceName: ex?.imageResourceNames.first, size: 52, cornerRadius: 12)
+                                VStack(alignment: .leading, spacing: 3) {
+                                    Text(ex?.name ?? item.exId)
+                                        .font(.rounded(15, .heavy)).foregroundStyle(Color.textPrimary).lineLimit(2)
+                                    Text("\(item.sets.count) sets · \(ex?.primaryMuscles.first?.displayName ?? "—")")
+                                        .font(.rounded(12, .semibold)).foregroundStyle(Color.text3)
+                                }
+                                Spacer(minLength: 8)
+                                Image(systemName: "chevron.right").font(.system(size: 12, weight: .bold))
+                                    .foregroundStyle(Color.text3)
                             }
-                            Spacer(minLength: 8)
+                            .padding(12)
+                            .cardSurface()
                         }
-                        .padding(12)
-                        .cardSurface()
+                        .buttonStyle(.plain)
                     }
                 }
                 .padding(20)
@@ -54,6 +59,9 @@ struct GeneratedWorkoutPreview: View {
             .background(Color.bg.ignoresSafeArea())
             .navigationTitle(workout.name)
             .navigationBarTitleDisplayMode(.inline)
+            .navigationDestination(for: ExerciseRef.self) { ref in
+                ExerciseDetailView(exId: ref.id, showProgress: false)
+            }
         }
         .presentationDetents([.medium, .large])
         .presentationDragIndicator(.visible)

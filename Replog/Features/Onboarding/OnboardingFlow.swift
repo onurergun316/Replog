@@ -24,6 +24,7 @@ struct OnboardingFlow: View {
     @State private var vm = OnboardingViewModel()
     @State private var showReport = false
     @State private var previewRef: GeneratedWorkoutRef?
+    @State private var didConfigure = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -39,6 +40,16 @@ struct OnboardingFlow: View {
         }
         .scrollDismissesKeyboard(.immediately)
         .hideKeyboardOnTap()
+        .onAppear {
+            guard !didConfigure else { return }
+            didConfigure = true
+            // Generating a plan from inside the app: the name is already known — skip that
+            // step and reuse the stored name instead of asking again.
+            if mode == .generatePlan {
+                vm.skipName = true
+                vm.answers.firstName = profiles.first?.name ?? ""
+            }
+        }
         .background(Color.bg.ignoresSafeArea())
         .sheet(isPresented: $showReport) {
             NavigationStack {
@@ -89,9 +100,8 @@ struct OnboardingFlow: View {
     private var ctaTitle: String {
         switch vm.current {
         case .welcome: return "Get started"
-        case .name: return "Build my plan"   // name is the last question before generating
         case .result: return mode == .firstRun ? "Start Replog" : "Use this plan"
-        default: return "Continue"
+        default: return vm.nextIsGenerating ? "Build my plan" : "Continue"
         }
     }
 

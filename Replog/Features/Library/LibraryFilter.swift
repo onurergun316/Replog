@@ -33,8 +33,10 @@ struct LibraryFilter: Equatable, Sendable {
             + categories.count + mechanics.count + muscles.count
     }
 
-    /// Whether `exercise` satisfies all active facets.
-    func matches(_ exercise: Exercise) -> Bool {
+    /// Whether `exercise` satisfies all active facets. `nonisolated` so the nonisolated
+    /// `ExerciseCatalog.search` can call it (the type is MainActor-isolated by default,
+    /// but this is pure value logic over `Sendable` data).
+    nonisolated func matches(_ exercise: Exercise) -> Bool {
         if !levels.isEmpty, !levels.contains(exercise.level) { return false }
         if !equipment.isEmpty {
             guard let eq = exercise.equipment, equipment.contains(eq) else { return false }
@@ -47,8 +49,10 @@ struct LibraryFilter: Equatable, Sendable {
             guard let mech = exercise.mechanic, mechanics.contains(mech) else { return false }
         }
         if !muscles.isEmpty {
+            // AND within the muscles facet: the exercise must train EVERY selected muscle
+            // (as a primary or secondary mover), not just any one of them.
             let worked = Set(exercise.primaryMuscles).union(exercise.secondaryMuscles)
-            if worked.isDisjoint(with: muscles) { return false }
+            if !muscles.isSubset(of: worked) { return false }
         }
         return true
     }
