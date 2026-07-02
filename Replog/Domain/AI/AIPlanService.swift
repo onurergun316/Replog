@@ -49,12 +49,14 @@ struct AIPlanService {
     }
 
     /// Generates a plan + report. Uses Apple Intelligence when available, else falls back.
-    func generate(_ answers: QuizAnswers) async -> Result {
+    /// `athlete` carries the user's real logged training (empty on first onboarding) so the
+    /// model can ground loads, reps and exercise choices in actual history.
+    func generate(_ answers: QuizAnswers, athlete: AthleteContext = .empty) async -> Result {
         guard !forceFallback, Self.isAvailable else {
             return Self.fallback(answers: answers, generator: generator)
         }
         do {
-            return try await generateWithAI(answers)
+            return try await generateWithAI(answers, athlete: athlete)
         } catch {
             return Self.fallback(answers: answers, generator: generator)
         }
@@ -62,13 +64,13 @@ struct AIPlanService {
 
     // MARK: - Live two-stage generation
 
-    private func generateWithAI(_ answers: QuizAnswers) async throws -> Result {
+    private func generateWithAI(_ answers: QuizAnswers, athlete: AthleteContext) async throws -> Result {
         let options = GenerationOptions(temperature: temperature)
 
         // 1) Framing: the model designs the split + report sections.
         let framingSession = LanguageModelSession(instructions: Self.framingInstructions)
         let framing = try await framingSession.respond(
-            to: Self.framingPrompt(for: answers),
+            to: Self.framingPrompt(for: answers, athlete: athlete),
             generating: PlanFraming.self,
             options: options
         ).content
@@ -90,7 +92,8 @@ struct AIPlanService {
             let count = max(3, min(6, day.exerciseCount))
             let selectionSession = LanguageModelSession(instructions: Self.selectionInstructions)
             let selection = try await selectionSession.respond(
-                to: Self.selectionPrompt(day: day, candidates: candidates, count: count, answers: answers),
+                to: Self.selectionPrompt(day: day, candidates: candidates, count: count,
+                                         answers: answers, athlete: athlete),
                 generating: DaySelection.self,
                 options: options
             ).content
@@ -157,8 +160,8 @@ struct AIPlanService {
     choose from the numbered candidates given.
     """)
 
-    static func framingPrompt(for answers: QuizAnswers) -> String {
-        """
+    static func framingPrompt(for answers: QuizAnswers, athlete: AthleteContext = .empty) -> String {
+        let base = """
         Design a personalized resistance-training plan for this person:
 
         \(profileLines(answers))
@@ -168,15 +171,27 @@ struct AIPlanService {
         RPE, and set scheme. Then write the report sections: philosophy, why this split and why these \
         muscles are paired together, the science, safety adaptations, and an encouraging note.
         """
+        // The athlete's logged history gets whatever token budget the fixed parts leave over.
+        let history = athlete.promptSection(
+            maxTokens: PromptBudget.remainingTokens(afterFixed: framingInstructions, base))
+        return history.isEmpty ? base : base + "\n\n" + history
     }
 
-    static func selectionPrompt(day: DayFraming, candidates: [Exercise], count: Int, answers: QuizAnswers) -> String {
+    static func selectionPrompt(day: DayFraming, candidates: [Exercise], count: Int,
+                                answers: QuizAnswers, athlete: AthleteContext = .empty) -> String {
         let list = candidates.enumerated().map { i, ex in
             let muscle = ex.primaryMuscles.first?.displayName ?? "—"
             let equip = ex.equipment?.displayName ?? "Bodyweight"
             let mech = ex.mechanic?.displayName ?? ""
-            return "\(i + 1). \(ex.name) — \(muscle), \(equip)\(mech.isEmpty ? "" : ", \(mech)")"
+            let base = "\(i + 1). \(ex.name) — \(muscle), \(equip)\(mech.isEmpty ? "" : ", \(mech)")"
+            guard let digest = athlete.digest(forExId: ex.id) else { return base }
+            return base + " [\(digest.shortNote)]"
         }.joined(separator: "\n")
+
+        let historyHint = athlete.isEmpty ? "" : """
+         Candidates marked [logged: …] are lifts the person already trains — prefer keeping ones \
+        that are progressing, and consider a variation where one stalls.
+        """
 
         return """
         Training day: "\(day.name)" focusing on \(day.targetMuscles.joined(separator: ", ")).
@@ -185,7 +200,7 @@ struct AIPlanService {
 
         Choose exactly \(count) exercises for this day from the candidates below, in the order they \
         should be performed (compound movements first). Give the candidate number and a clear reason \
-        for each.
+        for each.\(historyHint)
 
         Candidates:
         \(list)

@@ -97,8 +97,11 @@ final class OnboardingViewModel {
     }
 
     /// Generates the plan + report (Apple Intelligence when available, else deterministic).
-    func generate() async {
-        let result = await service.generate(answers)
+    /// `history` is the user's logged training (empty on first run); it is digested into an
+    /// `AthleteContext` so the planner grounds its choices in real data.
+    func generate(history: [HistoryEntry] = []) async {
+        let athlete = AthleteContext.make(history: history, catalog: service.generator.catalog)
+        let result = await service.generate(answers, athlete: athlete)
         generated = result.plan
         reportMarkdown = result.reportMarkdown
         usedAppleIntelligence = result.usedAppleIntelligence

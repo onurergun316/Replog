@@ -337,8 +337,10 @@ struct OnboardingFlow: View {
         }
         .frame(maxWidth: .infinity)
         .task {
-            // Run generation while guaranteeing a minimum spinner time for a calm UX.
-            async let generation: Void = vm.generate()
+            // Feed any logged history into the planner (empty on first run), and run
+            // generation while guaranteeing a minimum spinner time for a calm UX.
+            let history = (try? context.fetch(FetchDescriptor<HistoryEntry>())) ?? []
+            async let generation: Void = vm.generate(history: history)
             async let minimumDelay: Void = sleepQuietly(1.5)
             _ = await (generation, minimumDelay)
             withAnimation(.snappy) { vm.advance() }
