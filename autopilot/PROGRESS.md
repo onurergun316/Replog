@@ -243,3 +243,75 @@ the live Apple Intelligence planner path still can't run in the simulator; verif
 consumes B1 directly, and its acceptance (suggestion visible + dismissible + seeded-launch
 screenshot) is the first user-visible payoff of the adaptive trainer. B3 is also READY if a
 smaller item is preferred.
+
+---
+
+## Iteration 5 — 2026-07-02 ~12:05 — Claude Fable 5 — Item B2
+
+**Item:** B2. Apply recommendations to the next session — surface the B1 suggestion on the
+log card, dismissible, never auto-overwriting user input.
+
+**What changed:**
+- `Replog/Models/Session.swift` — `SessionExercise` gains persisted suggestion state
+  (additive optionals + defaulted Bool → lightweight-migration safe): `suggestionActionRaw`,
+  `suggestedWeightKg`, `suggestedReps`, `suggestionReason`, `suggestionDismissed`; a typed
+  `suggestion: ProgressionRecommendation?` accessor (the `kindRaw`/`kind` house pattern);
+  and `applySuggestion()` — copies the prescription onto **not-done sets only** (logged
+  sets are never touched) and retires the banner. Stored on the session (not recomputed in
+  the view) so suggestion + dismissal survive pause/resume.
+- `Replog/Domain/SessionBuilder.swift` — `start` reads goal (`userProfile()`) + units
+  (`appSettings()`) once, fetches each exercise's history once (reused for prev-fill and
+  the engine), and stores `ProgressionEngine.recommend(…)` per exercise. No history → nil
+  → no banner.
+- `Replog/Features/ActiveSession/ExerciseLogCard.swift` — new private `SuggestionBanner`
+  between header and set rows, shown while `suggestion != nil && !dismissed && !isDone`:
+  action-tinted (up-green for increase load/reps, accent for hold, down-red for deload),
+  SF Symbol + "Coach: <action>", the engine's reason sentence, an **Apply** capsule
+  (opt-in; calls `applySuggestion()`), and an ✕ dismiss — both save via the existing
+  `onChange` path and animate `.snappy` like the rest of the card.
+- `ReplogTests/ActiveSessionTests.swift` — 8 new tests: builder attaches exactly what the
+  engine recommends; no history → no suggestion; goal-aware (fat-loss range top → +load at
+  62.5 kg, reps reset to 12); persistence round-trip; apply updates only undone sets and
+  retires the banner; apply with no suggestion is a no-op; dismissal persists while the
+  stored suggestion remains; typed-accessor round-trip incl. nil clearing.
+
+**Build:** clean, 0 errors / 0 warnings (`** BUILD SUCCEEDED **`).
+**Tests:** 218/218 passed on iPhone 17 (`** TEST SUCCEEDED **`, 0 failures; +8 new,
+`ActiveSessionTests` 8 → 16). Note: iter 4 recorded the baseline as 211, but the distinct
+passing-test count before + after this change reconciles to 210 + 8 = 218 — the 211 appears
+to have been an off-by-one in that log's counting, not a removed test.
+
+**Screenshots:** `autopilot/replog-b2-active.png` (iPhone 17) and `replog-b2-promax.png`
+(17 Pro Max), both `REPLOG_SEED=1 REPLOG_ACTIVE=1`: the history-seeded first exercise shows
+the green "Coach: Add a rep" banner ("Progressing well — aim for 78kg × 9.") with Apply/✕;
+the no-history exercises show no banner; prescribed sets remain 16 kg × 10 (nothing
+auto-overwritten); no clipping on either size. The installed iOS 26.5 runtime has no
+SE-class device, so the small-device check used the regular 6.3" 17 (banner is flexible
+HStack/VStack, no magic widths).
+
+**Assumptions / decisions:**
+1. Suggestion is computed **at session build** and persisted on `SessionExercise`, not
+   recomputed live: writes stay in the Domain builder (house rule), the banner is stable
+   across pause/resume, and dismissal is per-session state — exactly the acceptance's
+   "dismissible".
+2. The engine receives the lift's **full history** (same data the prev-fill uses), not a
+   recency window — consistent with the existing "previous" column; windowing/staleness
+   policy belongs to B3 (plateau detection) if needed.
+3. **Apply is opt-in and partial-safe**: it never touches a set the user marked done, and
+   applying dismisses the banner (accepting the advice retires it). Dismiss keeps the
+   stored suggestion (hidden), useful later for B3/D1 analytics.
+4. "Hold" suggestions also get an Apply button — repeating last session's exact load/reps
+   is still a concrete prescription when the template differs.
+5. In the DEBUG seed, the suggested 78 kg differs wildly from the 16 kg template — that is
+   a seed-data artifact (fabricated history at 70–78 kg vs a freshly generated plan), not
+   an engine bug; real users' templates converge on their logged numbers.
+
+**NEEDS HUMAN REVIEW:**
+- Feel-level check on device: banner animation when dismissing/applying mid-workout, and
+  whether the banner competes visually with the rest timer bar (screenshots can't judge
+  motion). (Standing item from iters 1–4: the live Apple Intelligence planner path still
+  can't run in the simulator; verify on device.)
+
+**Recommended next item:** B3 (plateau + deload detection recorded to `CoachingLog`). It is
+READY, builds directly on B1's rule table and A3's `recordCoaching(.plateau/.deload, …)`
+write path, and is the last B-epic piece before the report epics (D1 consumes its logs).

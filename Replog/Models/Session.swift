@@ -58,6 +58,15 @@ final class SessionExercise {
     /// Rest between sets for this exercise, in seconds. `nil` = use the app default.
     /// Copied from the plan's `PlanItem.restSeconds` when the session is built.
     var restSeconds: Int?
+    /// The coach's next-session prescription from `ProgressionEngine`, computed and
+    /// stored by `SessionBuilder` so it survives pause/resume. All nil = no history.
+    var suggestionActionRaw: String?
+    var suggestedWeightKg: Double?
+    var suggestedReps: Int?
+    var suggestionReason: String?
+    /// The user swiped the suggestion away (or applied it) — never show it again
+    /// for this session. User input is never auto-overwritten.
+    var suggestionDismissed: Bool = false
     var session: ActiveSession?
 
     @Relationship(deleteRule: .cascade, inverse: \LoggedSet.exercise)
@@ -74,6 +83,37 @@ final class SessionExercise {
     /// The heaviest set by estimated 1RM (used for history & "best").
     var topSet: LoggedSet? {
         sets.max { Formulas.e1rm(kg: $0.weightKg, reps: $0.reps) < Formulas.e1rm(kg: $1.weightKg, reps: $1.reps) }
+    }
+
+    /// Typed view over the stored suggestion fields (the `kindRaw`/`kind` pattern).
+    var suggestion: ProgressionRecommendation? {
+        get {
+            guard let raw = suggestionActionRaw,
+                  let action = ProgressionAction(rawValue: raw),
+                  let weightKg = suggestedWeightKg,
+                  let reps = suggestedReps,
+                  let reason = suggestionReason else { return nil }
+            return ProgressionRecommendation(
+                exId: exId, action: action,
+                suggestedWeightKg: weightKg, suggestedReps: reps, reason: reason)
+        }
+        set {
+            suggestionActionRaw = newValue?.action.rawValue
+            suggestedWeightKg = newValue?.suggestedWeightKg
+            suggestedReps = newValue?.suggestedReps
+            suggestionReason = newValue?.reason
+        }
+    }
+
+    /// Copies the suggested weight/reps onto every set the user has NOT completed yet
+    /// (logged sets are never touched) and retires the banner. Explicit opt-in only.
+    func applySuggestion() {
+        guard let suggestion else { return }
+        for set in sets where !set.done {
+            set.weightKg = suggestion.suggestedWeightKg
+            set.reps = suggestion.suggestedReps
+        }
+        suggestionDismissed = true
     }
 }
 

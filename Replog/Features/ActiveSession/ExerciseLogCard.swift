@@ -2,8 +2,9 @@
 //  ExerciseLogCard.swift
 //  Replog
 //
-//  One exercise card in the active workout: set rows with trend arrows, a tap-to-edit
-//  inline stepper editor, swipe-to-delete, and Add set.
+//  One exercise card in the active workout: a coach-suggestion banner (ProgressionEngine),
+//  set rows with trend arrows, a tap-to-edit inline stepper editor, swipe-to-delete,
+//  and Add set.
 //
 
 import SwiftUI
@@ -24,6 +25,20 @@ struct ExerciseLogCard: View {
     var body: some View {
         VStack(spacing: 0) {
             header
+            if let suggestion = exercise.suggestion, !exercise.suggestionDismissed, !exercise.isDone {
+                SuggestionBanner(
+                    recommendation: suggestion,
+                    onApply: {
+                        withAnimation(.snappy) { exercise.applySuggestion() }
+                        onChange()
+                    },
+                    onDismiss: {
+                        withAnimation(.snappy) { exercise.suggestionDismissed = true }
+                        onChange()
+                    }
+                )
+                .padding(.top, 12)
+            }
             columnHeader
             ForEach(Array(exercise.orderedSets.enumerated()), id: \.element.id) { index, set in
                 SetLogRow(
@@ -77,6 +92,68 @@ struct ExerciseLogCard: View {
 
     private func toggleEdit(_ set: LoggedSet) {
         withAnimation(.snappy) { expandedSetID = expandedSetID == set.id ? nil : set.id }
+    }
+}
+
+// MARK: - Coach suggestion banner
+
+/// The ProgressionEngine's next-session prescription for this lift. Purely advisory:
+/// "Apply" copies it onto the not-yet-logged sets, "x" dismisses it for this session,
+/// and it never overwrites anything the user has already logged.
+private struct SuggestionBanner: View {
+    let recommendation: ProgressionRecommendation
+    let onApply: () -> Void
+    let onDismiss: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 5) {
+            HStack(spacing: 6) {
+                Image(systemName: symbol)
+                    .font(.system(size: 12, weight: .heavy))
+                Text("Coach: \(recommendation.action.displayName)")
+                    .font(.rounded(12, .heavy))
+                Spacer(minLength: 8)
+                Button(action: onApply) {
+                    Text("Apply").font(.rounded(12, .heavy)).foregroundStyle(.white)
+                        .padding(.horizontal, 12).padding(.vertical, 5)
+                        .background(Capsule().fill(tint))
+                }
+                .buttonStyle(.plain)
+                Button(action: onDismiss) {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 11, weight: .heavy)).foregroundStyle(Color.text3)
+                        .frame(width: 26, height: 26)
+                        .background(Circle().fill(Color.surface2))
+                }
+                .buttonStyle(.plain)
+            }
+            .foregroundStyle(tint)
+            Text(recommendation.reason)
+                .font(.rounded(12, .semibold)).foregroundStyle(Color.text2)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .padding(10)
+        .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(tint.opacity(0.09)))
+        .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous)
+            .strokeBorder(tint.opacity(0.25), lineWidth: 1))
+    }
+
+    private var tint: Color {
+        switch recommendation.action {
+        case .increaseLoad, .increaseReps: return Color.up
+        case .hold:                        return Color.accent
+        case .deload:                      return Color.down
+        }
+    }
+
+    private var symbol: String {
+        switch recommendation.action {
+        case .increaseLoad: return "arrow.up.circle.fill"
+        case .increaseReps: return "plus.circle.fill"
+        case .hold:         return "equal.circle.fill"
+        case .deload:       return "arrow.down.circle.fill"
+        }
     }
 }
 

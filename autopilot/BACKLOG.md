@@ -59,10 +59,19 @@ Status key: READY · BLOCKED · HUMAN-REVIEW · DONE
   goal/units convenience reuses `Formulas.weightStepKg`/`formatWeight` so reasons render
   in the user's units. `ReplogTests/ProgressionEngineTests.swift` — 21 tests.
 
-- [ ] READY (unblocked by B1)  **B2. Apply recommendations to the next session.**
+- [x] DONE (iter 5, 2026-07-02)  **B2. Apply recommendations to the next session.**
   Surface B1 output when building a session (e.g. suggested next weight/reps on the
   log card) without auto-overwriting user input.
   *Accept:* suggestion visible, dismissible, seeded-launch screenshot captured.
+  *Done:* `SessionBuilder.start` computes `ProgressionEngine.recommend(…)` per exercise
+  (full per-lift history, profile goal, display units) and stores it on new
+  `SessionExercise` fields (`suggestionActionRaw`/`suggestedWeightKg`/`suggestedReps`/
+  `suggestionReason` + typed `suggestion` accessor, `suggestionDismissed`), so it
+  survives pause/resume. `ExerciseLogCard` renders a dismissible `SuggestionBanner`
+  (action-tinted, "Coach: <action>" + reason) with an opt-in **Apply** that copies the
+  prescription onto not-yet-done sets only (`SessionExercise.applySuggestion()` —
+  logged sets never touched). 8 new tests in `ActiveSessionTests`; screenshots
+  `autopilot/replog-b2-active.png` / `replog-b2-promax.png`.
 
 - [ ] READY (A2 + B1 done)  **B3. Plateau + deload detection.**
   Detect stalls across sessions and recommend a deload or exercise swap.

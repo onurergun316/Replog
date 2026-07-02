@@ -169,6 +169,139 @@ struct ActiveSessionTests {
         #expect(stored.first?.completedSets == 1)
     }
 
+    // MARK: - Progression suggestions (B2)
+
+    /// Three sessions of rising e1RM, mid rep range.
+    private func seedProgressingHistory(_ ctx: ModelContext, exId: String, topR: Int = 9) {
+        for (i, w) in [56.0, 58.0, 60.0].enumerated() {
+            let entry = HistoryEntry(
+                exId: exId, date: Date().addingTimeInterval(Double(i - 3) * 86_400),
+                topW: w, topR: topR, e1rm: Formulas.e1rmRounded(kg: w, reps: topR),
+                sets: [RecordedSet(w: w, r: topR)])
+            ctx.insert(entry)
+        }
+        try? ctx.save()
+    }
+
+    @Test func startAttachesEngineSuggestionFromHistory() throws {
+        let ctx = makeContext()
+        let workout = seedWorkout(ctx)
+        seedProgressingHistory(ctx, exId: "Bench")
+
+        let session = SessionBuilder.start(workout: workout, into: ctx)
+        let bench = session.orderedExercises.first { $0.exId == "Bench" }!
+
+        // The stored suggestion is exactly what the engine recommends for this history.
+        let expected = ProgressionEngine.recommend(
+            exId: "Bench", history: ctx.history(forExercise: "Bench"),
+            goal: ctx.userProfile().goal, units: ctx.appSettings().units)
+        #expect(bench.suggestion == expected)
+        #expect(bench.suggestion?.action == .increaseReps)   // progressing, mid-range
+        #expect(bench.suggestion?.suggestedReps == 10)
+        #expect(bench.suggestion?.suggestedWeightKg == 60)
+        #expect(bench.suggestionDismissed == false)
+    }
+
+    @Test func startWithoutHistoryHasNoSuggestion() throws {
+        let ctx = makeContext()
+        let workout = seedWorkout(ctx)
+        let session = SessionBuilder.start(workout: workout, into: ctx)
+        #expect(session.exercises.allSatisfy { $0.suggestion == nil })
+    }
+
+    @Test func suggestionRespectsProfileGoal() throws {
+        let ctx = makeContext()
+        let workout = seedWorkout(ctx)
+        ctx.userProfile().goal = .loseWeight            // rep range 12...15
+        seedProgressingHistory(ctx, exId: "Bench", topR: 15)
+
+        let session = SessionBuilder.start(workout: workout, into: ctx)
+        let bench = session.orderedExercises.first { $0.exId == "Bench" }!
+        // Top of the fat-loss range reached -> add load, rebuild from the range floor.
+        #expect(bench.suggestion?.action == .increaseLoad)
+        #expect(bench.suggestion?.suggestedWeightKg == 62.5)
+        #expect(bench.suggestion?.suggestedReps == 12)
+    }
+
+    @Test func suggestionSurvivesPersistenceRoundTrip() throws {
+        let ctx = makeContext()
+        let workout = seedWorkout(ctx)
+        seedProgressingHistory(ctx, exId: "Bench")
+        let built = SessionBuilder.start(workout: workout, into: ctx)
+        let suggestion = built.orderedExercises.first { $0.exId == "Bench" }!.suggestion
+        try ctx.save()
+
+        let fetched = try ctx.fetch(FetchDescriptor<SessionExercise>())
+            .first { $0.exId == "Bench" }
+        #expect(fetched?.suggestion == suggestion)
+        #expect(suggestion != nil)
+    }
+
+    @Test func applySuggestionUpdatesOnlyUndoneSets() throws {
+        let ctx = makeContext()
+        let workout = seedWorkout(ctx)
+        seedProgressingHistory(ctx, exId: "Bench")
+        let session = SessionBuilder.start(workout: workout, into: ctx)
+        let bench = session.orderedExercises.first { $0.exId == "Bench" }!
+
+        // The user already logged set 1 with their own numbers.
+        let logged = bench.orderedSets[0]
+        logged.weightKg = 100
+        logged.reps = 3
+        logged.done = true
+
+        bench.applySuggestion()
+
+        #expect(logged.weightKg == 100)                 // logged set untouched
+        #expect(logged.reps == 3)
+        let pending = bench.orderedSets[1]
+        #expect(pending.weightKg == 60)                 // suggestion applied
+        #expect(pending.reps == 10)
+        #expect(bench.suggestionDismissed)              // banner retired after apply
+    }
+
+    @Test func applyWithoutSuggestionIsANoOp() throws {
+        let ctx = makeContext()
+        let workout = seedWorkout(ctx)
+        let session = SessionBuilder.start(workout: workout, into: ctx)
+        let bench = session.orderedExercises.first { $0.exId == "Bench" }!
+        let before = bench.orderedSets.map { ($0.weightKg, $0.reps) }
+
+        bench.applySuggestion()
+
+        #expect(bench.orderedSets.map(\.weightKg) == before.map(\.0))
+        #expect(bench.orderedSets.map(\.reps) == before.map(\.1))
+        #expect(bench.suggestionDismissed == false)     // nothing to retire
+    }
+
+    @Test func dismissedSuggestionPersists() throws {
+        let ctx = makeContext()
+        let workout = seedWorkout(ctx)
+        seedProgressingHistory(ctx, exId: "Bench")
+        let session = SessionBuilder.start(workout: workout, into: ctx)
+        let bench = session.orderedExercises.first { $0.exId == "Bench" }!
+
+        bench.suggestionDismissed = true
+        try ctx.save()
+
+        let fetched = try ctx.fetch(FetchDescriptor<SessionExercise>())
+            .first { $0.exId == "Bench" }
+        #expect(fetched?.suggestionDismissed == true)
+        #expect(fetched?.suggestion != nil)             // still stored, just hidden
+    }
+
+    @Test func suggestionAccessorRoundTripsAndClears() throws {
+        let exercise = SessionExercise(exId: "Row")
+        let rec = ProgressionRecommendation(
+            exId: "Row", action: .deload,
+            suggestedWeightKg: 52.5, suggestedReps: 8, reason: "Deload and rebuild.")
+        exercise.suggestion = rec
+        #expect(exercise.suggestion == rec)
+        exercise.suggestion = nil
+        #expect(exercise.suggestion == nil)
+        #expect(exercise.suggestionActionRaw == nil)
+    }
+
     @Test func finishWithNoCompletedSetsCountsNothing() throws {
         let ctx = makeContext()
         let workout = seedWorkout(ctx)
