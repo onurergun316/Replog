@@ -93,7 +93,7 @@ while [ "$(date +%s)" -lt "${END}" ]; do
   fi
 
   # usage / rate limit -> fall back once, then stop
-  if grep -qiE "usage limit|rate limit|limit reached|out of (credit|tokens)|429" "${log}"; then
+  if grep -qiE "rate_limit_error|overloaded_error|usage limit reached|limit reached|out of credit|credit balance" "${log}"; then
     if [ "${MODEL}" = "${PRIMARY_MODEL}" ]; then
       echo "[autopilot] ${PRIMARY_MODEL} limit hit -> switching to ${FALLBACK_MODEL}"
       MODEL="${FALLBACK_MODEL}"
