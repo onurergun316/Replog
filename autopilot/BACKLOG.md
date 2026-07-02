@@ -73,9 +73,21 @@ Status key: READY · BLOCKED · HUMAN-REVIEW · DONE
   logged sets never touched). 8 new tests in `ActiveSessionTests`; screenshots
   `autopilot/replog-b2-active.png` / `replog-b2-promax.png`.
 
-- [ ] READY (A2 + B1 done)  **B3. Plateau + deload detection.**
+- [x] DONE (iter 6, 2026-07-02)  **B3. Plateau + deload detection.**
   Detect stalls across sessions and recommend a deload or exercise swap.
   *Accept:* detection is a pure tested function; recommendation recorded to `CoachingLog`.
+  *Done:* `Replog/Domain/StallDetector.swift` — pure `detect(exId:history:)` →
+  `StallDetection {trend: regression|plateau, response: deload|swapExercise,
+  sessionsStalled, stallStartDate, last top set}` using the engine's thresholds;
+  a latest-session ≥5% weight back-off reads as "rebuilding, not stalled"; a back-off
+  earlier in the last 8 steps (outside the current run) means a deload was already
+  tried → escalate to `swapExercise`; bodyweight lifts stall on top reps and always
+  get a swap (no load to shed). Pure `swapCandidates(for:catalog:)` ranks same-equipment,
+  same-first-primary-muscle movements by mechanic/level similarity. `detectAndRecord`
+  writes ONE `CoachingLog` per stall (kind `.deload` or `.plateau`, metrics + tags incl.
+  candidate exIds), dedup by `stallStartDate` + response tag, re-records on escalation
+  or a fresh stall; wired into `SessionFinisher.finish` right after each `HistoryEntry`
+  insert. `ReplogTests/StallDetectorTests.swift` — 26 tests.
 
 ## Epic C — Check-ins and tracking
 

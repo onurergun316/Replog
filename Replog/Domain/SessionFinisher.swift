@@ -2,8 +2,9 @@
 //  SessionFinisher.swift
 //  Replog
 //
-//  Finishing a workout: write each exercise's top set to History, bump the streak,
-//  mark today complete on the calendar, then remove the live session.
+//  Finishing a workout: write each exercise's top set to History, record any newly
+//  detected stall to the coaching memory, bump the streak, mark today complete on
+//  the calendar, then remove the live session.
 //
 
 import Foundation
@@ -37,6 +38,7 @@ enum SessionFinisher {
             let top = doneSets.max {
                 Formulas.e1rm(kg: $0.weightKg, reps: $0.reps) < Formulas.e1rm(kg: $1.weightKg, reps: $1.reps)
             }!
+            let prior = context.history(forExercise: exercise.exId)
             let entry = HistoryEntry(
                 exId: exercise.exId,
                 date: date,
@@ -47,6 +49,11 @@ enum SessionFinisher {
             )
             context.insert(entry)
             logged += 1
+
+            // The trail just grew — let the long-horizon coach look for a stall and
+            // remember its recommendation (deload / swap) once per stall.
+            StallDetector.detectAndRecord(
+                exId: exercise.exId, history: prior + [entry], context: context, date: date)
         }
 
         if isComplete {

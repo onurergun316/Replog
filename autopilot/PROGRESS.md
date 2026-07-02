@@ -315,3 +315,89 @@ HStack/VStack, no magic widths).
 **Recommended next item:** B3 (plateau + deload detection recorded to `CoachingLog`). It is
 READY, builds directly on B1's rule table and A3's `recordCoaching(.plateau/.deload, …)`
 write path, and is the last B-epic piece before the report epics (D1 consumes its logs).
+
+---
+
+## Iteration 6 — 2026-07-02 ~12:20 — Claude Fable 5 — Item B3
+
+**Item:** B3. Plateau + deload detection — detect stalls across sessions, recommend a
+deload or exercise swap, and record the recommendation to `CoachingLog`.
+
+**What changed:**
+- NEW `Replog/Domain/StallDetector.swift`:
+  - `StallTrend` (`regression`/`plateau`), `StallResponse` (`deload`/`swapExercise`),
+    `StallDetection` (exId, trend, response, `sessionsStalled`, `stallStartDate`,
+    last top set + e1RM).
+  - Pure `detect(exId:history:)` — reuses `ProgressionEngine`'s thresholds
+    (2 strict declines → regression, 3 non-improving deltas → plateau) over the
+    trailing run of the e1RM series; three refinements beyond B1:
+    (a) a **latest-session back-off** (top weight down ≥5%, `backoffFraction`) returns
+    nil — the user just deloaded, a rebuild in progress is not a stall;
+    (b) **escalation**: a back-off earlier in the last `swapLookbackDeltas` (8) steps
+    but *before* the current stalled run means a deload was already tried and didn't
+    fix it → response is `swapExercise` instead of another deload (the run's own drops
+    are excluded so a regression never counts as its own remedy);
+    (c) **bodyweight lifts** stall on top reps (stored e1RM is 0) and always get
+    `swapExercise` — there is no load to shed, change the stimulus.
+  - Pure `swapCandidates(for:catalog:limit:)` — same equipment (guaranteed available)
+    + same first primary muscle, ranked same-mechanic then same-level then name.
+  - `detectAndRecord(exId:history:context:catalog:date:)` — the CoachingLog write:
+    kind `.deload` (deload response, with `deloadToKg` via `ProgressionEngine.deloadWeight`
+    in the user's display units) or `.plateau` (swap response, candidate exIds in tags,
+    first candidate named in the summary); metrics carry `sessionsStalled`/last top set.
+    **One memory per stall**: skips when the newest plateau/deload log for the lift is
+    dated inside the current stall and carries the same response tag — a fresh stall or
+    a deload→swap escalation records anew.
+- `Replog/Domain/SessionFinisher.swift` — after each exercise's `HistoryEntry` insert,
+  calls `StallDetector.detectAndRecord` with prior history + the new entry (prior is
+  fetched before the insert, so no reliance on pending-changes fetch semantics).
+  Signature unchanged; partial finishes also detect (a logged session is real evidence).
+- NEW `ReplogTests/StallDetectorTests.swift` — 26 tests: too-little/progressing/single-dip
+  nil cases; order invariance; plateau + regression detection with `sessionsStalled` and
+  `stallStartDate`; three-flat-not-yet-plateau boundary; latest-back-off suppression;
+  tried-deload escalation to swap; regression's own drops not counting as a tried deload;
+  back-off older than the lookback not escalating; 3 bodyweight trend tests; 3
+  swap-candidate tests (equipment/muscle filter + self-exclusion, similarity ranking +
+  limit, bodyweight stays bodyweight); 7 recording tests (deload log content incl.
+  55 kg snap, once-per-stall dedup, escalation re-record, fresh-stall-after-recovery
+  re-record, progressing records nothing, unknown-exId generic summary, lb-units
+  summary); 1 `SessionFinisher` integration test (a 4th flat session at finish writes
+  exactly one `.deload` log dated at the finish).
+
+**Build:** clean, 0 errors / 0 warnings (`** BUILD SUCCEEDED **`).
+**Tests:** 245/245 passed on iPhone 17 (`result: Passed`, 0 failures; +26 new — the
+pre-existing suite counts 219, so iter 5's "218" was again off by one in the log, not
+a removed test). Every detection branch, both escalation paths, all dedup paths and
+the finisher wiring are exercised.
+
+**Screenshots:** none — Domain + store-layer change with no UI surface. The logs this
+writes get their UI in D1 (weekly report) / a future coaching feed.
+
+**Assumptions / decisions:**
+1. **Recording happens at Finish**, not session build: history only changes at finish,
+   so that is when the long-horizon trail is re-examined. The in-session banner (B2)
+   stays `ProgressionEngine`'s job; `StallDetector` owns the durable memory.
+2. **≥5% session-over-session top-weight drop reads as a deliberate back-off.** Used
+   both to suppress detection right after a deload (rebuild grace) and to detect that
+   a deload was already tried (escalate to swap). A genuine strength loss usually
+   keeps the weight and loses reps, so the heuristic separates the two in practice;
+   it is a named constant (`backoffFraction`) if the owner wants to tune it.
+3. **Escalation scans only outside the current stalled run** — a regression's own
+   weight drops are the problem, not an attempted remedy (tested).
+4. **Kind mirrors the response**: `.deload` logs a recommended back-off; `.plateau`
+   logs a persistent stall where a swap is recommended. Tags always carry
+   `response` + `trend` (+ candidate exIds for swaps) so D1 can group either way.
+5. Swap candidates require the same equipment as the stalled lift — the one piece of
+   equipment we KNOW the user has (profile doesn't persist the equipment quiz answer);
+   same *first* primary muscle keeps the swap purpose-equivalent.
+6. `sessionsStalled` counts the full trailing non-improving run (a regression preceded
+   by flats counts the flats too) — that is the number the user has felt.
+
+**NEEDS HUMAN REVIEW:** none for this item — pure tested math + a tested store write.
+(Standing item from iters 1–5: the live Apple Intelligence planner path still can't run
+in the simulator; verify on device.)
+
+**Recommended next item:** C1 (bodyweight check-in + history) — READY, independent of
+the B epic, and its store + trend calc unblock the D1 weekly report's bodyweight
+section. D1 itself is now unblocked too (A3 + B1 done, and B3's logs give it real
+coaching content), so C1 then D1 is the natural order.
