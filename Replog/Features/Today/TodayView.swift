@@ -16,11 +16,26 @@ struct TodayView: View {
     @Query private var profiles: [UserProfile]
     @Query private var history: [HistoryEntry]
     @Query private var activeSessions: [ActiveSession]
+    @Query(sort: \BodyweightEntry.date) private var bodyweightEntries: [BodyweightEntry]
+    @Query private var settingsRows: [AppSettings]
 
     @State private var path = NavigationPath()
     @State private var selectedStat: StatKind?
+    @State private var showingBodyweightSheet = false
+
+    init() {
+        #if DEBUG
+        if DebugSeed.wantsBodyweightSheet { _showingBodyweightSheet = State(initialValue: true) }
+        #endif
+    }
 
     private var profile: UserProfile { profiles.first ?? context.userProfile() }
+
+    private var units: Units { settingsRows.first?.units ?? .kg }
+
+    private var bodyweightSnapshot: BodyweightSnapshot? {
+        BodyweightTracker.snapshot(entries: bodyweightEntries)
+    }
 
     /// A paused/in-progress session, if any (one at a time).
     private var activeSession: ActiveSession? { activeSessions.first }
@@ -81,6 +96,14 @@ struct TodayView: View {
                     }
 
                     quickStats
+
+                    SectionHeader(title: "Bodyweight")
+                    BodyweightCard(
+                        snapshot: bodyweightSnapshot,
+                        due: BodyweightTracker.checkInDue(lastDate: bodyweightSnapshot?.date),
+                        units: units, goal: profile.goal
+                    ) { showingBodyweightSheet = true }
+
                     if let highlight = recentHighlight { highlight }
                 }
                 .padding(20)
@@ -88,6 +111,18 @@ struct TodayView: View {
             .background(Color.bg.ignoresSafeArea())
             .toolbar(.hidden, for: .navigationBar)
             .planNavigationDestinations()
+            .sheet(isPresented: $showingBodyweightSheet) {
+                BodyweightCheckInSheet(
+                    initialKg: bodyweightSnapshot?.currentKg ?? 75,
+                    units: units,
+                    lastCheckInLine: bodyweightSnapshot.map {
+                        "Last check-in: \(Formulas.formatBodyweight(kg: $0.currentKg, units: units)) · \($0.date.formatted(.relative(presentation: .named)))"
+                    }
+                ) { kg in
+                    context.logBodyweight(kg)
+                    try? context.save()
+                }
+            }
             .sheet(item: $selectedStat) { kind in
                 StatDetailSheet(kind: kind, doneDates: profile.doneDates, history: history,
                                 catalog: catalog, scheduledCount: scheduledDays.count,

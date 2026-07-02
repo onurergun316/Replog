@@ -401,3 +401,100 @@ in the simulator; verify on device.)
 the B epic, and its store + trend calc unblock the D1 weekly report's bodyweight
 section. D1 itself is now unblocked too (A3 + B1 done, and B3's logs give it real
 coaching content), so C1 then D1 is the natural order.
+
+---
+
+## Iteration 7 — 2026-07-02 ~12:40 — Claude Fable 5 — Item C1
+
+**Item:** C1. Bodyweight check-in + history — prompt periodically, store a time series,
+show a trend.
+
+**What changed:**
+- NEW `Replog/Models/Bodyweight.swift` — `BodyweightEntry @Model` (`id`, `date`,
+  `weightKg`; stored metric), registered in `ReplogSchema.models` (additive,
+  lightweight-migration safe).
+- `Replog/Models/ReplogStore.swift` — `logBodyweight(_:date:)` (single write path,
+  **one entry per calendar day**: same-day re-log updates instead of duplicating),
+  `bodyweightEntries()` (oldest-first, matching `history(forExercise:)`),
+  `latestBodyweight()`.
+- NEW `Replog/Domain/BodyweightTracker.swift` — pure:
+  - `checkInDue(lastDate:now:)` — due when never logged or ≥7 **calendar** days since
+    the last entry (named `checkInIntervalDays`).
+  - `snapshot(entries:)` → `BodyweightSnapshot {currentKg, date, deltaKg (vs previous
+    check-in), weeklyRateKg, direction, sparklineValues}`. Rate = least-squares slope
+    over the trailing 28-day window (`trendWindowDays`), needs ≥2 in-window points;
+    direction applies a ±0.15 kg/week noise deadband (`flatBandKgPerWeek`);
+    order-invariant; sparkline = last 12 entries at 0.1 kg resolution.
+  - `isFavorable(direction:goal:)` — up is good for buildMuscle, down for loseWeight,
+    everything else neutral (recomp/sport have no "right" scale direction) — drives the
+    card tint only.
+- `Replog/Domain/Formulas.swift` — bodyweight display trio: `displayBodyweight` /
+  `formatBodyweight` (0.1-precision lb — the existing `kgToLb` 5-lb rounding is plate
+  math, wrong for a scale) and `bodyweightStepKg` (±0.5 kg / ±1 lb).
+- NEW `Replog/Features/Today/BodyweightCheckIn.swift` — `BodyweightCard` (empty state:
+  accent-soft "Weekly check-in / Log your bodyweight" prompt; data state: weight in
+  `.metric` type, `TrendArrow` + goal-tinted rate line, accent `Sparkline`, caption =
+  "Check in due" when due else relative date) and `BodyweightCheckInSheet`
+  (`SetRestSheet` pattern: `NumericStepperField` with decimal pad in display units,
+  clamped 20–400 kg, "Last check-in" line, `PrimaryButton` save).
+- `Features/Today/TodayView.swift` — Bodyweight section between quick stats and the
+  highlight; `@Query` on entries + `AppSettings`; sheet saves via
+  `context.logBodyweight` + `save()`.
+- `Features/Onboarding/OnboardingFlow.swift` — `finish()` seeds the series from the
+  quiz `bodyWeightKg` **only when the series is empty** (regenerating a plan later must
+  not overwrite a real scale reading); first periodic prompt lands a week later.
+- `App/DebugSeed.swift` — seeds 5 weekly check-ins (78.6→76.8, last one 8 days ago so
+  the due state shows); NEW envs `REPLOG_BODYWEIGHT=1` (auto-present the entry sheet —
+  no UI automation exists to tap) and `REPLOG_MINIMAL=1` (skip the demo plan so
+  below-the-fold Today cards fit a screenshot).
+- NEW `ReplogTests/BodyweightTests.swift` — 21 tests: store insert/order/latest,
+  same-day upsert, cross-context persistence; due boundaries (0/3/6/7/10 days);
+  snapshot empty/single/up/down/deadband-flat/order-invariance; window exclusion of
+  stale entries; single-in-window → no rate but delta still reads; sparkline cap +
+  ordering; goal favorability matrix; lb precision (scale 168.7 lb vs bar 170 lb),
+  formatting, steps.
+
+**Build:** clean, 0 errors / 0 warnings (fixed 2 warnings from bare `min`/`max` inside a
+`ClosedRange` extension by qualifying `Swift.min`/`Swift.max`).
+**Tests:** 266/266 passed on iPhone 17 (`** TEST SUCCEEDED **`, 0 failures; was 245,
++21 — all logic-layer). Every tracker branch (due boundaries, both trend signs, deadband,
+window edges, no-spread guard) and all three store helpers are exercised.
+
+**Screenshots (iOS 26.5 sims):**
+- `autopilot/replog-c1-today.png` (iPhone 17, `REPLOG_SEED=1 REPLOG_MINIMAL=1`) — card
+  shows 76.8kg, red "-0.4kg/week" + down arrow (down is unfavorable for the seeded
+  buildMuscle goal — tint logic visibly correct), down-trending sparkline, accent
+  "Check in due". No clipping.
+- `autopilot/replog-c1-sheet.png` (+`REPLOG_BODYWEIGHT=1`) — entry sheet: guidance copy,
+  stepper prefilled 76.8 with kg suffix, "Last check-in: 76.8kg · last week", Save CTA.
+- `autopilot/replog-c1-promax.png` (17 Pro Max) — same card, no stretching/clipping.
+- Full-seed Today places the card below the fold (scroll position can't be automated);
+  the minimal seed exists precisely to verify it. First full-seed shot confirmed the
+  section header renders in flow.
+
+**Assumptions / decisions:**
+1. **Dedicated `BodyweightEntry` model, not `CoachingLog(kind: .bodyweight)`** — raw
+   time series are models (the `HistoryEntry` precedent); `CoachingLog` stays for coach
+   *observations*. D1 can read the series directly; no coaching log is written per
+   check-in (a weekly OBSERVATION belongs to D1/C2).
+2. **One entry per calendar day (upsert)** — a scale is re-stepped-on; the day's last
+   reading wins. Keeps the series clean for the regression.
+3. **7-day cadence, 28-day trend window, ±0.15 kg/wk deadband, ±0.5 kg / ±1 lb steps** —
+   all named constants for the owner to tune.
+4. **Prompting = the Today card's due state** (accent caption / first-log banner), not a
+   modal or notification — notifications are E1 (HUMAN-REVIEW).
+5. Sim runtime note: the default `iPhone 17` device on this machine is iOS 26.3.1 which
+   refuses the 26.5 build — screenshots used the iOS-26-5 iPhone 17 (3051B5BC…). Tests
+   are unaffected (xcodebuild picks a 26.5 clone).
+
+**NEEDS HUMAN REVIEW:**
+- Sheet detent/keyboard feel on device (decimal pad over the 340-pt detent) and whether
+  the red rate tint for a cutting user who *wants* the scale down reads correctly in
+  context (goal loseWeight tints down-green — verify it feels right, screenshots can't).
+- (Standing from iters 1–6: the live Apple Intelligence planner path still can't run in
+  the simulator; verify on device.)
+
+**Recommended next item:** D1 (weekly report). READY and everything it consumes now
+exists: `HistoryEntry` volume/PRs, `CoachingLog` plateau/deload notes (B3), and the
+bodyweight series + `BodyweightSnapshot` trend (C1) for its bodyweight section. C2 is
+the alternative if a smaller pure-logic item is preferred.

@@ -450,6 +450,12 @@ struct OnboardingFlow: View {
         if !vm.answers.fullName.isEmpty { profile.name = vm.answers.fullName }
         profile.goal = vm.answers.goal
         profile.onboardingDone = true
+        // The quiz weight starts the bodyweight series (baseline for the Today card;
+        // first periodic check-in due a week from now). Only when the series is empty —
+        // regenerating a plan later must not overwrite a real scale reading.
+        if context.latestBodyweight() == nil {
+            context.logBodyweight(vm.answers.bodyWeightKg)
+        }
         context.recomputeStreaks(profile: profile)
         try? context.save()
         if mode == .generatePlan {

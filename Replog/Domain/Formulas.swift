@@ -59,6 +59,33 @@ enum Formulas {
         return includeUnit ? "\(text)\(units.label)" : text
     }
 
+    // MARK: Bodyweight
+    // Bar-weight display rounds lb to the nearest 5 (plate math); bodyweight needs the
+    // scale's own resolution, so these convert at 0.1 precision instead.
+
+    /// The displayed bodyweight for a kg amount, at 0.1 precision in either unit.
+    static func displayBodyweight(kg: Double, units: Units) -> Double {
+        let value = units == .kg ? kg : kg * 2.20462
+        return (value * 10).rounded() / 10
+    }
+
+    /// Formats a bodyweight for display, dropping a trailing ".0" and appending the unit.
+    static func formatBodyweight(kg: Double, units: Units, includeUnit: Bool = true) -> String {
+        let value = displayBodyweight(kg: kg, units: units)
+        let text: String = value == value.rounded()
+            ? String(Int(value))
+            : String(format: "%.1f", value)
+        return includeUnit ? "\(text)\(units.label)" : text
+    }
+
+    /// Check-in stepper increment expressed in kg: ±0.5 kg, or ±1 lb when displaying lb.
+    static func bodyweightStepKg(units: Units) -> Double {
+        switch units {
+        case .kg: return 0.5
+        case .lb: return lbToKg(1)
+        }
+    }
+
     /// Parses user-typed weight text (entered in `units`) into clamped kilograms.
     /// Accepts "," or "." decimals; returns nil when the text isn't a number.
     static func parseWeightKg(_ raw: String, units: Units) -> Double? {

@@ -18,6 +18,12 @@ enum DebugSeed {
         ProcessInfo.processInfo.environment["REPLOG_SEED"] == "1"
     }
 
+    /// REPLOG_BODYWEIGHT=1 -> Today opens with the bodyweight check-in sheet presented
+    /// (no UI automation available, so the entry sheet is verified via launch state).
+    static var wantsBodyweightSheet: Bool {
+        ProcessInfo.processInfo.environment["REPLOG_BODYWEIGHT"] == "1"
+    }
+
     static var initialTab: MainTabView.Tab? {
         switch ProcessInfo.processInfo.environment["REPLOG_TAB"] {
         case "plans": return .plans
@@ -39,15 +45,21 @@ enum DebugSeed {
         }
         guard !profile.onboardingDone else { return }
 
-        var answers = QuizAnswers()
-        answers.firstName = "Alex"
-        answers.daysPerWeek = 3
-        let generated = PlanGenerator().generate(answers)
-        let report = ReportComposer.fallbackMarkdown(answers: answers, plan: generated)
-        let plan = PlanFactory.insert(generated, into: context, order: 0, reportMarkdown: report)
+        // REPLOG_MINIMAL=1 -> skip the demo plan + lift history (short Today page, so
+        // below-the-fold cards like the bodyweight check-in land in a screenshot).
+        let minimal = ProcessInfo.processInfo.environment["REPLOG_MINIMAL"] == "1"
+        var plan: Plan?
+        if !minimal {
+            var answers = QuizAnswers()
+            answers.firstName = "Alex"
+            answers.daysPerWeek = 3
+            let generated = PlanGenerator().generate(answers)
+            let report = ReportComposer.fallbackMarkdown(answers: answers, plan: generated)
+            plan = PlanFactory.insert(generated, into: context, order: 0, reportMarkdown: report)
+        }
 
         // Fabricate a few weeks of history for the first exercise to populate Progress.
-        if let firstItem = plan.orderedWorkouts.first?.orderedItems.first {
+        if let firstItem = plan?.orderedWorkouts.first?.orderedItems.first {
             let exId = firstItem.exId
             let cal = Calendar.current
             for (i, e1rm) in [92, 96, 99, 104, 110].enumerated() {
@@ -57,6 +69,14 @@ enum DebugSeed {
                                                             RecordedSet(w: 60, r: 10)])
                 context.insert(entry)
             }
+        }
+
+        // A month of weekly bodyweight check-ins (gently trending down), the last one
+        // 8 days ago so the Today card also shows the "Check in due" state.
+        let bodyweights: [Double] = [78.6, 78.1, 77.7, 77.4, 76.8]
+        for (i, kg) in bodyweights.enumerated() {
+            let date = Calendar.current.date(byAdding: .day, value: -(36 - i * 7), to: Date()) ?? Date()
+            context.logBodyweight(kg, date: date)
         }
 
         profile.name = "Alex"
@@ -69,7 +89,7 @@ enum DebugSeed {
 
         // Optionally drop straight into a live workout for verification.
         if ProcessInfo.processInfo.environment["REPLOG_ACTIVE"] == "1",
-           let workout = plan.orderedWorkouts.first {
+           let workout = plan?.orderedWorkouts.first {
             let session = SessionBuilder.start(workout: workout, into: context)
             if ProcessInfo.processInfo.environment["REPLOG_COMPLETE"] == "1" {
                 // Mark everything done to preview the completion celebration.

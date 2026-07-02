@@ -15,7 +15,7 @@ enum ReplogSchema {
         Plan.self, Workout.self, PlanItem.self, SetTemplate.self,
         ActiveSession.self, SessionExercise.self, LoggedSet.self,
         HistoryEntry.self, UserProfile.self, AppSettings.self,
-        CoachingLog.self
+        CoachingLog.self, BodyweightEntry.self
     ]
 
     /// The app's on-disk container.
@@ -104,6 +104,38 @@ extension ModelContext {
             sortBy: [SortDescriptor(\.date)]
         )
         return (try? fetch(descriptor)) ?? []
+    }
+
+    // MARK: - Bodyweight
+
+    /// All bodyweight check-ins, oldest first (matches `history(forExercise:)`).
+    func bodyweightEntries() -> [BodyweightEntry] {
+        let descriptor = FetchDescriptor<BodyweightEntry>(sortBy: [SortDescriptor(\.date)])
+        return (try? fetch(descriptor)) ?? []
+    }
+
+    /// The most recent bodyweight check-in, if any.
+    func latestBodyweight() -> BodyweightEntry? {
+        var descriptor = FetchDescriptor<BodyweightEntry>(
+            sortBy: [SortDescriptor(\.date, order: .reverse)])
+        descriptor.fetchLimit = 1
+        return ((try? fetch(descriptor)) ?? []).first
+    }
+
+    /// Records a bodyweight check-in. One entry per calendar day: logging again on the
+    /// same day updates that day's entry instead of inserting a duplicate.
+    @discardableResult
+    func logBodyweight(_ weightKg: Double, date: Date = Date()) -> BodyweightEntry {
+        if let sameDay = bodyweightEntries().last(where: {
+            Calendar.current.isDate($0.date, inSameDayAs: date)
+        }) {
+            sameDay.weightKg = weightKg
+            sameDay.date = date
+            return sameDay
+        }
+        let entry = BodyweightEntry(weightKg: weightKg, date: date)
+        insert(entry)
+        return entry
     }
 
     // MARK: - Coaching memory

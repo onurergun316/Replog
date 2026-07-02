@@ -91,18 +91,30 @@ Status key: READY · BLOCKED · HUMAN-REVIEW · DONE
 
 ## Epic C — Check-ins and tracking
 
-- [ ] READY  **C1. Bodyweight check-in + history.**
+- [x] DONE (iter 7, 2026-07-02)  **C1. Bodyweight check-in + history.**
   Prompt periodically for bodyweight, store a time series, show a trend.
   *Accept:* store + trend calc tested; entry UI seeded-launch screenshot captured.
+  *Done:* `Replog/Models/Bodyweight.swift` — `BodyweightEntry @Model` (kg + date) with
+  `ReplogStore` helpers `logBodyweight` (one entry per calendar day, same-day upsert),
+  `bodyweightEntries()`, `latestBodyweight()`. Pure `Domain/BodyweightTracker` —
+  `checkInDue` (7-calendar-day cadence), `snapshot(entries:)` (`BodyweightSnapshot`:
+  delta vs last, least-squares kg/week over a 28-day window, up/down/flat with a
+  0.15 kg/wk deadband, sparkline series) and goal-aware `isFavorable`. `Formulas`
+  gains 0.1-precision bodyweight display/format/step (bar weights keep 5-lb rounding).
+  Today shows a `BodyweightCard` (current weight + tinted rate + sparkline + "Check in
+  due", or a first-log prompt) opening `BodyweightCheckInSheet` (NumericStepperField,
+  ±0.5 kg / ±1 lb); onboarding seeds the series from the quiz weight only when empty.
+  21 tests in `ReplogTests/BodyweightTests.swift`; screenshots
+  `autopilot/replog-c1-today.png` / `replog-c1-sheet.png` / `replog-c1-promax.png`.
 
-- [ ] BLOCKED (needs A1)  **C2. Goal/sport-specific coaching module.**
+- [ ] READY (A1 done)  **C2. Goal/sport-specific coaching module.**
   For each goal (muscle gain, fat loss, running, cycling, sport + custom), a small
   strategy that shapes the check-in questions and the advice emphasis.
   *Accept:* one strategy per goal, selected by `UserProfile.goal`, logic unit-tested.
 
 ## Epic D — Reports
 
-- [ ] BLOCKED (needs A3, B1)  **D1. Weekly report.**
+- [ ] READY (A3, B1 done; B3 + C1 give it coaching logs + a bodyweight series)  **D1. Weekly report.**
   Compose a weekly summary (volume, PRs, adherence, one coaching note) from
   `HistoryEntry` + `CoachingLog`; store as markdown, readable in Profile like the
   existing AI Coach reports.
