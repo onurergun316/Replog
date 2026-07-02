@@ -31,15 +31,21 @@ Status key: READY · BLOCKED · HUMAN-REVIEW · DONE
   the sim; live model verified on device; history-signal properties assert the SIGNAL, with
   acting-on-it deferred to B-series).
 
-- [ ] READY  **A3. Coaching memory store.**
+- [x] DONE (iter 3, 2026-07-02)  **A3. Coaching memory store.**
   A SwiftData `@Model` `CoachingLog` (date, kind, summary, structured payload) plus
   fetch-or-create helpers in `ReplogStore`. This is the durable context the trainer
   "remembers" across weeks.
   *Accept:* model + relationships + cascade rules tested on the in-memory container.
+  *Done:* `Replog/Models/Coaching.swift` — `CoachingLog @Model` (`kind`/`CoachingKind`,
+  `summary`, `date`, `exId`/`planId` id-references, JSON `CoachingPayload {metrics, tags}`),
+  registered in `ReplogSchema.models`; `ReplogStore` helpers `recordCoaching(…)`,
+  `coachingLogs(kind:limit:)`, `latestCoachingLog(kind:)`, `coachingLogs(forExercise:)`.
+  `ReplogTests/CoachingLogTests.swift` — 14 tests incl. the "memory outlives the plan"
+  reference-not-relationship rule (log survives `ctx.delete(plan)`).
 
 ## Epic B — Adaptive progression (the core "it adjusts over time" value)
 
-- [ ] BLOCKED (needs A1, A3)  **B1. Progression engine (deterministic core).**
+- [ ] READY  **B1. Progression engine (deterministic core).**
   Pure `Domain/ProgressionEngine`: given a lift's history, output a recommendation
   (increase load / increase reps / hold / deload) with a reason. Keep the MATH in
   code, not the model.
@@ -56,7 +62,7 @@ Status key: READY · BLOCKED · HUMAN-REVIEW · DONE
 
 ## Epic C — Check-ins and tracking
 
-- [ ] BLOCKED (needs A3)  **C1. Bodyweight check-in + history.**
+- [ ] READY  **C1. Bodyweight check-in + history.**
   Prompt periodically for bodyweight, store a time series, show a trend.
   *Accept:* store + trend calc tested; entry UI seeded-launch screenshot captured.
 

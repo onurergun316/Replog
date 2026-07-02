@@ -108,3 +108,69 @@ production code touched — additive test-only files.
 
 **Recommended next item:** A3 (Coaching memory store — `CoachingLog` `@Model` + `ReplogStore`
 helpers). It is READY, has no blockers, and unblocks B1/B3/C1/D1.
+
+---
+
+## Iteration 3 — 2026-07-02 ~10:55 — Claude Opus 4.8 — Item A3
+
+**Item:** A3. Coaching memory store — the durable context the trainer "remembers" across weeks.
+
+**What changed:**
+- NEW `Replog/Models/Coaching.swift`:
+  - `CoachingKind` enum (`note`, `progression`, `plateau`, `deload`, `bodyweight`,
+    `weeklyReport`, `monthlyReport`, `planAdjustment`) with `displayName`.
+  - `CoachingPayload` value type (`metrics: [String: Double]`, `tags: [String]`) with a
+    lenient `init(from:)` so a bare `{}` and forward-compatible payloads decode to empties;
+    `subscript(metric:)` accessor.
+  - `CoachingLog @Model`: `id`, `date`, `kindRaw`(+typed `kind`), `summary`, optional
+    `exId` / `planId` **id references** (not relationships — matching `HistoryEntry` /
+    `ActiveSession.workoutId`, so the memory OUTLIVES the plan/exercise it concerned),
+    and `payloadJSON`(+typed `payload`, the `HistoryEntry.sets` JSON pattern).
+- `Replog/Models/ReplogStore.swift`:
+  - Registered `CoachingLog.self` in `ReplogSchema.models`.
+  - `ModelContext` helpers: `recordCoaching(_:summary:date:exId:planId:payload:)` (the single
+    write path, `@discardableResult`), `coachingLogs(kind:limit:)` (newest-first, optional
+    kind predicate + fetchLimit), `latestCoachingLog(kind:)`, `coachingLogs(forExercise:)`.
+- NEW `ReplogTests/CoachingLogTests.swift` — 14 tests: kind/payload round-trips, lenient
+  `{}` decode, save+fetch persistence, record/return, newest-first ordering, kind filter,
+  limit, latest-of-kind, per-exercise filter, and the two cascade rules — **a log survives
+  `ctx.delete(plan)`** (memory outlives the plan; `planId` still set, no cascade) and deleting
+  a log leaves unrelated data intact.
+
+**Reviewer pass:** id-reference (not `@Relationship`) is deliberate and matches the codebase's
+cross-cutting-log convention (`HistoryEntry`, `ActiveSession.workoutId`) — a relationship with a
+cascade inverse would have *deleted* the memory when a plan is removed, the opposite of the intent.
+Enum/payload typed accessors mirror `Goal`/`Units`/`HistoryEntry.sets`. Predicate captures
+`kind.rawValue` into a local (SwiftData `#Predicate` requirement). No retain cycles; models are
+`@MainActor`-isolated as the rest of the layer. Additive only — no existing type or behavior changed.
+
+**Build:** clean, 0 errors / 0 warnings (`** BUILD SUCCEEDED **`).
+**Tests:** 190/190 passed on iPhone 17 (was 176; +14, all in `CoachingLogTests`, all logic-layer).
+Coverage: the new file's every branch (`kind`/`payload` get+set, lenient decode, all four store
+helpers, both cascade paths) is exercised.
+
+**Screenshots:** none — model/store-layer change with no UI surface (the coaching feed/report UI
+that will *render* these logs is D1/future).
+
+**Assumptions / decisions:**
+1. **Id references, not relationships.** `exId`/`planId` are plain optionals, so the coaching
+   memory persists after its plan or exercise is gone. "relationships + cascade rules tested"
+   (accept criteria) is honored by asserting the *no-cascade* property, which is the correct
+   behavior for a durable memory and matches the house convention.
+2. **`recordCoaching` is the single write path** (returns the inserted log, `@discardableResult`)
+   so B1/B3/C1/D1 write memory one way. It inserts but does not `save()` — callers batch the save
+   with their own transaction, as elsewhere in the codebase.
+3. **`CoachingPayload` is a flexible `metrics`+`tags` bag** rather than a per-kind struct, so each
+   future kind carries only what it needs without a schema change; lenient decoding keeps old rows
+   readable as the payload evolves.
+4. No `fetchLimit` on the unfiltered path unless `limit` is passed; `coachingLogs()` returns all.
+
+**NEEDS HUMAN REVIEW:** none for this item — it is pure model/store logic fully covered by tests.
+(Standing item from iters 1–2 still open: the live Apple Intelligence planner path is unexercised
+in the simulator; verify on device.)
+
+**Recommended next item:** B1 (Progression engine — pure `Domain/ProgressionEngine`). It is now
+READY (A1 + A3 both done), keeps the MATH in code, is fully unit-testable across
+progressing/stalling/regressing histories, and its recommendations can be recorded via the new
+`recordCoaching(.progression, …)` / `recordCoaching(.deload, …)` write path — directly unblocking
+B2, B3, and D1.

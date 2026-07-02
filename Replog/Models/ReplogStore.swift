@@ -14,7 +14,8 @@ enum ReplogSchema {
     static let models: [any PersistentModel.Type] = [
         Plan.self, Workout.self, PlanItem.self, SetTemplate.self,
         ActiveSession.self, SessionExercise.self, LoggedSet.self,
-        HistoryEntry.self, UserProfile.self, AppSettings.self
+        HistoryEntry.self, UserProfile.self, AppSettings.self,
+        CoachingLog.self
     ]
 
     /// The app's on-disk container.
@@ -101,6 +102,52 @@ extension ModelContext {
         let descriptor = FetchDescriptor<HistoryEntry>(
             predicate: #Predicate { $0.exId == exId },
             sortBy: [SortDescriptor(\.date)]
+        )
+        return (try? fetch(descriptor)) ?? []
+    }
+
+    // MARK: - Coaching memory
+
+    /// Records a coaching note into the durable memory and returns the inserted log.
+    /// This is the single write path the trainer uses to "remember" something.
+    @discardableResult
+    func recordCoaching(
+        _ kind: CoachingKind,
+        summary: String,
+        date: Date = Date(),
+        exId: String? = nil,
+        planId: UUID? = nil,
+        payload: CoachingPayload = CoachingPayload()
+    ) -> CoachingLog {
+        let log = CoachingLog(
+            kind: kind, summary: summary, date: date,
+            exId: exId, planId: planId, payload: payload
+        )
+        insert(log)
+        return log
+    }
+
+    /// Coaching logs, newest first. Optionally filtered to one `kind` and capped to `limit`.
+    func coachingLogs(kind: CoachingKind? = nil, limit: Int? = nil) -> [CoachingLog] {
+        var descriptor = FetchDescriptor<CoachingLog>(sortBy: [SortDescriptor(\.date, order: .reverse)])
+        if let kind {
+            let raw = kind.rawValue
+            descriptor.predicate = #Predicate { $0.kindRaw == raw }
+        }
+        if let limit { descriptor.fetchLimit = limit }
+        return (try? fetch(descriptor)) ?? []
+    }
+
+    /// The most recent coaching log of a given kind, if any.
+    func latestCoachingLog(kind: CoachingKind) -> CoachingLog? {
+        coachingLogs(kind: kind, limit: 1).first
+    }
+
+    /// Coaching logs concerning one exercise, newest first.
+    func coachingLogs(forExercise exId: String) -> [CoachingLog] {
+        let descriptor = FetchDescriptor<CoachingLog>(
+            predicate: #Predicate { $0.exId == exId },
+            sortBy: [SortDescriptor(\.date, order: .reverse)]
         )
         return (try? fetch(descriptor)) ?? []
     }
