@@ -49,3 +49,62 @@ UI is untouched.
 
 **Recommended next item:** A2 (planner eval harness — personas + property assertions); it now
 can also assert prompt-level properties over `AthleteContext` personas.
+
+---
+
+## Iteration 2 — 2026-07-02 ~10:50 — Claude Opus 4.8 — Item A2
+
+**Item:** A2. Planner eval harness (personas + property assertions, AUTOPILOT §5).
+
+**What changed:**
+- NEW `ReplogTests/PlannerEval.swift` — the harness:
+  - `EvalPersona` (name + `QuizAnswers` + fabricated `HistoryEntry` trail) and `EvalPersonas`
+    (`@MainActor`) with `progressing(…)` / `stalling(…)` history builders and `all(catalog:now:)`
+    returning **7 personas**: fresh beginner (no history), intermediate w/ bench+squat
+    progressing, machine-only, bodyweight-only, knee-injured runner, fat-loss home-dumbbell
+    staller, advanced high-frequency recomp w/ mixed history.
+  - `PlannerEvalMetrics` (pure): `exercises/equipmentUsed/primaryMusclesTrained/`
+    `weeklySetsPerMuscle/prescribedReps/prescribedRPE` over a `GeneratedPlan` + catalog.
+  - `EvalPrescription` — goal→reps, experience→RPE contract, and weekly-set guardrails
+    (`minEffectiveSets = 2`, `maxRecoverableSets = 40`).
+- NEW `ReplogTests/PlannerEvalTests.swift` — **14 property tests** over the roster:
+  non-empty plan; day count == request (3–6); equipment never exceeds allowed;
+  machine-only never gets `.bodyOnly` (and only `.machine`); bodyweight ⊆ {bodyOnly, bands};
+  injured muscles never primary movers; reps==goal contract; RPE==experience contract;
+  weekly sets/muscle in band; ≥4 muscles trained; progressing history → up trend, stalling →
+  flat trend (`AthleteContext` signal); rich history → different, in-budget framing prompt;
+  candidate list never offers unavailable equipment.
+
+**Reviewer pass:** metrics are pure and `@MainActor` only where `HistoryEntry` (a `@Model`)
+requires it; personas built from the real catalog so exId resolution and equipment filters
+match production; no force-unwraps except `try! #require` in tests (idiomatic here). No
+production code touched — additive test-only files.
+
+**Build:** clean, 0 errors / 0 warnings (`** BUILD SUCCEEDED **`).
+**Tests:** 176/176 passed on iPhone 17 (was 162; +14, all in `PlannerEvalTests`, all logic-layer).
+
+**Screenshots:** none — test-only change, no UI surface.
+
+**Assumptions / decisions:**
+1. **Fallback caveat (documented in file header):** `FoundationModels` is unavailable in the
+   simulator, so every persona's plan comes from the deterministic `PlanGenerator`. The
+   properties constrain the PLAN (equipment/muscles/volume/prescription), so they guard both
+   engines, but the live model's specific picks still need on-device verification.
+2. **Progression property is asserted as a SIGNAL, not an action.** The deterministic engine
+   does not yet adapt load/reps to history (that is B1). So the harness asserts that
+   `AthleteContext.make` correctly reports an *up* trend for a progressing trail and *flat* for
+   a stalled one — i.e. the data feeding the planner is right — and treats the deterministic
+   prescription (reps/RPE) as a fixed contract. When B1 lands, `EvalPrescription` becomes
+   history-aware bands and those two tests tighten into "next prescription increases".
+3. **Weekly-set band = [2, 40] sets/muscle.** Evidence-based hypertrophy targets (10–20) are
+   *not* asserted because the current volume-blind engine can't guarantee them for every muscle
+   in a 3-day split; [2, 40] catches trivial/junk volume and is the honest guardrail until a
+   volume-aware generator exists. Noted as future tightening.
+
+**NEEDS HUMAN REVIEW:**
+- The live Apple Intelligence planner path is still unexercised by tests (sim limitation). The
+  eval harness now makes it cheap to re-run the same property checks against a real on-device
+  plan — worth doing manually once to confirm the model honors equipment/injury constraints.
+
+**Recommended next item:** A3 (Coaching memory store — `CoachingLog` `@Model` + `ReplogStore`
+helpers). It is READY, has no blockers, and unblocks B1/B3/C1/D1.

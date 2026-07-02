@@ -20,9 +20,16 @@ Status key: READY · BLOCKED · HUMAN-REVIEW · DONE
   measured margin; a persona with rich history produces a visibly different plan than
   an empty-history persona.
 
-- [ ] READY  **A2. Planner eval harness.**
+- [x] DONE (iter 2, 2026-07-02)  **A2. Planner eval harness.**
   Personas + property assertions per AUTOPILOT section 5.
   *Accept:* >=6 personas, all properties assert, suite green, documented fallback caveat.
+  *Done:* `ReplogTests/PlannerEval.swift` (7 personas + pure `PlannerEvalMetrics`) and
+  `ReplogTests/PlannerEvalTests.swift` (14 property tests: equipment never violated,
+  machine-only/bodyweight guards, injuries excluded, reps/RPE contract, weekly-set band,
+  balanced coverage, progressing/stalling trend signal, in-budget prompt, candidate-list
+  equipment). Fallback caveat documented in the file header (deterministic engine runs in
+  the sim; live model verified on device; history-signal properties assert the SIGNAL, with
+  acting-on-it deferred to B-series).
 
 - [ ] READY  **A3. Coaching memory store.**
   A SwiftData `@Model` `CoachingLog` (date, kind, summary, structured payload) plus
