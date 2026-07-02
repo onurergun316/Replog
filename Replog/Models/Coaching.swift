@@ -54,7 +54,10 @@ enum CoachingKind: String, Codable, CaseIterable, Identifiable, Sendable {
 /// Structured detail for a `CoachingLog`, kept flexible so each `CoachingKind` can carry
 /// only what it needs. Numeric facts (weights, e1RM, trend %, bodyweight) go in `metrics`;
 /// short labels (recommended action verbs, muscle names) go in `tags`.
-struct CoachingPayload: Codable, Hashable, Sendable {
+// Nonisolated: a pure value type whose Codable conformance must be usable inside the
+// nonisolated JSONDecoder/JSONEncoder generics (the custom `init(from:)` would otherwise
+// inherit the module's default MainActor isolation).
+nonisolated struct CoachingPayload: Codable, Hashable, Sendable {
     /// Named numeric facts, e.g. `["fromWeightKg": 60, "toWeightKg": 62.5, "trendPct": 4.1]`.
     var metrics: [String: Double]
     /// Short labels, e.g. `["increaseLoad"]` or `["chest", "triceps"]`.

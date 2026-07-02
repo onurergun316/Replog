@@ -174,3 +174,72 @@ READY (A1 + A3 both done), keeps the MATH in code, is fully unit-testable across
 progressing/stalling/regressing histories, and its recommendations can be recorded via the new
 `recordCoaching(.progression, …)` / `recordCoaching(.deload, …)` write path — directly unblocking
 B2, B3, and D1.
+
+---
+
+## Iteration 4 — 2026-07-02 ~11:40 — Claude Fable 5 — Item B1
+
+**Item:** B1. Progression engine (deterministic core) — increase load / increase reps / hold /
+deload with a reason, math in code, not the model.
+
+**What changed:**
+- NEW `Replog/Domain/ProgressionEngine.swift` — pure double-progression rule table:
+  - `ProgressionAction` (`increaseLoad`/`increaseReps`/`hold`/`deload`, `displayName`) and
+    `ProgressionRecommendation` (`exId`, `action`, `suggestedWeightKg`, `suggestedReps`,
+    one-sentence `reason` ready for the B2 log card / a B3 `CoachingLog`).
+  - `recommend(exId:history:repRange:weightStepKg:units:)` — rules, first match wins:
+    (1) bodyweight lift (topW 0) trends on **reps** (stored e1RM is weight-based, always 0)
+    — +1 rep uncapped, or hold on a rep stall/regression, never a weight suggestion;
+    (2) rep-range top reached → +1 weight step, reps reset to the range floor;
+    (3) e1RM dropped 2 consecutive deltas → deload; (4) no e1RM improvement across
+    3 deltas → plateau deload; (5) single down session → hold (noise, not a trend);
+    (6) otherwise +1 rep (clamped into the range).
+  - `deloadWeight(fromKg:stepKg:)` — ~10% off, snapped to the stepper increment, always
+    strictly below the current weight, floored at 0.
+  - `repRange(for goal:)` — 8–12 hypertrophy/recomp, 12–15 fat loss, 6–10 sport (brackets
+    `PlanGenerator`'s fixed 10/13/8); goal+units convenience reuses `Formulas.weightStepKg`
+    and formats reasons via `Formulas.formatWeight` in the user's display units.
+- FIX `Replog/Models/Coaching.swift` — `CoachingPayload` is now `nonisolated`: a clean full
+  build surfaced 2 Swift-6 warnings from iter 3 (MainActor-isolated Codable conformance used
+  inside nonisolated JSONDecoder/JSONEncoder generics — the custom `init(from:)` suppressed
+  the usual nonisolated synthesis). Behavior unchanged; all 14 CoachingLog tests still green.
+- NEW `ReplogTests/ProgressionEngineTests.swift` — 21 tests: empty/single-session/order-
+  invariance; progressing (+rep, range-top +load & reset, above-top, below-floor lift);
+  priority (range top beats a regressing trail); off-day hold; 2-drop regression deload;
+  4-session flat plateau deload; 3-session flat still pushes reps; dip-then-recovery is not
+  a regression; bodyweight rep progression past the range top + bodyweight stall holds;
+  deload snapping/strict-below (property-swept 2.5–200 kg)/zero-step/zero-weight; goal rep
+  ranges bracket the generator prescription; goal convenience; lb step + lb-formatted reasons.
+
+**Build:** clean, 0 errors / 0 warnings (** BUILD SUCCEEDED **) — after fixing the two
+pre-existing iter-3 warnings above.
+**Tests:** 211/211 passed on iPhone 17 (was 190; +21, all logic-layer). Every rule branch,
+both deload reasons, both bodyweight paths and all `deloadWeight` edges are exercised.
+
+**Screenshots:** none — pure Domain addition, no UI surface yet (that's B2).
+
+**Assumptions / decisions:**
+1. **Double progression** is the model: reps climb at fixed weight; load rises only when the
+   goal's rep-range top is hit (then reps reset to the floor). Thresholds as named constants:
+   `regressionDeltas = 2` (e1RM strictly down), `plateauDeltas = 3` (no improvement),
+   `deloadFactor = 0.9`.
+2. **Hitting the range top beats a bad trend** — reaching the top IS current success even if
+   prior sessions regressed (tested).
+3. **Bodyweight lifts trend on reps, not e1RM** — stored e1RM is `weight × (1 + reps/30)` = 0
+   at 0 kg, so an e1RM-based stall signal would mark ANY 4-session bodyweight trail a plateau.
+   Caught by hand-verifying test expectations; rep-delta logic added. Bodyweight stalls hold
+   (form/quality cue) rather than "deload" a weight that doesn't exist.
+4. The engine is **per-lift and history-in, recommendation-out pure**; no CoachingLog writes
+   (that wiring is B3's acceptance) and no windowing — callers pass the (already relevant)
+   entries, matching `ProgressAggregator`'s contract.
+5. A single down session recommends **hold**, not deload — one bad day is noise; the reason
+   string says so.
+
+**NEEDS HUMAN REVIEW:** none for this item — pure tested math. (Standing item from iters 1–3:
+the live Apple Intelligence planner path still can't run in the simulator; verify on device.)
+
+**Recommended next item:** B2 (apply recommendations to the next session — surface
+`ProgressionRecommendation` on the log card without overwriting user input). It is READY,
+consumes B1 directly, and its acceptance (suggestion visible + dismissible + seeded-launch
+screenshot) is the first user-visible payoff of the adaptive trainer. B3 is also READY if a
+smaller item is preferred.

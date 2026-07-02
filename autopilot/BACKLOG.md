@@ -45,18 +45,26 @@ Status key: READY · BLOCKED · HUMAN-REVIEW · DONE
 
 ## Epic B — Adaptive progression (the core "it adjusts over time" value)
 
-- [ ] READY  **B1. Progression engine (deterministic core).**
+- [x] DONE (iter 4, 2026-07-02)  **B1. Progression engine (deterministic core).**
   Pure `Domain/ProgressionEngine`: given a lift's history, output a recommendation
   (increase load / increase reps / hold / deload) with a reason. Keep the MATH in
   code, not the model.
   *Accept:* rule table unit-tested across progressing / stalling / regressing histories.
+  *Done:* `Replog/Domain/ProgressionEngine.swift` — double progression rule table
+  (`ProgressionAction` + `ProgressionRecommendation {suggestedWeightKg, suggestedReps,
+  reason}`): range top → +load & rep reset; 2 consecutive e1RM drops → deload ~10%
+  (snapped to the unit step, strictly below current); 3 non-improving deltas → plateau
+  deload; single dip → hold; else +1 rep. Bodyweight lifts trend on REPS (e1RM is 0) and
+  never get weight suggestions. `repRange(for goal:)` brackets the generator's fixed reps;
+  goal/units convenience reuses `Formulas.weightStepKg`/`formatWeight` so reasons render
+  in the user's units. `ReplogTests/ProgressionEngineTests.swift` — 21 tests.
 
-- [ ] BLOCKED (needs B1)  **B2. Apply recommendations to the next session.**
+- [ ] READY (unblocked by B1)  **B2. Apply recommendations to the next session.**
   Surface B1 output when building a session (e.g. suggested next weight/reps on the
   log card) without auto-overwriting user input.
   *Accept:* suggestion visible, dismissible, seeded-launch screenshot captured.
 
-- [ ] BLOCKED (needs A2, B1)  **B3. Plateau + deload detection.**
+- [ ] READY (A2 + B1 done)  **B3. Plateau + deload detection.**
   Detect stalls across sessions and recommend a deload or exercise swap.
   *Accept:* detection is a pure tested function; recommendation recorded to `CoachingLog`.
 
