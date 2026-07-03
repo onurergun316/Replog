@@ -25,6 +25,12 @@ struct ProfileView: View {
     private var plansWithReports: [Plan] { plans.filter(\.hasReport) }
     /// Recent surfaced coach insights (debriefs, milestones, Today cards), newest first.
     private var recentInsights: [CoachingLog] { context.coachingLogs(kind: .coachInsight, limit: 15) }
+    /// Published weekly + monthly narrative reports, newest first.
+    private var trainingReports: [CoachingLog] {
+        (context.coachingLogs(kind: .weeklyReport) + context.coachingLogs(kind: .monthlyReport))
+            .sorted { $0.date > $1.date }
+    }
+    @State private var reportToRead: CoachingLog?
     private var workoutStreak: Int {
         StreakEngine.workoutStreak(scheduledDays: scheduledDays, doneDates: profile.doneDates)
     }
@@ -40,6 +46,7 @@ struct ProfileView: View {
                     profileHeader
                     statsRow
                     if !plansWithReports.isEmpty { coachReports }
+                    if !trainingReports.isEmpty { trainingReportsSection }
                     if !recentInsights.isEmpty { coachInsightsSection }
                     preferences
                     resetButton
@@ -61,6 +68,12 @@ struct ProfileView: View {
                                 catalog: catalog, scheduledCount: scheduledDays.count,
                                 workoutStreakValue: workoutStreak, weekStreakValue: weekStreak,
                                 totalWorkouts: profile.totalWorkouts)
+            }
+            .sheet(item: $reportToRead) { report in
+                NavigationStack {
+                    CoachReportView(title: report.summary, markdown: report.bodyMarkdown ?? "",
+                                    showsDoneButton: true)
+                }
             }
         }
     }
@@ -87,6 +100,30 @@ struct ProfileView: View {
             stat("\(profile.totalWorkouts)", "Workouts") { selectedStat = .workouts }
             stat("\(workoutStreak)", "Workout streak") { selectedStat = .workoutStreak }
             stat("\(weekStreak)", "Week streak") { selectedStat = .weekStreak }
+        }
+    }
+
+    private var trainingReportsSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            SectionHeader(title: "Training Reports")
+            ForEach(trainingReports) { report in
+                Button { reportToRead = report } label: {
+                    HStack(spacing: 12) {
+                        Image(systemName: report.kind == .monthlyReport ? "calendar" : "calendar.day.timeline.left")
+                            .font(.system(size: 16, weight: .bold)).foregroundStyle(Color.accent)
+                            .frame(width: 24)
+                        Text(report.summary)
+                            .font(.rounded(15, .heavy)).foregroundStyle(Color.textPrimary)
+                            .lineLimit(2)
+                        Spacer(minLength: 0)
+                        Image(systemName: "chevron.right").font(.system(size: 12, weight: .bold))
+                            .foregroundStyle(Color.text3)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(14).cardSurface()
+                }
+                .buttonStyle(.plain)
+            }
         }
     }
 

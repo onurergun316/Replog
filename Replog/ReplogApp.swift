@@ -11,6 +11,7 @@ import SwiftData
 
 @main
 struct ReplogApp: App {
+    @Environment(\.scenePhase) private var scenePhase
     let container: ModelContainer
 
     init() {
@@ -22,6 +23,8 @@ struct ReplogApp: App {
         _ = context.userProfile()
         _ = context.appSettings()
         try? context.save()
+        // Register the best-effort background report refresh (no-ops if not permitted).
+        ReportScheduler.registerBackgroundTask(container: container)
     }
 
     var body: some Scene {
@@ -30,5 +33,16 @@ struct ReplogApp: App {
                 .environment(\.exerciseCatalog, .shared)
         }
         .modelContainer(container)
+        .onChange(of: scenePhase) { _, phase in
+            switch phase {
+            case .active:
+                // Publish any due weekly/monthly report whose boundary has passed.
+                ReportScheduler.runOnActivation(context: container.mainContext)
+            case .background:
+                ReportScheduler.scheduleBackgroundRefresh()
+            default:
+                break
+            }
+        }
     }
 }

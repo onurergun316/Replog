@@ -167,3 +167,30 @@ above.) `readinessPatternSurfacesAReadinessInsight` added in Phase 5.
 - `highFatigueTrimsTheLastSetOfEachExerciseAndNotes` — load 6 → each exercise 3→2 sets,
   trimmed sets actually deleted from the store, "Trimmed a set" note.
 - `loggingAReadinessCheckInPersistsOnePerDay` — same-day re-log overwrites, latest wins.
+
+---
+
+## Phase 6 — Weekly/monthly narrative reports
+
+**`MonthlyReportTests`** (`ReplogTests/MonthlyReportTests.swift`, @MainActor)
+- `statMathIsExact` — total sets, total volume (Σ w×r), days trained; markdown has the
+  headline + "Recommended adjustment" section.
+- `adherencePercentIsWholePercent` — the pure `MonthStats.adherencePct` (6/8 → 75; none
+  scheduled → nil).
+- `adherenceSurvivesCompositionCoherently` — adherence stays within 0–100 and
+  scheduledDone ≤ scheduledCount through a real composition.
+- `topMoversRanksBiggestPositiveClimb` — e1RM movers rank by biggest positive first→last
+  climb; single-entry and decreasing lifts are excluded.
+- `composeSurfacesNewRecordsAgainstPriorHistory` — a new best vs pre-month history is a
+  record (reusing the weekly PR detector).
+- `startOfMonthNormalisesToTheFirst`, `lastCompletedMonthIsThePriorMonth`,
+  `lastCompletedMonthRollsOverTheYear` — month boundary logic incl. Jan→Dec year rollover.
+- `publishIfDueIsIdempotentPerMonth` — second publish returns nil; exactly one monthly log.
+- `idleMonthPublishesNoReport` — an empty month publishes nothing.
+
+The existing **`WeeklyReportTests`** already cover the weekly composer (stat math, PR
+detection, dedup); Phase 6 wires its `publishIfDue` (previously uncalled) plus the new
+monthly one into `ReportScheduler.runOnActivation`, fired from the app's `scenePhase == .active`.
+The `BGTaskScheduler` app-refresh path is best-effort and untested (it requires the Info.plist
+`BGTaskSchedulerPermittedIdentifiers` entry + Background Modes to run at all, and iOS decides
+if/when) — documented in `ReportScheduler`.
