@@ -149,11 +149,13 @@ extension ModelContext {
         date: Date = Date(),
         exId: String? = nil,
         planId: UUID? = nil,
-        payload: CoachingPayload = CoachingPayload()
+        payload: CoachingPayload = CoachingPayload(),
+        bodyMarkdown: String? = nil
     ) -> CoachingLog {
         let log = CoachingLog(
             kind: kind, summary: summary, date: date,
-            exId: exId, planId: planId, payload: payload
+            exId: exId, planId: planId, payload: payload,
+            bodyMarkdown: bodyMarkdown
         )
         insert(log)
         return log

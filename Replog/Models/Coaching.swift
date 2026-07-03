@@ -95,6 +95,8 @@ final class CoachingLog {
     var planId: UUID?
     /// JSON-encoded `CoachingPayload` of structured detail.
     var payloadJSON: String = "{}"
+    /// Long-form markdown body (e.g. a weekly report). `nil` for one-liner memories.
+    var bodyMarkdown: String?
 
     init(
         kind: CoachingKind,
@@ -102,7 +104,8 @@ final class CoachingLog {
         date: Date = Date(),
         exId: String? = nil,
         planId: UUID? = nil,
-        payload: CoachingPayload = CoachingPayload()
+        payload: CoachingPayload = CoachingPayload(),
+        bodyMarkdown: String? = nil
     ) {
         self.kindRaw = kind.rawValue
         self.summary = summary
@@ -110,6 +113,7 @@ final class CoachingLog {
         self.exId = exId
         self.planId = planId
         self.payload = payload
+        self.bodyMarkdown = bodyMarkdown
     }
 
     var kind: CoachingKind {
