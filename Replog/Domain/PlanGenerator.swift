@@ -15,6 +15,9 @@ struct GeneratedSet: Equatable, Sendable {
     var weightKg: Double
     var reps: Int
     var rpe: Int
+    /// True when `weightKg` is a computed first-session ESTIMATE (not user-logged), so the UI
+    /// can label it "suggested" until the athlete's logged sets calibrate it.
+    var estimated: Bool = false
 }
 
 struct GeneratedItem: Equatable, Sendable {
@@ -250,19 +253,11 @@ struct PlanGenerator {
             case .advanced: return 9
             }
         }()
-        let weight = Self.startingWeight(for: ex)
-        return Array(repeating: GeneratedSet(weightKg: weight, reps: reps, rpe: rpe), count: setCount)
-    }
-
-    /// A sensible starting prescription (kg) the user can tune. Bodyweight = 0.
-    static func startingWeight(for ex: Exercise) -> Double {
-        switch ex.equipment {
-        case .none, .bodyOnly, .bands, .foamRoll, .exerciseBall: return 0
-        case .barbell, .ezCurlBar: return ex.mechanic == .compound ? 40 : 20
-        case .dumbbell, .kettlebells: return ex.mechanic == .compound ? 16 : 8
-        case .machine, .cable: return 25
-        case .medicineBall, .other: return 6
-        }
+        // Science-based, per-user starting load — never a hardcoded weight.
+        let estimate = StartingLoadEstimator.estimate(
+            for: ex, targetReps: reps, targetRPE: rpe, user: LoadUser.from(answers))
+        return Array(repeating: GeneratedSet(weightKg: estimate.kg, reps: reps, rpe: rpe, estimated: true),
+                     count: setCount)
     }
 
     // MARK: Priorities & cosmetics

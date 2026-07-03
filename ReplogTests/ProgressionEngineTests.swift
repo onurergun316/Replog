@@ -206,4 +206,56 @@ struct ProgressionEngineTests {
         #expect(rec.reason.contains("lb"))
         #expect(!rec.reason.contains("kg"))
     }
+
+    // MARK: - First-session RPE calibration (opt-in via targetRPE)
+
+    private func entryRPE(_ w: Double, _ r: Int, _ rpe: Int, daysAgo: Double) -> HistoryEntry {
+        HistoryEntry(exId: exId, date: now.addingTimeInterval(-daysAgo * 86_400),
+                     topW: w, topR: r, e1rm: Formulas.e1rmRounded(kg: w, reps: r),
+                     sets: [RecordedSet(w: w, r: r)], topRPE: rpe)
+    }
+
+    @Test func firstSessionOverSeededAtHighRPECalibratesLoadDown() throws {
+        // Seeded 80 kg × 8 but it felt like RPE 10 vs a target of 8 → drop the load.
+        let rec = try #require(ProgressionEngine.recommend(
+            exId: exId, history: [entryRPE(80, 8, 10, daysAgo: 0)],
+            goal: .buildMuscle, targetRPE: 8))
+        #expect(rec.action == .deload)
+        #expect(rec.suggestedWeightKg < 80)
+        #expect(rec.suggestedWeightKg == 75)   // e1RM 101.3 → working at 8@8 → 75
+        #expect(rec.reason.contains("Calibrated"))
+    }
+
+    @Test func firstSessionUnderSeededAtLowRPECalibratesLoadUp() throws {
+        let rec = try #require(ProgressionEngine.recommend(
+            exId: exId, history: [entryRPE(40, 8, 5, daysAgo: 0)],
+            goal: .buildMuscle, targetRPE: 8))
+        #expect(rec.action == .increaseLoad)
+        #expect(rec.suggestedWeightKg > 40)
+    }
+
+    @Test func withoutTargetRPETheFirstSessionRuleIsUnchanged() throws {
+        // No targetRPE → the existing double-progression behavior (add a rep) is preserved.
+        let rec = try #require(ProgressionEngine.recommend(
+            exId: exId, history: [entryRPE(80, 8, 10, daysAgo: 0)], goal: .buildMuscle))
+        #expect(rec.action == .increaseReps)
+        #expect(rec.suggestedWeightKg == 80)
+    }
+
+    @Test func onTargetRPEDoesNotTriggerCalibration() throws {
+        // Felt exactly like the target → normal rules apply (no calibration override).
+        let rec = try #require(ProgressionEngine.recommend(
+            exId: exId, history: [entryRPE(60, 10, 8, daysAgo: 0)], goal: .buildMuscle, targetRPE: 8))
+        #expect(rec.action == .increaseReps)
+        #expect(rec.suggestedWeightKg == 60)
+    }
+
+    @Test func calibrationAppliesOnlyToTheFirstSession() throws {
+        // Two sessions → calibration is skipped; normal progression drives the result.
+        let rec = try #require(ProgressionEngine.recommend(
+            exId: exId,
+            history: [entryRPE(80, 8, 10, daysAgo: 3), entryRPE(80, 9, 10, daysAgo: 0)],
+            goal: .buildMuscle, targetRPE: 8))
+        #expect(rec.suggestedWeightKg == 80)   // not calibrated down to 75
+    }
 }

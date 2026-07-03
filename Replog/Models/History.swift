@@ -24,15 +24,19 @@ final class HistoryEntry {
     var topW: Double = 0
     var topR: Int = 0
     var e1rm: Int = 0
+    /// The RPE logged on the top set — lets `LoadCalibrator` infer the true working load and
+    /// correct a starting estimate. Defaults to 8 for entries written before this existed.
+    var topRPE: Int = 8
     /// JSON-encoded `[RecordedSet]` of every set done that day (for the Session Log).
     var setsJSON: String = "[]"
 
-    init(exId: String, date: Date, topW: Double, topR: Int, e1rm: Int, sets: [RecordedSet]) {
+    init(exId: String, date: Date, topW: Double, topR: Int, e1rm: Int, sets: [RecordedSet], topRPE: Int = 8) {
         self.exId = exId
         self.date = date
         self.topW = topW
         self.topR = topR
         self.e1rm = e1rm
+        self.topRPE = topRPE
         self.sets = sets
     }
 

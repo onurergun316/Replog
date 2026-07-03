@@ -35,8 +35,11 @@ enum SessionBuilder {
 
             let history = context.history(forExercise: item.exId)
             let previous = history.last
+            // Pass the plan's prescribed RPE so a first-session estimate calibrates to the
+            // athlete's real logged effort (see ProgressionEngine + LoadCalibrator).
             sessionExercise.suggestion = ProgressionEngine.recommend(
-                exId: item.exId, history: history, goal: goal, units: units)
+                exId: item.exId, history: history, goal: goal, units: units,
+                targetRPE: item.orderedSets.first?.rpe)
 
             for (setIndex, template) in item.orderedSets.enumerated() {
                 let prev = previous?.sets[safe: setIndex]

@@ -75,12 +75,22 @@ enum RepScheme {
 
     /// Builds the concrete set list for a slot: `sets` copies of the resolved rep target,
     /// with the given starting weight and a resolved RPE (parsed, else `defaultRPE`).
-    static func sets(for slot: ProgramSlot, startingWeightKg: Double, defaultRPE: Int = 8) -> [GeneratedSet] {
+    /// `estimated` flags the weight as a computed first-session seed (see `StartingLoadEstimator`).
+    static func sets(for slot: ProgramSlot, startingWeightKg: Double,
+                     defaultRPE: Int = 8, estimated: Bool = false) -> [GeneratedSet] {
         let count = max(1, min(slot.sets, 8))
         let target = parse(reps: slot.reps)
         let rpe = parseRPE(intensity: slot.intensity) ?? defaultRPE
-        return Array(repeating: GeneratedSet(weightKg: startingWeightKg, reps: target.reps, rpe: rpe),
+        return Array(repeating: GeneratedSet(weightKg: startingWeightKg, reps: target.reps,
+                                             rpe: rpe, estimated: estimated),
                      count: count)
+    }
+
+    /// The resolved (target reps, RPE) for a slot — used to compute a per-user starting load
+    /// before building the sets. RPE parsed from intensity, else `defaultRPE`.
+    static func target(for slot: ProgramSlot, defaultRPE: Int = 8) -> (reps: Int, rpe: Int, isTimed: Bool) {
+        let parsed = parse(reps: slot.reps)
+        return (parsed.reps, parseRPE(intensity: slot.intensity) ?? defaultRPE, parsed.isTimed)
     }
 
     // MARK: - Number & unit extraction

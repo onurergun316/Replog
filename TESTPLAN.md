@@ -245,3 +245,37 @@ thin OS boundaries (`NotificationScheduler`, `ReportScheduler`'s BGTask), verifi
 `DebugSeed` (DEBUG-only) now seeds a stalling lift, last-week/month completed days, a low-sleep
 readiness pattern, and publishes due reports so the coach card, Coach Insights, and Training
 Reports are all populated for manual verification.
+
+---
+
+## Follow-up — Science-based per-user starting loads + auto-calibration
+
+Replaces hardcoded `SetTemplate` weights (the 25 kg / 8 kg-curl bug) with a computed,
+per-user seed that self-corrects from the first logged session.
+
+**`StartingLoadEstimatorTests`** (`ReplogTests/StartingLoadEstimatorTests.swift`, pure)
+- `femaleBeginnerLoadsAreDramaticallyLowerThanMaleAdvanced` / `...HammerCurlIsWellUnderEightKgPerHand`
+  / `...BarbellCurlNeverExceedsAnEmptyBar` — absolute-ceiling guards against the old bug.
+- `femaleMaleRatioIsSmallerForUpperBodyThanLower` + `sexCoefficientsEncodeTheFinding` — the
+  ~0.55 (upper) vs ~0.68 (lower) sex gap, checked on the unrounded value + the constants.
+- `barbellLoadsNeverDropBelowAnEmptyBar` (across users/patterns), `dumbbellAndMachineHaveSaneNonZeroFloors`.
+- `advancedSeedsHeavierThanIntermediateThanBeginner` + `sexScalingDoesNotChangeExperienceOrdering`
+  — experience monotonicity (and that sex scales the estimate, not the ordering).
+- `bodyweightMovementsEmitNoExternalLoad`; catalog mapping (`loading`/`pattern`) + the coach
+  reason note.
+
+**`LoadCalibratorTests`** (`ReplogTests/LoadCalibratorTests.swift`, pure)
+- RIR-adjusted Epley `inferredE1RM`, clean `workingLoad` inversion, over-/under-seed direction,
+  and zero-input safety.
+- `underSeededExerciseConvergesWithinTwoSessions` / `overSeededExerciseConvergesWithinTwoSessions`
+  / `eachCalibrationStepMovesTowardTheTrueLoad` — a bad seed converges to the true working load
+  (a simulated athlete logs → calibrate) within 1–2 sessions.
+
+**`ProgressionEngineTests`** (extended) — first-session RPE calibration is opt-in via `targetRPE`:
+over-seeded-at-high-RPE calibrates the load down, under-seeded up, on-target/no-`targetRPE`/multi-
+session leave the existing double-progression behavior unchanged.
+
+Wiring: `ProgramPlanBuilder` and `PlanGenerator` now compute each `SetTemplate`'s weight via
+`StartingLoadEstimator` (flagged `estimated`, persisted and shown as an "est" suggestion in the
+live log); `HistoryEntry.topRPE` is persisted on Finish so `SessionBuilder` → `ProgressionEngine`
+calibrates from real logged effort. The dead `PlanGenerator.startingWeight` was removed.

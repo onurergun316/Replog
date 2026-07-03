@@ -76,10 +76,17 @@ enum ProgramPlanBuilder {
             let chosen = validated(modelPick, against: candidates) ?? candidates[0]
             usedIDs.insert(chosen.id)
 
-            let weight = PlanGenerator.startingWeight(for: chosen)
-            let sets = RepScheme.sets(for: slot, startingWeightKg: weight, defaultRPE: defaultRPE(answers))
+            // Compute a science-based, per-user starting load from the slot's target rep/RPE —
+            // never a hardcoded weight. The calibrator corrects it from the first logged session.
+            let scheme = RepScheme.target(for: slot, defaultRPE: defaultRPE(answers))
+            let estimate = StartingLoadEstimator.estimate(
+                for: chosen, targetReps: scheme.reps, targetRPE: scheme.rpe,
+                user: LoadUser.from(answers))
+            let sets = RepScheme.sets(for: slot, startingWeightKg: estimate.kg,
+                                      defaultRPE: defaultRPE(answers), estimated: true)
             items.append(GeneratedItem(exId: chosen.id, sets: sets, restSeconds: slot.restSeconds))
-            notes.append(ExerciseNote(name: chosen.name, reason: slotReason(slot: slot, exercise: chosen)))
+            notes.append(ExerciseNote(name: chosen.name,
+                                      reason: slotReason(slot: slot, exercise: chosen, estimate: estimate)))
         }
         return DayResolution(items: items, notes: notes)
     }
@@ -167,14 +174,14 @@ enum ProgramPlanBuilder {
         }
     }
 
-    private static func slotReason(slot: ProgramSlot, exercise: Exercise) -> String {
+    private static func slotReason(slot: ProgramSlot, exercise: Exercise, estimate: LoadEstimate) -> String {
         let muscles = exercise.primaryMuscles.prefix(2).map(\.displayName).joined(separator: " & ")
         let role = slot.pattern.displayName.lowercased()
         let variant = slot.variant.map { " (\($0))" } ?? ""
-        if muscles.isEmpty {
-            return "Fills this session's \(role) work\(variant)."
-        }
-        return "Your \(role) movement\(variant) — trains \(muscles)."
+        let base = muscles.isEmpty
+            ? "Fills this session's \(role) work\(variant)."
+            : "Your \(role) movement\(variant) — trains \(muscles)."
+        return "\(base) Weight is a \(estimate.note)."
     }
 
     private static func itemReason(_ item: GeneratedItem) -> String {

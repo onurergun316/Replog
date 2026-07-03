@@ -45,7 +45,8 @@ enum SessionFinisher {
                 topW: top.weightKg,
                 topR: top.reps,
                 e1rm: Formulas.e1rmRounded(kg: top.weightKg, reps: top.reps),
-                sets: doneSets.sorted { $0.order < $1.order }.map { RecordedSet(w: $0.weightKg, r: $0.reps) }
+                sets: doneSets.sorted { $0.order < $1.order }.map { RecordedSet(w: $0.weightKg, r: $0.reps) },
+                topRPE: top.rpe
             )
             context.insert(entry)
             logged += 1

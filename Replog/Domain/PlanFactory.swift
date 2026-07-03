@@ -40,7 +40,8 @@ enum PlanFactory {
                 context.insert(item)
 
                 for (sIndex, gs) in gi.sets.enumerated() {
-                    let set = SetTemplate(weightKg: gs.weightKg, reps: gs.reps, rpe: gs.rpe, order: sIndex)
+                    let set = SetTemplate(weightKg: gs.weightKg, reps: gs.reps, rpe: gs.rpe,
+                                          order: sIndex, estimated: gs.estimated)
                     set.item = item
                     context.insert(set)
                 }

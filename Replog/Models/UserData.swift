@@ -112,12 +112,16 @@ final class SetTemplate {
     var reps: Int = 10
     var rpe: Int = 8
     var order: Int = 0
+    /// True when `weightKg` is a computed first-session estimate (see `StartingLoadEstimator`)
+    /// rather than a user-set/logged value — drives the "suggested" UI treatment.
+    var estimated: Bool = false
     var item: PlanItem?
 
-    init(weightKg: Double, reps: Int, rpe: Int, order: Int = 0) {
+    init(weightKg: Double, reps: Int, rpe: Int, order: Int = 0, estimated: Bool = false) {
         self.weightKg = weightKg
         self.reps = reps
         self.rpe = rpe
         self.order = order
+        self.estimated = estimated
     }
 }

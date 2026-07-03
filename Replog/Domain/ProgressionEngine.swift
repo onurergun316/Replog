@@ -60,12 +60,14 @@ enum ProgressionEngine {
     static func recommend(exId: String,
                           history: [HistoryEntry],
                           goal: Goal,
-                          units: Units = .kg) -> ProgressionRecommendation? {
+                          units: Units = .kg,
+                          targetRPE: Int? = nil) -> ProgressionRecommendation? {
         recommend(exId: exId,
                   history: history,
                   repRange: repRange(for: goal),
                   weightStepKg: Formulas.weightStepKg(units: units),
-                  units: units)
+                  units: units,
+                  targetRPE: targetRPE)
     }
 
     /// The rule table. History may arrive in any order (sorted by date internally);
@@ -81,9 +83,31 @@ enum ProgressionEngine {
                           history: [HistoryEntry],
                           repRange: ClosedRange<Int>,
                           weightStepKg: Double = 2.5,
-                          units: Units = .kg) -> ProgressionRecommendation? {
+                          units: Units = .kg,
+                          targetRPE: Int? = nil) -> ProgressionRecommendation? {
         let sorted = history.sorted { $0.date < $1.date }
         guard let last = sorted.last else { return nil }
+
+        // Calibration (opt-in): after the FIRST logged session of a lift that was seeded with a
+        // computed estimate, the real weight-at-RPE replaces the estimate. If the top set felt
+        // meaningfully off the target RPE, retarget the load to the intended effort — a bad seed
+        // self-corrects immediately instead of waiting for the double-progression rules.
+        if let targetRPE, sorted.count == 1, last.topW > 0, abs(last.topRPE - targetRPE) >= 2 {
+            let calibrated = LoadCalibrator.calibratedLoad(
+                from: LoggedEffort(weightKg: last.topW, reps: last.topR, rpe: last.topRPE),
+                targetReps: last.topR, targetRPE: targetRPE, stepKg: weightStepKg)
+            if calibrated > 0, abs(calibrated - last.topW) >= weightStepKg {
+                let reps = min(max(last.topR, repRange.lowerBound), repRange.upperBound)
+                let heavier = calibrated > last.topW
+                let w = { (kg: Double) in Formulas.formatWeight(kg: kg, units: units) }
+                return ProgressionRecommendation(
+                    exId: exId,
+                    action: heavier ? .increaseLoad : .deload,
+                    suggestedWeightKg: calibrated, suggestedReps: reps,
+                    reason: "Calibrated from your first session — it felt like RPE \(last.topRPE), " +
+                            "so \(w(calibrated)) better matches your target effort.")
+            }
+        }
 
         // Session-over-session e1RM deltas, oldest → newest.
         let series = sorted.map(\.e1rm)
