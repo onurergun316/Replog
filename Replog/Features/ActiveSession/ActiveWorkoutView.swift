@@ -24,6 +24,8 @@ struct ActiveWorkoutView: View {
     @State private var showFinishConfirm = false
     @State private var showCelebration = false
     @State private var didCelebrate = false
+    @State private var debriefInsights: [CoachInsight] = []
+    @State private var showDebrief = false
 
     private var profile: UserProfile { profiles.first ?? context.userProfile() }
     private var settings: AppSettings { settingsList.first ?? context.appSettings() }
@@ -59,6 +61,9 @@ struct ActiveWorkoutView: View {
         .background(Color.bg.ignoresSafeArea())
         .sheet(item: $detailRef) { ref in
             NavigationStack { ExerciseDetailView(exId: ref.id, showProgress: true) }
+        }
+        .sheet(isPresented: $showDebrief, onDismiss: { dismiss() }) {
+            NavigationStack { CoachDebriefView(insights: debriefInsights) }
         }
         .confirmationDialog("Finish workout?", isPresented: $showFinishConfirm, titleVisibility: .visible) {
             Button("Finish anyway", role: .destructive) { finish() }
@@ -262,7 +267,33 @@ struct ActiveWorkoutView: View {
     }
 
     private func finish() {
+        // Capture the outcome (PRs judged vs prior best) BEFORE history is written.
+        let outcome = CoachContextBuilder.sessionOutcome(from: session, context: context, catalog: catalog)
+        let deloadRule = sourceProgramDeloadRule()
+
         SessionFinisher.finish(session, profile: profile, context: context)
-        dismiss()
+
+        // Build the debrief from the now-updated store and record its durable insights.
+        let ctx = CoachContextBuilder.debriefContext(
+            outcome: outcome, profile: profile, settings: settings,
+            programDeloadRule: deloadRule, context: context, catalog: catalog)
+        let insights = CoachEngine.insights(ctx)
+        CoachContextBuilder.recordDebrief(insights, context: context)
+        try? context.save()
+
+        if insights.isEmpty {
+            dismiss()
+        } else {
+            debriefInsights = insights
+            showDebrief = true   // dismissing the debrief dismisses the workout
+        }
+    }
+
+    /// The deload rule of the program this session's workout belongs to, if program-driven.
+    private func sourceProgramDeloadRule() -> String? {
+        guard let workoutId = session.workoutId else { return nil }
+        let plans = (try? context.fetch(FetchDescriptor<Plan>())) ?? []
+        let rule = plans.first { $0.workouts.contains { $0.id == workoutId } }?.progressionDeload
+        return (rule?.isEmpty ?? true) ? nil : rule
     }
 }

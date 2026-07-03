@@ -118,3 +118,31 @@ the program-driven flow.
 
 **`PlannerEvalTests`** — updated `richHistoryProducesADifferentInBudgetPromptThanEmpty` to the
 new program-driven framing prompt signature (rest unchanged, exercising `PlanGenerator`).
+
+---
+
+## Phase 4 — CoachEngine (explainable insights)
+
+**`CoachEngineTests`** (`ReplogTests/CoachEngineTests.swift`, @MainActor) — fixture personas
+over the pure engine, asserting the right insight kinds, priorities, and reason strings.
+- `progressingSessionYieldsDebriefAndPRNoStall` — a progressing session → sessionDebrief
+  (carrying the next-session recommendation reason + "up X% volume") + a high-priority PR
+  milestone; never a stall alert.
+- `stallingSessionYieldsStallAlertWithDeloadReason` — four flat sessions → a high-priority
+  stall alert whose body explains "stuck … deload to <computed>".
+- `stallAlertPrefersProgramDeloadRuleWhenPresent` — the program's own deload rule is quoted
+  when program-driven.
+- `scheduledUndoneWorkoutWithStreakYieldsHighAdherenceAlert` — streak-at-risk → high
+  adherence insight ("N-workout streak … on the line"); suppressed once today is done.
+- `favorableBodyweightTrendReadsAsRightDirection` — a downward trend for a fat-loss goal
+  reads as the right direction; `checkInDueYieldsAPrompt`.
+- `stallOutranksBodyweightTrendForTheTodayCard` — priority ordering for the single Today card.
+- `freshUserGetsOnlyWelcome` — a brand-new user gets exactly one welcome insight.
+- `freshUserWithOneSessionGetsDebriefNeverStall` — no-spam property: one session → a debrief,
+  never a stall alert, and welcome is superseded.
+- `streakMilestoneFiresOnRoundNumbers` — milestone on 7, not on 8.
+
+(The MainActor surfacing — `CoachContextBuilder`, `CoachVoice`, the Today card, the debrief
+sheet, and the Profile "Coach Insights" section — is wired but, like the other AI seams, its
+live model path is verified on device, not unit-tested. The pure engine it feeds is covered
+above.)

@@ -22,6 +22,8 @@ struct TodayView: View {
     @State private var path = NavigationPath()
     @State private var selectedStat: StatKind?
     @State private var showingBodyweightSheet = false
+    /// Which calendar day the Today coach card was dismissed on (max one card per day).
+    @AppStorage("coachCardDismissedDay") private var coachCardDismissedDay = ""
 
     init() {
         #if DEBUG
@@ -35,6 +37,22 @@ struct TodayView: View {
 
     private var bodyweightSnapshot: BodyweightSnapshot? {
         BodyweightTracker.snapshot(entries: bodyweightEntries)
+    }
+
+    private var settings: AppSettings { settingsRows.first ?? context.appSettings() }
+
+    /// A stable per-day key so the coach card can be dismissed for the rest of the day.
+    private var todayKey: String {
+        let c = Calendar.current.dateComponents([.year, .month, .day], from: Date())
+        return "\(c.year ?? 0)-\(c.month ?? 0)-\(c.day ?? 0)"
+    }
+
+    /// The single top-priority coach insight for the Today card, unless dismissed today.
+    private var coachInsight: CoachInsight? {
+        guard coachCardDismissedDay != todayKey else { return nil }
+        let ctx = CoachContextBuilder.todayContext(
+            profile: profile, settings: settings, plans: plans, context: context, catalog: catalog)
+        return CoachEngine.topInsight(ctx)
     }
 
     /// A paused/in-progress session, if any (one at a time).
@@ -71,6 +89,15 @@ struct TodayView: View {
                 VStack(alignment: .leading, spacing: 22) {
                     header
                     WeekStripView(cells: StreakCalendar.weekStrip(doneDates: profile.doneDates))
+
+                    if let insight = coachInsight {
+                        CoachCardView(insight: insight) { coachCardDismissedDay = todayKey }
+                            .onAppear {
+                                if CoachContextBuilder.recordDailyCard(insight, context: context) != nil {
+                                    try? context.save()
+                                }
+                            }
+                    }
 
                     if let session = activeSession {
                         resumeBanner(session)

@@ -34,6 +34,8 @@ enum CoachingKind: String, Codable, CaseIterable, Identifiable, Sendable {
     case monthlyReport
     /// The coach adjusted the plan (split/volume/exercise choice).
     case planAdjustment
+    /// A surfaced coach insight (post-session debrief, Today card, milestone, …).
+    case coachInsight
 
     var id: String { rawValue }
 
@@ -47,6 +49,7 @@ enum CoachingKind: String, Codable, CaseIterable, Identifiable, Sendable {
         case .weeklyReport:  return "Weekly report"
         case .monthlyReport: return "Monthly report"
         case .planAdjustment: return "Plan adjustment"
+        case .coachInsight:  return "Coach"
         }
     }
 }
