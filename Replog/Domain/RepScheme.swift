@@ -20,7 +20,7 @@
 import Foundation
 
 /// A parsed rep target for one slot.
-struct RepTarget: Equatable, Sendable {
+nonisolated struct RepTarget: Equatable, Sendable {
     /// Target repetitions, OR — when `isTimed` — the target duration in seconds.
     var reps: Int
     /// True when the value represents a time/hold in seconds rather than a repetition count.

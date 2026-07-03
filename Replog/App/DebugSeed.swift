@@ -87,7 +87,54 @@ enum DebugSeed {
         profile.onboardingDone = true
         try? context.save()
 
+        if !minimal { seedCoachAndReports(context, profile: profile, plan: plan) }
+
         // Optionally drop straight into a live workout for verification.
+        seedActiveIfRequested(context, plan: plan)
+    }
+
+    /// Seeds enough state for the OWNER to see the coach features working: a stalling lift
+    /// (→ stall insight), completed days in the last week/month (→ a due weekly & monthly
+    /// report), a recurring low-sleep readiness pattern, and a recorded Today coach card.
+    private static func seedCoachAndReports(_ context: ModelContext, profile: UserProfile, plan: Plan?) {
+        let cal = Calendar.current
+        let stallEx = plan?.orderedWorkouts.dropFirst().first?.orderedItems.first?.exId
+            ?? "Barbell_Bench_Press_-_Medium_Grip"
+
+        // Four flat sessions → a genuine plateau the coach will flag.
+        for weeksAgo in [4, 3, 2, 1] {
+            let date = cal.date(byAdding: .day, value: -(weeksAgo * 7 - 1), to: Date()) ?? Date()
+            context.insert(HistoryEntry(exId: stallEx, date: date, topW: 80, topR: 5, e1rm: 93,
+                                        sets: [RecordedSet(w: 80, r: 5), RecordedSet(w: 80, r: 5)]))
+        }
+
+        // Completed days across the last completed week/month so reports have a story.
+        var dones = profile.doneDates
+        for offset in [5, 7, 9, 12, 19, 26] {
+            if let d = cal.date(byAdding: .day, value: -offset, to: Date()) { dones.append(d) }
+        }
+        profile.doneDates = dones
+
+        // Three low-sleep days this week → a readiness-pattern insight.
+        for offset in [1, 2, 3] {
+            if let d = cal.date(byAdding: .day, value: -offset, to: Date()) {
+                context.logReadiness(ReadinessCheckIn(sleep: .poor, soreness: .good, stress: .good), date: d)
+            }
+        }
+        try? context.save()
+
+        // Publish any due weekly & monthly report, and record the top Today insight so the
+        // Profile "Coach Insights" + "Training Reports" sections are populated.
+        ReportScheduler.runOnActivation(context: context)
+        let ctx = CoachContextBuilder.todayContext(
+            profile: profile, settings: context.appSettings(), plans: context.allPlans(), context: context)
+        if let top = CoachEngine.topInsight(ctx) {
+            CoachContextBuilder.recordDailyCard(top, context: context)
+        }
+        try? context.save()
+    }
+
+    private static func seedActiveIfRequested(_ context: ModelContext, plan: Plan?) {
         if ProcessInfo.processInfo.environment["REPLOG_ACTIVE"] == "1",
            let workout = plan?.orderedWorkouts.first {
             let session = SessionBuilder.start(workout: workout, into: context)

@@ -32,7 +32,7 @@ struct ReadinessCheckIn: Equatable, Sendable {
 }
 
 /// How a session is adjusted for readiness.
-enum SessionModulation: Equatable, Sendable {
+nonisolated enum SessionModulation: Equatable, Sendable {
     /// Train exactly as planned.
     case normal
     /// Keep the planned volume but flag "cap the intensity today" (a note only).
@@ -45,7 +45,7 @@ enum SessionModulation: Equatable, Sendable {
 }
 
 /// A recurring readiness pattern across the trailing week, for the coach to surface.
-enum ReadinessPattern: Equatable, Sendable {
+nonisolated enum ReadinessPattern: Equatable, Sendable {
     case lowSleep(days: Int)
     case highSoreness(days: Int)
     case highStress(days: Int)

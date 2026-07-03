@@ -1,10 +1,17 @@
 # Replog — Test Plan (AI Personal Trainer cycle)
 
-Running log of every test suite added per phase and what it asserts. The owner runs the
-suite with coverage at the end of the cycle (see Phase 8). Per the no-simulator rule these
-tests are written and compiled but not executed during the cycle.
+Running log of every test suite added per phase and what it asserts. Per the no-simulator
+rule these tests are written and compiled (both targets, headless) but **not executed** during
+the cycle — the owner runs them with coverage.
 
 Coverage target: **≥80% of the logic layer** (Domain, Models, Catalog, view models).
+
+**Run the full suite with coverage** (owner):
+```bash
+xcodebuild test -project Replog.xcodeproj -scheme Replog \
+  -destination 'platform=iOS Simulator,name=iPhone 17' \
+  -enableCodeCoverage YES -only-testing:ReplogTests
+```
 
 ---
 
@@ -216,3 +223,25 @@ inputs/prefs from the store, re-plans on activation / preference change / Finish
 OS boundary — verified on device, not unit-tested. Permission is requested in context from the
 Profile master toggle (with value copy), never at launch. Per-kind toggles + reminder time
 live in Profile → Notifications.
+
+---
+
+## Phase 8 — Test audit + polish
+
+**`CoachContextBuilderTests`** (`ReplogTests/CoachContextBuilderTests.swift`, @MainActor,
+in-memory) — closes the biggest remaining logic gap, the session→outcome glue:
+- `sessionOutcomeDetectsPRsAndVolume` — PR judged vs the athlete's prior best (first-ever
+  session isn't a PR), per-lift + total volume, and the previous-session volume comparison.
+- `recordDebriefStoresOnlyDebriefAndMilestoneInsights` — stall alerts aren't re-recorded
+  (StallDetector owns them).
+- `recordDailyCardIsAtMostOncePerDay` / `recordDailyCardNeverRecordsAStallAlert` — the
+  once-per-day + no-stall-double-record rules.
+
+Audit outcome: the logic layer added this cycle (ProgramLibrary, ProgramMatcher, PatternMapping,
+RepScheme, ProgramPlanBuilder, CoachEngine + CoachContextBuilder, ReadinessModulator, Weekly/
+MonthlyReportComposer, NotificationPlanner) is covered by the suites above. Untested surfaces are
+the intentional non-deterministic seams (`AIPlanService`/`CoachVoice` live model calls) and the
+thin OS boundaries (`NotificationScheduler`, `ReportScheduler`'s BGTask), verified on device.
+`DebugSeed` (DEBUG-only) now seeds a stalling lift, last-week/month completed days, a low-sleep
+readiness pattern, and publishes due reports so the coach card, Coach Insights, and Training
+Reports are all populated for manual verification.

@@ -237,7 +237,7 @@ struct StallDetectorTests {
     @Test func sameOngoingStallIsRecordedOnlyOnce() throws {
         let ctx = makeContext()
         let plateau: [(w: Double, r: Int)] = [(60, 10), (60, 10), (60, 10), (60, 10)]
-        try #require(record(plateau, into: ctx))
+        _ = try #require(record(plateau, into: ctx))
         // One more stalled session: same stall, same response — no new memory.
         #expect(record(plateau + [(60, 10)], into: ctx) == nil)
         #expect(ctx.coachingLogs().count == 1)
@@ -246,7 +246,7 @@ struct StallDetectorTests {
     @Test func escalationToSwapRecordsANewPlateauLog() throws {
         let ctx = makeContext()
         let plateau: [(w: Double, r: Int)] = [(100, 10), (100, 10), (100, 10), (100, 10)]
-        try #require(record(plateau, into: ctx))
+        _ = try #require(record(plateau, into: ctx))
         let continued = plateau + [(90, 10), (95, 10), (100, 10), (100, 10), (100, 10), (100, 10)]
         let swap = try #require(record(continued, into: ctx))
         #expect(swap.kind == .plateau)
@@ -259,10 +259,10 @@ struct StallDetectorTests {
     @Test func aFreshStallAfterRecoveryRecordsAgain() throws {
         let ctx = makeContext()
         let first: [(w: Double, r: Int)] = [(60, 10), (60, 10), (60, 10), (60, 10)]
-        try #require(record(first, into: ctx))
+        _ = try #require(record(first, into: ctx))
         // Recovered (rep PR), then plateaued again at the new level.
         let second = first + [(60, 12), (60, 12), (60, 12), (60, 12)]
-        try #require(record(second, into: ctx))
+        _ = try #require(record(second, into: ctx))
         #expect(ctx.coachingLogs(kind: .deload).count == 2)
     }
 

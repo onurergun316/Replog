@@ -57,16 +57,27 @@ numbered the request.
 
 ## Locked technical decisions
 - **Persistence: SwiftData** (the spec says "Core Data"; we use its modern successor).
-- **AI planner: on-device Apple Intelligence** (`FoundationModels`), in `Domain/AI/`. Two-stage,
-  genuinely model-driven & non-deterministic (temperature 1.0): a **framing** call designs the split
-  + per-day muscle/volume/rep scheme + report sections, then **per-day** calls pick specific exercises
-  from a numbered list of real catalog candidates (already filtered to the user's equipment/injuries —
-  an exercise's **missing equipment counts as bodyweight**, so a machine-only user never gets a
-  bodyweight movement) and justify each. `PlanResolver` validates picks against the catalog;
-  `ReportComposer` renders the saved report. The model is grounded in `CoachingKnowledge` (an
-  evidence-based prompt cheat-sheet — edit it to steer the science). Still **on-device, no network**.
-  `AIPlanService` falls back to the **deterministic `PlanGenerator`** (+ templated report) when the
-  model is unavailable, flagged via `usedAppleIntelligence`. No raw-paper RAG yet (context is ~4k tokens).
+- **AI planner: on-device Apple Intelligence** (`FoundationModels`), in `Domain/AI/`, now
+  **program-driven**. `ProgramMatcher` first narrows the bundled 62-program library to a gated + scored
+  shortlist for the athlete. Then two-stage, genuinely model-driven & non-deterministic (temperature
+  1.0): a **framing** call picks ONE program from that shortlist (disclaimer programs excluded) + writes
+  the report sections, then **per-day** calls fill each `ProgramSlot` with a specific exercise from a
+  numbered list of real catalog candidates (filtered to the user's equipment/injuries via
+  `PatternMapping` — an exercise's **missing equipment counts as bodyweight**, so a machine-only user
+  never gets a bodyweight movement) and justify each. `ProgramPlanBuilder` validates slot picks and is
+  the shared resolver; `ReportComposer` renders the saved report. Grounded in `CoachingKnowledge`. Still
+  **on-device, no network**. Falls back deterministically: no model → `ProgramMatcher`'s top
+  auto-pickable program built by the same slot resolver; if that can't materialise → the legacy
+  `PlanGenerator` split. Flagged via `usedAppleIntelligence`. `Plan` stores `programId` + progression.
+- **The coach: on-device & explainable.** `CoachEngine` produces a deterministic, priority-sorted
+  `[CoachInsight]` (session debrief, stall alerts, adherence, milestones, bodyweight/readiness trends,
+  check-in prompts) — every recommendation carries a plain-language REASON from the deterministic
+  engines. `CoachVoice` may reword an insight into coach voice (fallback = verbatim); it never invents
+  the decision. Surfaced as a post-Finish debrief sheet, one dismissible Today "Coach" card/day, and a
+  Profile "Coach Insights" list. Weekly/monthly narrative reports (`WeeklyReportComposer`/
+  `MonthlyReportComposer`, triggered on activation) list under Profile "Training Reports". Optional
+  readiness check-in at session start modulates volume (`ReadinessModulator`). Capped, respectful local
+  notifications (`NotificationPlanner`: ≤1/day, quiet hours, per-kind toggles, encouraging copy).
 - **Font: SF Rounded** (`.system(design: .rounded)`), no bundled fonts.
 - **Images: HEIC**, ~420 px, q42 — the full Free Exercise DB (1746 photos) ships at ~18 MB.
   `ExerciseImageView(contentMode:)` — thumbnails use `.fill` (uniform square crop, via
@@ -130,14 +141,30 @@ Plan ──< Workout ──< PlanItem(exId, restSeconds?) ──< SetTemplate {w
   WeekStripView, Sparkline, FlowLayout, …).
 - `Catalog/` — `Exercise` + enums (lenient decoding), `ExerciseCatalog` (incl. `search(_:filter:)`),
   `ExerciseImageView` (HEIC + cache, `contentMode`) + `ExerciseThumbnail` (uniform list thumbnail).
+  - `Catalog/ProgramLibrary/` — the bundled **62-program library** (`Resources/programs.json`):
+    `WorkoutProgram` (+ `ProgramDay`/`ProgramSlot`/`ProgramAudience`/`ProgramProgression`, lenient like
+    `Exercise`), `MovementPattern` (slot pattern enum with `.other`), `ProgramCatalog` (loader/queries).
 - `Models/` — SwiftData `@Model` types + `ReplogStore` (schema, containers, singleton helpers).
+  Includes `ReadinessEntry` (subjective check-ins) and the notification prefs on `AppSettings`.
 - `Domain/` — pure logic: `Formulas`, `PlanGenerator`/`PlanFactory`, `QuizAnswers`, `TrendCalculator`,
-  `ProgressAggregator`, `StreakCalendar`, `StreakEngine`, `Scheduling`, `SessionBuilder`, `SessionFinisher`.
-  - `Domain/AI/` — Apple Intelligence: `AIPlanService` (the FoundationModels boundary + fallback),
-    `PlanBlueprint` (`@Generable` framing/selection + report value types), `PlanResolver`
-    (picks → real catalog items), `ReportComposer` (markdown + fallback report), `CoachingKnowledge`
-    (science prompt block). The pure resolver/composer/prompts are fully tested; the live model call
-    is a non-deterministic seam (not unit-tested) — verified on-device.
+  `ProgressAggregator`, `ProgressionEngine`, `StallDetector`, `StreakCalendar`, `StreakEngine`,
+  `Scheduling`, `SessionBuilder`, `SessionFinisher`, `BodyweightTracker`.
+  - **Program-driven planning:** `ProgramMatcher` (hard-gated + soft-scored program selection from
+    `QuizAnswers`), `PatternMapping` (slot `MovementPattern` → catalog facets → real candidates),
+    `RepScheme` (parses slot reps/intensity into `SetTemplate` targets — ranges→lower bound,
+    time/hold→seconds, RPE from intensity; convention in `ARCHITECTURE.md`).
+  - **The coach:** `ReadinessModulator` (readiness → session modulation + weekly pattern),
+    `WeeklyReportComposer`/`MonthlyReportComposer` + `ReportScheduler` (activation + best-effort
+    `BGTaskScheduler`), `NotificationPlanner` (pure: what to schedule; caps + quiet hours + toggles)
+    / `NotificationScheduler` (thin `UNUserNotificationCenter` boundary).
+  - `Domain/AI/` — Apple Intelligence: `AIPlanService` (program-driven two-stage: pick a program from a
+    `ProgramMatcher` shortlist, then fill each slot with a real exercise; deterministic fallback via
+    `ProgramMatcher`'s top pick → `ProgramPlanBuilder` → legacy `PlanGenerator`), `ProgramPlanBuilder`
+    (the shared slot resolver), `PlanBlueprint` (`@Generable` program-framing/selection + report value
+    types), `ReportComposer` (markdown + fallback), `CoachEngine` (explainable `[CoachInsight]`) +
+    `CoachContextBuilder` (store glue) + `CoachVoice` (optional reword, fallback verbatim),
+    `AthleteContext`, `CoachingKnowledge`. The pure resolvers/composers/planner/coach are fully tested;
+    the live model calls are non-deterministic seams (not unit-tested) — verified on-device.
 - `Features/` — `Onboarding` (quiz: **first name only, asked last**; `Gender` (default `.male`),
   goal (no emojis), sport when goal is Sport (running/swimming/football/basketball/cycling/boxing/
   volleyball/**Other + free-text** `customSport`), height, weight, equipment-type multi-select that
@@ -159,7 +186,7 @@ Plan ──< Workout ──< PlanItem(exId, restSeconds?) ──< SetTemplate {w
   set is complete). `StatDetailSheet` reconstructs completed workouts via pure `Domain/WorkoutHistory`.
 - Design: native iOS 26 controls + Liquid Glass + `.sensoryFeedback` haptics, over the warm brand
   (`DesignSystem/`). New files auto-join the targets (Xcode **synchronized file-system groups**).
-- `Resources/` — `exercises.json` + `ExerciseImages/<id>__<n>.heic` (flat, unique names).
+- `Resources/` — `exercises.json` + `programs.json` (the 62-program library) + `ExerciseImages/<id>__<n>.heic` (flat, unique names).
 - `Scripts/build-exercise-db.sh` — one-shot dev tool that compresses the source DB (lives one level
   up at `../../free-exercise-db-main`, not committed) into `Resources/`. Re-run if you re-tune size.
 

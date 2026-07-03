@@ -119,7 +119,7 @@ struct MatchContext: Equatable, Sendable {
 
 /// A ranked candidate program with its score, the reasons behind it, and whether it may be
 /// selected automatically (programs with a medical disclaimer never can).
-struct ProgramMatch: Equatable, Sendable {
+nonisolated struct ProgramMatch: Equatable, Sendable {
     let program: WorkoutProgram
     let score: Double
     let autoPickable: Bool
