@@ -24,7 +24,7 @@ enum Muscle: String, Codable, CaseIterable, Identifiable, Sendable {
 
     /// Best-effort mapping from a free-text muscle name (e.g. from the AI blueprint) onto
     /// the catalog taxonomy. Handles common synonyms and plurals; nil if unrecognized.
-    static func lenient(_ raw: String) -> Muscle? {
+    nonisolated static func lenient(_ raw: String) -> Muscle? {
         let s = raw.lowercased().trimmingCharacters(in: .whitespaces)
         if let exact = Muscle(rawValue: s) { return exact }
         switch s {
