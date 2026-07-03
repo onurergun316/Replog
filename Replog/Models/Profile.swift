@@ -88,6 +88,20 @@ final class AppSettings {
     var restTimerAuto: Bool = false
     var restSeconds: Int = 90
 
+    // MARK: Notifications (Phase 7)
+    /// Master switch — off until the user opts in (permission is requested in context).
+    var notificationsEnabled: Bool = false
+    /// Per-kind toggles, each individually controllable in Profile.
+    var notifyWorkoutReminder: Bool = true
+    var notifyStreakRisk: Bool = true
+    var notifyReportReady: Bool = true
+    var notifyCheckInDue: Bool = true
+    /// Hour of day (0–23) for the scheduled-workout reminder.
+    var reminderHour: Int = 18
+    /// Quiet hours: no notification fires at/after `quietStartHour` or before `quietEndHour`.
+    var quietStartHour: Int = 21
+    var quietEndHour: Int = 9
+
     init() {}
 
     var units: Units {

@@ -49,6 +49,7 @@ struct ProfileView: View {
                     if !trainingReports.isEmpty { trainingReportsSection }
                     if !recentInsights.isEmpty { coachInsightsSection }
                     preferences
+                    notificationsSection
                     resetButton
                 }
                 .padding(20)
@@ -182,6 +183,86 @@ struct ProfileView: View {
             }
             .cardSurface()
         }
+    }
+
+    private var notificationsSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            SectionHeader(title: "Notifications")
+            VStack(spacing: 0) {
+                toggleRow(icon: "bell.fill", title: "Enable notifications",
+                          isOn: Binding(get: { settings.notificationsEnabled },
+                                        set: { setNotificationsEnabled($0) }))
+                if settings.notificationsEnabled {
+                    Divider().padding(.leading, 14)
+                    reminderTimeRow
+                    Divider().padding(.leading, 14)
+                    notifyToggle("figure.run", "Workout reminders",
+                                 Binding(get: { settings.notifyWorkoutReminder },
+                                         set: { settings.notifyWorkoutReminder = $0; saveAndRefresh() }))
+                    Divider().padding(.leading, 14)
+                    notifyToggle("flame.fill", "Streak reminders",
+                                 Binding(get: { settings.notifyStreakRisk },
+                                         set: { settings.notifyStreakRisk = $0; saveAndRefresh() }))
+                    Divider().padding(.leading, 14)
+                    notifyToggle("doc.text.fill", "Report ready",
+                                 Binding(get: { settings.notifyReportReady },
+                                         set: { settings.notifyReportReady = $0; saveAndRefresh() }))
+                    Divider().padding(.leading, 14)
+                    notifyToggle("scalemass.fill", "Check-in reminders",
+                                 Binding(get: { settings.notifyCheckInDue },
+                                         set: { settings.notifyCheckInDue = $0; saveAndRefresh() }))
+                }
+            }
+            .cardSurface()
+            Text("Encouraging nudges only — at most one a day, never during quiet hours (9pm–9am).")
+                .font(.rounded(12, .semibold)).foregroundStyle(Color.text3)
+                .padding(.horizontal, 4)
+        }
+    }
+
+    private func notifyToggle(_ icon: String, _ title: String, _ binding: Binding<Bool>) -> some View {
+        toggleRow(icon: icon, title: title, isOn: binding)
+    }
+
+    private var reminderTimeRow: some View {
+        HStack(spacing: 12) {
+            icon("clock.fill")
+            Text("Reminder time").font(.rounded(15, .heavy)).foregroundStyle(Color.textPrimary)
+            Spacer()
+            Stepper(reminderTimeLabel, value: Binding(
+                get: { settings.reminderHour },
+                set: { settings.reminderHour = min(23, max(0, $0)); saveAndRefresh() }),
+                in: 0...23)
+                .labelsHidden()
+            Text(reminderTimeLabel).font(.rounded(14, .heavy)).foregroundStyle(Color.text2)
+                .frame(width: 74, alignment: .trailing)
+        }
+        .padding(14)
+    }
+
+    private var reminderTimeLabel: String {
+        let h = settings.reminderHour
+        let period = h < 12 ? "AM" : "PM"
+        let hour12 = h % 12 == 0 ? 12 : h % 12
+        return "\(hour12):00 \(period)"
+    }
+
+    private func setNotificationsEnabled(_ on: Bool) {
+        if on {
+            Task {
+                let granted = await NotificationScheduler.requestAuthorization()
+                settings.notificationsEnabled = granted
+                saveAndRefresh()
+            }
+        } else {
+            settings.notificationsEnabled = false
+            saveAndRefresh()
+        }
+    }
+
+    private func saveAndRefresh() {
+        save()
+        NotificationCoordinator.refresh(context: context)
     }
 
     private func stat(_ value: String, _ label: String, action: @escaping () -> Void) -> some View {

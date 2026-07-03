@@ -36,8 +36,10 @@ struct ReplogApp: App {
         .onChange(of: scenePhase) { _, phase in
             switch phase {
             case .active:
-                // Publish any due weekly/monthly report whose boundary has passed.
+                // Publish any due weekly/monthly report whose boundary has passed, then
+                // re-plan notifications from the fresh state.
                 ReportScheduler.runOnActivation(context: container.mainContext)
+                NotificationCoordinator.refresh(context: container.mainContext)
             case .background:
                 ReportScheduler.scheduleBackgroundRefresh()
             default:

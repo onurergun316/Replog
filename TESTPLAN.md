@@ -194,3 +194,25 @@ monthly one into `ReportScheduler.runOnActivation`, fired from the app's `sceneP
 The `BGTaskScheduler` app-refresh path is best-effort and untested (it requires the Info.plist
 `BGTaskSchedulerPermittedIdentifiers` entry + Background Modes to run at all, and iOS decides
 if/when) — documented in `ReportScheduler`.
+
+---
+
+## Phase 7 — Smart notifications
+
+**`NotificationPlannerTests`** (`ReplogTests/NotificationPlannerTests.swift`, pure)
+- `disabledMasterSwitchPlansNothing` — the master switch gates everything.
+- `eachKindIsIndividuallyToggleable` — per-kind toggles; only the enabled kinds appear.
+- `workoutReminderRespectsScheduledDaysOnly` — reminders land only on scheduled weekdays.
+- `atMostOnePerDayEvenWhenEverythingFires` — the one-per-day cap holds when every kind is
+  eligible; `streakRiskOutranksOtherKindsSameDay` — priority resolves the tie.
+- `propertyNeverMoreThanOnePerDayAcrossManyConfigurations` — the ≤1/day invariant across a
+  fuzz of streak/undone/report combinations.
+- `quietHourDetectionHandlesOvernightWrap`, `remindersNeverFireInsideQuietHours`,
+  `eveningQuietReminderShiftsToNextMorningOpen` — quiet-hours (21:00–09:00) shifting.
+- `copyIsEncouragingNotGuiltBased` — no guilt words in any notification copy.
+
+The `NotificationScheduler` (UNUserNotificationCenter) and `NotificationCoordinator` (builds
+inputs/prefs from the store, re-plans on activation / preference change / Finish) are the thin
+OS boundary — verified on device, not unit-tested. Permission is requested in context from the
+Profile master toggle (with value copy), never at launch. Per-kind toggles + reminder time
+live in Profile → Notifications.

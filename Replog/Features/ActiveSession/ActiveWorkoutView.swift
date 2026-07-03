@@ -293,6 +293,9 @@ struct ActiveWorkoutView: View {
         CoachContextBuilder.recordDebrief(insights, context: context)
         try? context.save()
 
+        // Today's session is done — re-plan notifications (clears today's streak-risk nudge).
+        NotificationCoordinator.refresh(context: context)
+
         if insights.isEmpty {
             dismiss()
         } else {
