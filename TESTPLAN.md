@@ -36,3 +36,35 @@ Coverage target: **≥80% of the logic layer** (Domain, Models, Catalog, view mo
 - `patternDecodingFoldsCaseAndWhitespace` — case/whitespace-insensitive parsing.
 - `conditioningPatternsAreFlagged` — `isConditioningOrMobility` true for cardio/mobility only.
 - `audienceAgeMembershipRespectsInclusiveBounds` — inclusive [min, max] membership.
+
+---
+
+## Phase 2 — Deterministic ProgramMatcher
+
+**`ProgramMatcherTests`** (`ReplogTests/ProgramMatcherTests.swift`) — runs against the real
+bundled library so every gate/score sees genuine data.
+- `machineOnlyUserNeverGetsABandsRequiredProgram` — property: no bands-required program
+  survives for a machine-only athlete.
+- `bodyweightUserNeverGetsBarbellDumbbellCableMachineOrKettlebellPrograms` — property:
+  bodyweight-only athlete never sees programs needing gear they lack.
+- `disclaimerProgramsAreNeverInTheAutoPickSet` — across 3 contexts, every surviving
+  disclaimer program is flagged non-auto-pickable and `topAutoPick` never returns one.
+- `prerequisiteProgramsAreGatedForNoHistoryUsersButAllowedWithHistory` — run_10k_8wk
+  (prereq "Can run 5K") is gated with no history, allowed once prerequisites are satisfied.
+- `ageOutsideAudienceBandExcludesTheProgram` — teen_foundations_3d (age 14–18) dropped for
+  a 50-year-old.
+- `basketballSportUserGetsTheirSportProgramFirst` / `boxingSportUserGetsTheirSportProgramFirst`
+  — the sport-specific program ranks #1 for that sport athlete.
+- `customSportWithNoMatchFallsBackToGeneralAthleteProgram` — unmatched free-text sport →
+  general-athletic (GPP) ranks first; no mismatched sport program leaks past the sport gate.
+- `recognisedCustomSportMapsToItsProgram` — "bouldering" → climbing program first.
+- `femaleFocusedProgramRanksHigherForWomenButStaysAvailableToMen` — sex-focus nudge boosts
+  score for women while remaining auto-pickable for men (never exclusionary).
+- `beginnerGetsBeginnerProgramsScoredForExperience` — beginner program yields an
+  experience-fit reason for a beginner.
+- `daysPerWeekFitBoostsAnExactMatch` — a 3-day program scores higher for a 3-day athlete
+  than a 6-day one.
+- `fatLossPersonaTopPickTargetsFatLossOrConditioning` — loseWeight persona's auto-pick has
+  fat-loss/conditioning tokens.
+- `everySurvivingProgramSatisfiesTheEquipmentGate` — invariant across 5 personas.
+- `rankingIsDeterministicAndScoreSorted` — stable order + descending score.
