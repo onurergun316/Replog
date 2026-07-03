@@ -20,6 +20,7 @@ extension CoachInsightKind {
         case .milestone:        return "trophy.fill"
         case .bodyweightTrend:  return "scalemass.fill"
         case .checkInPrompt:    return "calendar.badge.clock"
+        case .readinessTrend:   return "bed.double.fill"
         case .welcome:          return "hand.wave.fill"
         }
     }

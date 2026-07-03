@@ -15,7 +15,7 @@ enum ReplogSchema {
         Plan.self, Workout.self, PlanItem.self, SetTemplate.self,
         ActiveSession.self, SessionExercise.self, LoggedSet.self,
         HistoryEntry.self, UserProfile.self, AppSettings.self,
-        CoachingLog.self, BodyweightEntry.self
+        CoachingLog.self, BodyweightEntry.self, ReadinessEntry.self
     ]
 
     /// The app's on-disk container.
@@ -120,6 +120,34 @@ extension ModelContext {
             sortBy: [SortDescriptor(\.date, order: .reverse)])
         descriptor.fetchLimit = 1
         return ((try? fetch(descriptor)) ?? []).first
+    }
+
+    /// Records a readiness check-in for a session start. One entry per calendar day: a second
+    /// check-in the same day overwrites the first.
+    @discardableResult
+    func logReadiness(_ checkIn: ReadinessCheckIn, date: Date = Date()) -> ReadinessEntry {
+        let existing = ((try? fetch(FetchDescriptor<ReadinessEntry>())) ?? [])
+            .first { Calendar.current.isDate($0.date, inSameDayAs: date) }
+        if let existing {
+            existing.sleepRaw = checkIn.sleep.rawValue
+            existing.sorenessRaw = checkIn.soreness.rawValue
+            existing.stressRaw = checkIn.stress.rawValue
+            existing.date = date
+            return existing
+        }
+        let entry = ReadinessEntry(date: date, sleep: checkIn.sleep,
+                                   soreness: checkIn.soreness, stress: checkIn.stress)
+        insert(entry)
+        return entry
+    }
+
+    /// Readiness check-ins within the trailing `days`, newest first.
+    func recentReadiness(days: Int = 7, now: Date = Date()) -> [ReadinessEntry] {
+        let cutoff = Calendar.current.date(byAdding: .day, value: -days, to: now) ?? now
+        let descriptor = FetchDescriptor<ReadinessEntry>(
+            predicate: #Predicate { $0.date >= cutoff },
+            sortBy: [SortDescriptor(\.date, order: .reverse)])
+        return (try? fetch(descriptor)) ?? []
     }
 
     /// Records a bodyweight check-in. One entry per calendar day: logging again on the

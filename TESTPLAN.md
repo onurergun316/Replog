@@ -145,4 +145,25 @@ over the pure engine, asserting the right insight kinds, priorities, and reason 
 (The MainActor surfacing — `CoachContextBuilder`, `CoachVoice`, the Today card, the debrief
 sheet, and the Profile "Coach Insights" section — is wired but, like the other AI seams, its
 live model path is verified on device, not unit-tested. The pure engine it feeds is covered
-above.)
+above.) `readinessPatternSurfacesAReadinessInsight` added in Phase 5.
+
+---
+
+## Phase 5 — Readiness check-in + session modulation
+
+**`ReadinessModulatorTests`** (`ReplogTests/ReadinessModulatorTests.swift`, pure)
+- Modulation table: fresh/light → normal; load 2–3 → capIntensity; load ≥4 → trimLastSet;
+  only trim reduces volume.
+- Reason strings: empty for normal; names the flagged dimensions ("poor sleep", "high
+  soreness") and leads with the poorest signal; correct verb per modulation.
+- Pattern detection: three low-sleep days in the window → `.lowSleep(3)`; two days is not
+  yet a pattern; stale days outside the 7-day window don't count; the dominant pattern wins.
+
+**`ReadinessSessionTests`** (`ReplogTests/ReadinessSessionTests.swift`, @MainActor, in-memory)
+- `skipPathLeavesTheSessionUntouched` — no check-in → 3 sets/exercise, empty note.
+- `normalReadinessDoesNotTrimAndLeavesNoNote` — `.fresh` → unchanged, no note.
+- `moderateReadinessCapsIntensityWithoutTrimming` — load 2 → volume kept, "Capped
+  intensity" note.
+- `highFatigueTrimsTheLastSetOfEachExerciseAndNotes` — load 6 → each exercise 3→2 sets,
+  trimmed sets actually deleted from the store, "Trimmed a set" note.
+- `loggingAReadinessCheckInPersistsOnePerDay` — same-day re-log overwrites, latest wins.

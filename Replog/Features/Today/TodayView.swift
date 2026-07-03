@@ -22,6 +22,8 @@ struct TodayView: View {
     @State private var path = NavigationPath()
     @State private var selectedStat: StatKind?
     @State private var showingBodyweightSheet = false
+    /// The workout awaiting the readiness check before its session begins.
+    @State private var pendingWorkout: Workout?
     /// Which calendar day the Today coach card was dismissed on (max one card per day).
     @AppStorage("coachCardDismissedDay") private var coachCardDismissedDay = ""
 
@@ -138,6 +140,11 @@ struct TodayView: View {
             .background(Color.bg.ignoresSafeArea())
             .toolbar(.hidden, for: .navigationBar)
             .planNavigationDestinations()
+            .sheet(item: $pendingWorkout) { workout in
+                ReadinessCheckInSheet { readiness in
+                    beginSession(workout, readiness: readiness)
+                }
+            }
             .sheet(isPresented: $showingBodyweightSheet) {
                 BodyweightCheckInSheet(
                     initialKg: bodyweightSnapshot?.currentKg ?? 75,
@@ -290,9 +297,17 @@ struct TodayView: View {
         // One session at a time: resume the in-progress one rather than starting a second.
         if let existing = activeSession {
             existing.isOpen = true
+            try? context.save()
         } else {
-            SessionBuilder.start(workout: workout, into: context)
+            // A brand-new session first offers the optional readiness check.
+            pendingWorkout = workout
         }
+    }
+
+    /// Begins a new session after the readiness sheet, applying any check-in.
+    private func beginSession(_ workout: Workout, readiness: ReadinessCheckIn?) {
+        if let readiness { context.logReadiness(readiness) }
+        SessionBuilder.start(workout: workout, into: context, readiness: readiness)
         try? context.save()
     }
 }

@@ -48,7 +48,7 @@ struct CoachEngineTests {
         #expect(kinds.contains(.milestone))          // the PR
         #expect(!kinds.contains(.stallAlert))
         // The debrief carries the next-session recommendation reason.
-        let debrief = try? #require(insights.first { $0.kind == .sessionDebrief })
+        let debrief = insights.first { $0.kind == .sessionDebrief }
         #expect(debrief?.body.contains("Next time on Squat:") == true)
         #expect(debrief?.body.contains("up ") == true)   // volume up vs last time
         // The PR insight is high priority.
@@ -151,6 +151,12 @@ struct CoachEngineTests {
         #expect(insights.contains { $0.kind == .sessionDebrief })
         #expect(!insights.contains { $0.kind == .stallAlert })     // 1 session can't stall
         #expect(!insights.contains { $0.kind == .welcome })        // debrief supersedes welcome
+    }
+
+    @Test func readinessPatternSurfacesAReadinessInsight() throws {
+        let ctx = CoachContext(now: now, readinessPattern: .lowSleep(days: 3))
+        let insight = try #require(CoachEngine.insights(ctx).first { $0.kind == .readinessTrend })
+        #expect(insight.body.contains("3 low-sleep days"))
     }
 
     @Test func streakMilestoneFiresOnRoundNumbers() {

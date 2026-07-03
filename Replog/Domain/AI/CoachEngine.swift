@@ -25,6 +25,7 @@ enum CoachInsightKind: String, Codable, Sendable, CaseIterable {
     case milestone
     case bodyweightTrend
     case checkInPrompt
+    case readinessTrend
     case welcome
 
     /// Tie-break rank when two insights share a priority (lower surfaces first).
@@ -32,11 +33,12 @@ enum CoachInsightKind: String, Codable, Sendable, CaseIterable {
         switch self {
         case .stallAlert:       return 0
         case .adherenceInsight: return 1
-        case .sessionDebrief:   return 2
-        case .milestone:        return 3
-        case .bodyweightTrend:  return 4
-        case .checkInPrompt:    return 5
-        case .welcome:          return 6
+        case .readinessTrend:   return 2
+        case .sessionDebrief:   return 3
+        case .milestone:        return 4
+        case .bodyweightTrend:  return 5
+        case .checkInPrompt:    return 6
+        case .welcome:          return 7
         }
     }
 }
@@ -122,6 +124,8 @@ struct CoachContext: Sendable {
     var programDeloadRule: String?
     /// Whole program weeks completed (for a program-week milestone), if derivable.
     var programWeeksCompleted: Int?
+    /// A recurring readiness pattern across the week (e.g. three low-sleep days), if any.
+    var readinessPattern: ReadinessPattern?
     /// True when the athlete has no logged history at all.
     var isFreshUser: Bool
 
@@ -133,6 +137,7 @@ struct CoachContext: Sendable {
          hasScheduledWorkoutToday: Bool = false, completedScheduledToday: Bool = false,
          bodyweight: BodyweightSnapshot? = nil, bodyweightCheckInDue: Bool = false,
          programDeloadRule: String? = nil, programWeeksCompleted: Int? = nil,
+         readinessPattern: ReadinessPattern? = nil,
          isFreshUser: Bool = false) {
         self.goal = goal
         self.units = units
@@ -148,6 +153,7 @@ struct CoachContext: Sendable {
         self.bodyweightCheckInDue = bodyweightCheckInDue
         self.programDeloadRule = programDeloadRule
         self.programWeeksCompleted = programWeeksCompleted
+        self.readinessPattern = readinessPattern
         self.isFreshUser = isFreshUser
     }
 }
@@ -167,6 +173,7 @@ enum CoachEngine {
         out += adherenceInsights(ctx)
         out += streakMilestoneInsights(ctx)
         out += bodyweightInsights(ctx)
+        out += readinessInsights(ctx)
         out += checkInInsights(ctx)
 
         if out.isEmpty && ctx.isFreshUser {
@@ -349,6 +356,29 @@ enum CoachEngine {
             title: "Bodyweight trending \(dir)",
             body: "You're trending \(dir) about \(perWeek)/week over the last month. \(tail)",
             metrics: ["weeklyRateKg": rate])]
+    }
+
+    // MARK: Readiness pattern
+
+    private static func readinessInsights(_ ctx: CoachContext) -> [CoachInsight] {
+        guard let pattern = ctx.readinessPattern, ctx.justFinished == nil else { return [] }
+        let (what, advice): (String, String)
+        switch pattern {
+        case .lowSleep(let days):
+            what = "\(days) low-sleep days this week"
+            advice = "Sleep is where you actually adapt — protect it, and keep sessions honest on tired days."
+        case .highSoreness(let days):
+            what = "high soreness on \(days) days this week"
+            advice = "Persistent soreness can mean you're outrunning recovery — an easier day or extra rest is smart."
+        case .highStress(let days):
+            what = "high stress on \(days) days this week"
+            advice = "Life stress and training stress share a budget — dial intensity to what you can recover from."
+        }
+        return [CoachInsight(
+            kind: .readinessTrend, priority: .normal,
+            title: "Readiness check",
+            body: "You've logged \(what). \(advice)",
+            metrics: ["patternDays": Double(pattern.days)])]
     }
 
     // MARK: Check-in prompt

@@ -20,6 +20,9 @@ final class ActiveSession {
     /// false (paused & persisted) so the workout survives and can be continued; it is
     /// only deleted on Finish.
     var isOpen: Bool = true
+    /// A plain-language note when a readiness check-in modulated this session
+    /// (e.g. "Trimmed a set today — you reported poor sleep."). Empty when unmodulated.
+    var readinessNote: String = ""
 
     @Relationship(deleteRule: .cascade, inverse: \SessionExercise.session)
     var exercises: [SessionExercise] = []

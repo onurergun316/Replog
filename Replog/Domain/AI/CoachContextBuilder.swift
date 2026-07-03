@@ -107,6 +107,11 @@ enum CoachContextBuilder {
 
         let deloadRule = plans.first { !$0.progressionDeload.isEmpty }?.progressionDeload
 
+        // A recurring readiness pattern this week (three-plus low-sleep days, etc.).
+        let readiness = context.recentReadiness(days: ReadinessModulator.patternWindowDays, now: now)
+        let pattern = ReadinessModulator.recentPattern(
+            ratings: readiness.map(\.checkIn), forDates: readiness.map(\.date), now: now)
+
         return CoachContext(
             goal: profile.goal, units: settings.units, now: now,
             justFinished: nil,
@@ -116,6 +121,7 @@ enum CoachContextBuilder {
             completedScheduledToday: completedToday,
             bodyweight: snapshot, bodyweightCheckInDue: checkInDue,
             programDeloadRule: deloadRule,
+            readinessPattern: pattern,
             isFreshUser: recent.isEmpty && profile.totalWorkouts == 0)
     }
 

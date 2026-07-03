@@ -33,6 +33,18 @@ struct ActiveWorkoutView: View {
     var body: some View {
         VStack(spacing: 0) {
             header
+            if !session.readinessNote.isEmpty {
+                HStack(spacing: 8) {
+                    Image(systemName: "bed.double.fill")
+                        .font(.system(size: 12, weight: .bold)).foregroundStyle(Color.accent)
+                    Text(session.readinessNote)
+                        .font(.rounded(12, .semibold)).foregroundStyle(Color.text2)
+                    Spacer(minLength: 0)
+                }
+                .padding(.horizontal, 16).padding(.vertical, 8)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(Color.accentSoft)
+            }
             ScrollView {
                 LazyVStack(spacing: 12) {
                     ForEach(session.orderedExercises) { exercise in

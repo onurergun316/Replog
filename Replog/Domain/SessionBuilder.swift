@@ -14,8 +14,12 @@ import SwiftData
 enum SessionBuilder {
 
     /// Builds and inserts an ActiveSession for `workout`. The caller saves the context.
+    /// When a `readiness` check-in is supplied, its modulation is applied to the built session
+    /// (trimming the last set of each exercise when fatigue is high) and its reason is stored
+    /// on `session.readinessNote`. Passing `nil` (the default) leaves the session untouched.
     @discardableResult
-    static func start(workout: Workout, into context: ModelContext) -> ActiveSession {
+    static func start(workout: Workout, into context: ModelContext,
+                      readiness: ReadinessCheckIn? = nil) -> ActiveSession {
         let planName = workout.plan?.name ?? ""
         let session = ActiveSession(workoutId: workout.id, name: workout.name, planName: planName)
         context.insert(session)
@@ -48,7 +52,25 @@ enum SessionBuilder {
                 context.insert(logged)
             }
         }
+
+        if let readiness {
+            apply(readiness, to: session, context: context)
+        }
         return session
+    }
+
+    /// Applies a readiness modulation to a freshly-built session: trims the last set of each
+    /// multi-set exercise when fatigue is high, and always records the reason on the session.
+    private static func apply(_ readiness: ReadinessCheckIn, to session: ActiveSession,
+                              context: ModelContext) {
+        let modulation = ReadinessModulator.modulation(for: readiness)
+        session.readinessNote = ReadinessModulator.reason(for: readiness, modulation: modulation)
+        guard modulation.reducesVolume else { return }
+        for exercise in session.exercises {
+            let ordered = exercise.orderedSets
+            guard ordered.count > 1, let last = ordered.last else { continue }
+            context.delete(last)
+        }
     }
 }
 
