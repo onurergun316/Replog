@@ -32,6 +32,14 @@ final class OnboardingViewModel {
     var reportMarkdown: String = ""
     /// Whether Apple Intelligence (vs the deterministic fallback) produced the plan.
     var usedAppleIntelligence = false
+    /// One-sentence rationale for the chosen library program (if program-driven).
+    var programJustification: String = ""
+
+    /// The library program the generated plan was built from, if any.
+    var chosenProgram: WorkoutProgram? {
+        guard let id = generated?.programId, !id.isEmpty else { return nil }
+        return ProgramCatalog.shared.program(id: id)
+    }
 
     private let service: AIPlanService
 
@@ -105,5 +113,6 @@ final class OnboardingViewModel {
         generated = result.plan
         reportMarkdown = result.reportMarkdown
         usedAppleIntelligence = result.usedAppleIntelligence
+        programJustification = result.justification
     }
 }

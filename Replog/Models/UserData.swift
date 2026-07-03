@@ -23,6 +23,14 @@ final class Plan {
     /// Display headline from generation, e.g. "Your Hypertrophy Plan".
     var headline: String = ""
 
+    /// The bundled library program this plan was generated from (empty for manual/legacy plans).
+    var programId: String = ""
+    /// Progression metadata copied from the source program, so the coach and reports can
+    /// explain how loads advance and when to deload. Empty for manual/legacy plans.
+    var progressionType: String = ""
+    var progressionRule: String = ""
+    var progressionDeload: String = ""
+
     @Relationship(deleteRule: .cascade, inverse: \Workout.plan)
     var workouts: [Workout] = []
 

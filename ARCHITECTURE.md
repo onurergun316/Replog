@@ -110,10 +110,28 @@ Logic types are `struct`/`enum` (thread-safe, `Sendable`, copy-on-write). Reacti
 Observation framework (`@Observable`, `@Bindable`) rather than `ObservableObject`/`@Published` — less
 boilerplate, finer-grained invalidation.
 
-### 4.6 Graceful degradation (Strategy)
-`AIPlanService` tries on-device Apple Intelligence and **falls back** to the deterministic
-`PlanGenerator` when the model is unavailable — same output type, swapped strategy, flagged via
-`usedAppleIntelligence`. The UI is identical either way.
+### 4.6 Graceful degradation (Strategy) + program-driven planning
+Planning is **program-driven**: `ProgramMatcher` (pure) ranks the bundled 62-program library
+(`Catalog/ProgramLibrary/`) for the athlete via hard gates (equipment, age, sport, prerequisite,
+disclaimer) + soft scoring, and `AIPlanService` runs two model stages over the shortlist — stage 1
+picks one program + writes the report; stage 2 fills each program *slot* with a real catalog
+exercise. `PatternMapping` (pure, tested) maps a slot's `MovementPattern` to catalog facets
+(category/force/mechanic/muscles/keywords) so a slot resolves to real exercises the athlete can
+perform; `ProgramPlanBuilder` (pure, tested) is the shared spine that both the model path and the
+deterministic fallback use. When Apple Intelligence is unavailable it **falls back** to
+`ProgramMatcher`'s top auto-pickable program built by the same slot resolver (no model), and if that
+yields nothing (e.g. a program with no discrete days) to the legacy `PlanGenerator` split — same
+output type, swapped strategy, flagged via `usedAppleIntelligence`.
+
+**Slot rep/time convention** (`Domain/RepScheme.swift`, parsed into `SetTemplate` targets):
+- A plain count or range (`"5"`, `"8-12"`) → the **lower bound** (start there, earn the top of the
+  range, then add load — the double-progression the library favours).
+- A per-side scheme (`"10/side"`, `"12-15 each"`) → the per-side count, flagged `isPerSide`.
+- A time/hold/interval scheme (`"30-60s"`, `"3 min"`) → the **duration in seconds** (lower bound),
+  stored in `reps` and flagged `isTimed`, since `SetTemplate` has no duration field (minutes ×60,
+  clamped ≤600s). RPE is read from a slot's `intensity` (`"RPE 8"` → 8; range → the harder bound),
+  else a level default. `Plan` stores the source `programId` + progression metadata for the coach
+  and reports; unresolvable slots (e.g. a swim slot with no catalog match) are skipped.
 
 ### 4.7 Composition over inheritance (DesignSystem)
 There are no view subclasses. Screens are composed from small components and view modifiers

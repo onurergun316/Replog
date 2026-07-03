@@ -2,17 +2,21 @@
 //  AIPlanService.swift
 //  Replog
 //
-//  The Apple Intelligence boundary. Generation is genuinely model-driven and two-stage:
+//  The Apple Intelligence boundary — now program-driven. Generation is genuinely model-driven
+//  and two-stage, but grounded in the curated program library rather than invented from scratch:
 //
-//   1. Framing call — the model designs the split (per-day muscle focus, volume, rep/RPE
-//      scheme) and writes the report's overall sections.
-//   2. Per-day selection calls — for each day the model is given a numbered list of REAL
-//      catalog exercises (filtered to the user's equipment/injuries) and picks specific ones,
-//      justifying each. Picks are validated against the catalog so refs/images stay valid.
+//   1. Framing call — the model is handed a numbered shortlist of the best-matching real
+//      programs (from `ProgramMatcher`, disclaimer programs excluded) and picks ONE, with a
+//      one-sentence justification, then writes the report's overall sections.
+//   2. Per-day selection calls — for each day of the chosen program, the model is given, per
+//      slot, a numbered list of REAL catalog exercises that fit the slot's movement pattern +
+//      the user's equipment, and picks one exercise per slot. Picks are validated against the
+//      slot's candidate set so refs/images/patterns stay valid.
 //
-//  A non-zero sampling temperature means the same answers can yield different, equally-valid
-//  plans across sessions — as the user expects from an AI. If the model is unavailable or
-//  errors, it falls back to the deterministic engine (clearly flagged via `usedAppleIntelligence`).
+//  If the model is unavailable or errors, it falls back deterministically: `ProgramMatcher`'s
+//  top auto-pickable program is built via the same slot resolver (no model), and if even that
+//  yields nothing (e.g. a program with no discrete days) it falls back to the legacy split
+//  generator. The engine used is always flagged via `usedAppleIntelligence`.
 //
 
 import Foundation
@@ -26,18 +30,29 @@ struct AIPlanService {
         var plan: GeneratedPlan
         var reportMarkdown: String
         var usedAppleIntelligence: Bool
+        /// One-sentence rationale for the chosen program (model-written, or a templated line
+        /// on the deterministic path). Empty for the legacy split fallback.
+        var justification: String = ""
     }
 
     let generator: PlanGenerator
-    let resolver: PlanResolver
+    let programCatalog: ProgramCatalog
     /// Forces the deterministic path (used by tests so they never invoke the live model).
     let forceFallback: Bool
     /// Sampling temperature — higher means more run-to-run variety.
     let temperature: Double
 
-    nonisolated init(catalog: ExerciseCatalog = .shared, forceFallback: Bool = false, temperature: Double = 1.0) {
+    /// The most candidate programs ever shown to the framing model, and the floor the budget
+    /// trimmer will not go below.
+    static let maxCandidates = 5
+    static let minCandidates = 3
+
+    nonisolated init(catalog: ExerciseCatalog = .shared,
+                     programCatalog: ProgramCatalog = .shared,
+                     forceFallback: Bool = false,
+                     temperature: Double = 1.0) {
         self.generator = PlanGenerator(catalog: catalog)
-        self.resolver = PlanResolver()
+        self.programCatalog = programCatalog
         self.forceFallback = forceFallback
         self.temperature = temperature
     }
@@ -49,56 +64,71 @@ struct AIPlanService {
     }
 
     /// Generates a plan + report. Uses Apple Intelligence when available, else falls back.
-    /// `athlete` carries the user's real logged training (empty on first onboarding) so the
-    /// model can ground loads, reps and exercise choices in actual history.
+    /// `athlete` carries the user's real logged training (empty on first onboarding); a
+    /// non-empty history also lets prerequisite-gated programs qualify.
     func generate(_ answers: QuizAnswers, athlete: AthleteContext = .empty) async -> Result {
+        let context = MatchContext.from(answers, satisfiesPrerequisites: !athlete.isEmpty)
+        // Auto-pickable candidates only — disclaimer programs are never auto-selected.
+        let candidates = ProgramMatcher.rank(context, in: programCatalog)
+            .filter { $0.autoPickable }
+        let shortlist = Array(candidates.prefix(Self.maxCandidates))
+
+        guard !shortlist.isEmpty else {
+            // No program matched at all — fall back to the legacy split generator.
+            return Self.legacyFallback(answers: answers, generator: generator)
+        }
+
         guard !forceFallback, Self.isAvailable else {
-            return Self.fallback(answers: answers, generator: generator)
+            return programFallback(program: shortlist[0].program, answers: answers)
         }
         do {
-            return try await generateWithAI(answers, athlete: athlete)
+            return try await generateWithAI(answers, athlete: athlete, candidates: shortlist)
         } catch {
-            return Self.fallback(answers: answers, generator: generator)
+            return programFallback(program: shortlist[0].program, answers: answers)
         }
     }
 
     // MARK: - Live two-stage generation
 
-    private func generateWithAI(_ answers: QuizAnswers, athlete: AthleteContext) async throws -> Result {
+    private func generateWithAI(_ answers: QuizAnswers,
+                                athlete: AthleteContext,
+                                candidates: [ProgramMatch]) async throws -> Result {
         let options = GenerationOptions(temperature: temperature)
 
-        // 1) Framing: the model designs the split + report sections.
+        // 1) Framing: the model picks one program and writes the report sections.
         let framingSession = LanguageModelSession(instructions: Self.framingInstructions)
         let framing = try await framingSession.respond(
-            to: Self.framingPrompt(for: answers, athlete: athlete),
-            generating: PlanFraming.self,
+            to: Self.framingPrompt(candidates: candidates, answers: answers, athlete: athlete),
+            generating: ProgramFraming.self,
             options: options
         ).content
 
-        guard !framing.workouts.isEmpty else {
-            return Self.fallback(answers: answers, generator: generator)
+        let idx = framing.chosenProgramNumber - 1
+        let chosen = candidates.indices.contains(idx) ? candidates[idx].program : candidates[0].program
+        guard !chosen.days.isEmpty else {
+            // Chosen program has no discrete days (e.g. a couch-to-5k plan) — deterministic path.
+            return programFallback(program: chosen, answers: answers)
         }
 
-        // 2) Per-day: the model selects + justifies specific real exercises.
-        let weekdays = PlanGenerator.weekdays(count: framing.workouts.count)
+        // 2) Per-day: the model picks one real exercise per slot.
+        let weekdays = PlanGenerator.weekdays(count: chosen.days.count)
         var workouts: [GeneratedWorkout] = []
         var reportDays: [PerDayNote] = []
 
-        for (index, day) in framing.workouts.enumerated() {
-            let muscles = day.targetMuscles.compactMap { Muscle.lenient($0) }
-            let candidates = generator.candidates(forMuscles: muscles, answers: answers, limit: 14)
-            guard !candidates.isEmpty else { continue }
+        for (index, day) in chosen.days.enumerated() {
+            let entries = slotCandidateEntries(for: day, answers: answers)
+            guard !entries.isEmpty else { continue }
 
-            let count = max(3, min(6, day.exerciseCount))
             let selectionSession = LanguageModelSession(instructions: Self.selectionInstructions)
             let selection = try await selectionSession.respond(
-                to: Self.selectionPrompt(day: day, candidates: candidates, count: count,
-                                         answers: answers, athlete: athlete),
+                to: Self.slotSelectionPrompt(day: day, entries: entries, answers: answers),
                 generating: DaySelection.self,
                 options: options
             ).content
 
-            let resolved = resolver.resolveDay(day: day, selection: selection, candidates: candidates)
+            let picks = alignPicks(selection: selection, entries: entries, slotCount: day.slots.count)
+            let resolved = ProgramPlanBuilder.resolveDay(day, answers: answers,
+                                                         catalog: generator.catalog, picks: picks)
             guard !resolved.items.isEmpty else { continue }
 
             let weekday = index < weekdays.count ? weekdays[index] : Weekday.allCases[index % 7]
@@ -111,17 +141,18 @@ struct AIPlanService {
             ))
         }
 
-        guard !workouts.isEmpty else {
-            return Self.fallback(answers: answers, generator: generator)
-        }
+        guard !workouts.isEmpty else { return programFallback(program: chosen, answers: answers) }
 
-        let planName = framing.planName.trimmingCharacters(in: .whitespaces)
         let headline = framing.headline.trimmingCharacters(in: .whitespaces)
         let plan = GeneratedPlan(
-            name: planName.isEmpty ? "Your Plan" : planName,
+            name: chosen.name,
             colorHex: PlanGenerator.planColor(for: answers.goal),
             workouts: workouts,
-            headline: headline.isEmpty ? "Your Plan" : headline
+            headline: headline.isEmpty ? "Your Plan" : headline,
+            programId: chosen.id,
+            progression: PlanProgressionMeta(type: chosen.progression.type,
+                                             rule: chosen.progression.rule ?? "",
+                                             deload: chosen.progression.deload ?? "")
         )
         let report = PlanReport(
             philosophy: framing.philosophy,
@@ -132,78 +163,147 @@ struct AIPlanService {
             encouragement: framing.encouragement
         )
         return Result(plan: plan, reportMarkdown: ReportComposer.markdown(report: report, plan: plan),
-                      usedAppleIntelligence: true)
+                      usedAppleIntelligence: true,
+                      justification: framing.justification.trimmingCharacters(in: .whitespacesAndNewlines))
     }
 
-    // MARK: - Deterministic fallback (no model). Directly unit-tested.
+    // MARK: - Deterministic fallbacks (no model). Directly unit-tested.
 
-    static func fallback(answers: QuizAnswers, generator: PlanGenerator = PlanGenerator()) -> Result {
+    /// Program-driven fallback: build the chosen program with the deterministic slot resolver.
+    /// Falls through to the legacy generator if the program can't be materialised.
+    func programFallback(program: WorkoutProgram, answers: QuizAnswers) -> Result {
+        let plan = ProgramPlanBuilder.plan(from: program, answers: answers, catalog: generator.catalog)
+        guard !plan.workouts.isEmpty else {
+            return Self.legacyFallback(answers: answers, generator: generator)
+        }
+        let report = ProgramPlanBuilder.report(for: program, plan: plan, answers: answers)
+        return Result(plan: plan, reportMarkdown: ReportComposer.markdown(report: report, plan: plan),
+                      usedAppleIntelligence: false,
+                      justification: Self.firstSentence(program.whoIsItFor))
+    }
+
+    /// Legacy split generator fallback (no program), for when nothing matches or materialises.
+    static func legacyFallback(answers: QuizAnswers, generator: PlanGenerator = PlanGenerator()) -> Result {
         let plan = generator.generate(answers)
         let report = ReportComposer.fallbackMarkdown(answers: answers, plan: plan)
         return Result(plan: plan, reportMarkdown: report, usedAppleIntelligence: false)
     }
 
+    // MARK: - Slot candidate plumbing
+
+    /// A day's flat, globally-numbered candidate list, each tagged with the slot it belongs to.
+    struct SlotCandidateEntry: Equatable, Sendable {
+        var slotIndex: Int
+        var exercise: Exercise
+    }
+
+    /// Builds the per-slot candidate entries for a day (a few candidates per resolvable slot),
+    /// de-duplicating so the same exercise isn't offered twice.
+    func slotCandidateEntries(for day: ProgramDay, answers: QuizAnswers, perSlot: Int = 5) -> [SlotCandidateEntry] {
+        var seen = Set<String>()
+        var entries: [SlotCandidateEntry] = []
+        for (i, slot) in day.slots.enumerated() {
+            let cands = ProgramPlanBuilder.candidates(for: slot, answers: answers,
+                                                      catalog: generator.catalog, limit: perSlot)
+            for ex in cands where seen.insert(ex.id).inserted {
+                entries.append(SlotCandidateEntry(slotIndex: i, exercise: ex))
+            }
+        }
+        return entries
+    }
+
+    /// Maps the model's flat picks back onto slots: the first valid pick belonging to a slot
+    /// wins that slot; slots with no valid pick are left nil (the resolver fills them).
+    func alignPicks(selection: DaySelection, entries: [SlotCandidateEntry], slotCount: Int) -> [Exercise?] {
+        var picks = [Exercise?](repeating: nil, count: slotCount)
+        for pick in selection.picks {
+            let i = pick.number - 1
+            guard entries.indices.contains(i) else { continue }
+            let entry = entries[i]
+            if picks.indices.contains(entry.slotIndex), picks[entry.slotIndex] == nil {
+                picks[entry.slotIndex] = entry.exercise
+            }
+        }
+        return picks
+    }
+
     // MARK: - Prompts
 
     static let framingInstructions = CoachingKnowledge.grounded("""
-    You are an elite, caring strength & conditioning coach and exercise scientist who designs \
-    safe, evidence-based resistance-training programs tailored to the individual. Use warm, plain, \
-    encouraging language. Design the split and explain your reasoning thoroughly, citing the \
-    principles below in plain words.
+    You are an elite, caring strength & conditioning coach and exercise scientist. You are given \
+    a shortlist of real, evidence-based training programs and must choose the single best one for \
+    the person, then explain your reasoning thoroughly in warm, plain, encouraging language. \
+    Choose ONLY from the numbered programs provided.
     """)
 
     static let selectionInstructions = CoachingKnowledge.grounded("""
-    You are an elite exercise scientist selecting specific exercises for one training day from a \
-    provided list of real, available exercises. Choose the best mix of compound and isolation \
-    movements for the day's muscles and the person's level and equipment. For EACH exercise, \
-    explain in plain language what it trains and why it earns its place in this session. Only \
-    choose from the numbered candidates given.
+    You are an elite exercise scientist filling a training day's slots. Each slot names a movement \
+    pattern and lists real, available exercises that fit it. Pick exactly one exercise per slot — \
+    the best fit for the person's level and equipment — and explain in plain language why each \
+    earns its place. Only choose from the numbered candidates given.
     """)
 
-    static func framingPrompt(for answers: QuizAnswers, athlete: AthleteContext = .empty) -> String {
-        let base = """
-        Design a personalized resistance-training plan for this person:
-
-        \(profileLines(answers))
-
-        Produce exactly \(answers.daysPerWeek) training day(s). For each day give a name, its 2-4 \
-        primary muscle groups (lowercase single words), the number of exercises (3-6), and the rep, \
-        RPE, and set scheme. Then write the report sections: philosophy, why this split and why these \
-        muscles are paired together, the science, safety adaptations, and an encouraging note.
-        """
-        // The athlete's logged history gets whatever token budget the fixed parts leave over.
-        let history = athlete.promptSection(
-            maxTokens: PromptBudget.remainingTokens(afterFixed: framingInstructions, base))
+    /// The framing prompt. Trims the candidate shortlist (never below `minCandidates`) before
+    /// trimming the athlete history, so the whole prompt stays within the model's budget.
+    static func framingPrompt(candidates: [ProgramMatch], answers: QuizAnswers,
+                              athlete: AthleteContext = .empty) -> String {
+        var included = candidates
+        var base = framingBase(candidates: included, answers: answers)
+        // Trim least-relevant candidates until the fixed part fits with room for a response.
+        while included.count > minCandidates,
+              PromptBudget.tokenCount(for: framingInstructions) + PromptBudget.tokenCount(for: base) > PromptBudget.promptLimit {
+            included.removeLast()
+            base = framingBase(candidates: included, answers: answers)
+        }
+        let remaining = PromptBudget.remainingTokens(afterFixed: framingInstructions, base)
+        let history = athlete.promptSection(maxTokens: remaining)
         return history.isEmpty ? base : base + "\n\n" + history
     }
 
-    static func selectionPrompt(day: DayFraming, candidates: [Exercise], count: Int,
-                                answers: QuizAnswers, athlete: AthleteContext = .empty) -> String {
-        let list = candidates.enumerated().map { i, ex in
-            let muscle = ex.primaryMuscles.first?.displayName ?? "—"
-            let equip = ex.equipment?.displayName ?? "Bodyweight"
-            let mech = ex.mechanic?.displayName ?? ""
-            let base = "\(i + 1). \(ex.name) — \(muscle), \(equip)\(mech.isEmpty ? "" : ", \(mech)")"
-            guard let digest = athlete.digest(forExId: ex.id) else { return base }
-            return base + " [\(digest.shortNote)]"
+    private static func framingBase(candidates: [ProgramMatch], answers: QuizAnswers) -> String {
+        let list = candidates.enumerated().map { i, match in
+            let p = match.program
+            let who = firstSentence(p.whoIsItFor)
+            return "\(i + 1). \(p.name) — \(who) (\(p.daysPerWeek)×/week, \(p.durationWeeks) weeks)"
         }.joined(separator: "\n")
 
-        let historyHint = athlete.isEmpty ? "" : """
-         Candidates marked [logged: …] are lifts the person already trains — prefer keeping ones \
-        that are progressing, and consider a variation where one stalls.
-        """
-
         return """
-        Training day: "\(day.name)" focusing on \(day.targetMuscles.joined(separator: ", ")).
-        Person: \(answers.goal.displayName), \(answers.experience.displayName), equipment: \
-        \(answers.equipmentDescription)\(answers.injuries.isEmpty ? "" : ", limitations: \(answers.injuries.map(\.displayName).joined(separator: ", "))").
+        Choose the single best training program for this person:
 
-        Choose exactly \(count) exercises for this day from the candidates below, in the order they \
-        should be performed (compound movements first). Give the candidate number and a clear reason \
-        for each.\(historyHint)
+        \(profileLines(answers))
 
-        Candidates:
+        Programs to choose from (pick exactly one by number):
         \(list)
+
+        Give the chosen program's number, a one-sentence justification, a headline, and the report \
+        sections: philosophy, why this program works, the science, safety adaptations, and an \
+        encouraging note.
+        """
+    }
+
+    /// One day's slot-selection prompt: slots in order, each with its numbered candidate list.
+    static func slotSelectionPrompt(day: ProgramDay, entries: [SlotCandidateEntry],
+                                    answers: QuizAnswers) -> String {
+        var lines: [String] = []
+        for (slotIndex, slot) in day.slots.enumerated() {
+            let slotEntries = entries.enumerated().filter { $0.element.slotIndex == slotIndex }
+            guard !slotEntries.isEmpty else { continue }
+            let variant = slot.variant.map { " (\($0))" } ?? ""
+            lines.append("Slot \(slotIndex + 1) — \(slot.pattern.displayName)\(variant), \(slot.sets)×\(slot.reps):")
+            for (number, entry) in slotEntries {
+                let muscle = entry.exercise.primaryMuscles.first?.displayName ?? "—"
+                let equip = entry.exercise.equipment?.displayName ?? "Bodyweight"
+                lines.append("  \(number + 1). \(entry.exercise.name) — \(muscle), \(equip)")
+            }
+        }
+        return """
+        Training day: "\(day.name)". Person: \(answers.goal.displayName), \
+        \(answers.experience.displayName), equipment: \(answers.equipmentDescription)\
+        \(answers.injuries.isEmpty ? "" : ", limitations: \(answers.injuries.map(\.displayName).joined(separator: ", "))").
+
+        Pick exactly one exercise for each slot, giving its number and a clear reason.
+
+        \(lines.joined(separator: "\n"))
         """
     }
 
@@ -215,15 +315,17 @@ struct AIPlanService {
         lines.append("Experience: \(answers.experience.displayName)")
         lines.append("Gender: \(answers.gender.displayName)")
         lines.append("Age: \(answers.age)")
-        lines.append("Height: \(answers.heightCm) cm")
-        lines.append("Body weight: \(Int(answers.bodyWeightKg)) kg")
-        if let bmi = answers.bmi {
-            lines.append(String(format: "BMI: %.1f (%@)", bmi, answers.bmiCategory ?? ""))
-        }
         lines.append("Training days per week: \(answers.daysPerWeek)")
         lines.append("Time per session: ~\(answers.minutesPerSession) min")
         lines.append("Equipment available (use ONLY these): \(answers.equipmentDescription)")
         lines.append("Injuries / limitations: \(answers.injuries.isEmpty ? "none" : answers.injuries.map(\.displayName).joined(separator: ", "))")
         return lines.joined(separator: "\n")
+    }
+
+    /// The first sentence of a piece of text (up to the first period), trimmed.
+    static func firstSentence(_ text: String) -> String {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let dot = trimmed.firstIndex(of: ".") else { return trimmed }
+        return String(trimmed[..<dot]).trimmingCharacters(in: .whitespaces)
     }
 }

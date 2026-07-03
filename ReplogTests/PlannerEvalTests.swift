@@ -156,15 +156,18 @@ struct PlannerEvalTests {
     @Test func richHistoryProducesADifferentInBudgetPromptThanEmpty() {
         let persona = try! #require(personas.first { !$0.history.isEmpty })
         let context = AthleteContext.make(history: persona.history, catalog: catalog, now: now)
-        let rich = AIPlanService.framingPrompt(for: persona.answers, athlete: context)
-        let empty = AIPlanService.framingPrompt(for: persona.answers)
+        let programs = ProgramCatalog(bundle: .main)
+        let candidates = Array(ProgramMatcher.rank(MatchContext.from(persona.answers), in: programs)
+            .filter { $0.autoPickable }.prefix(AIPlanService.maxCandidates))
+        let rich = AIPlanService.framingPrompt(candidates: candidates, answers: persona.answers, athlete: context)
+        let empty = AIPlanService.framingPrompt(candidates: candidates, answers: persona.answers)
 
         #expect(rich != empty, "\(persona.name): history did not change the prompt")
         #expect(rich.contains("RECENT LOGGED TRAINING"))
 
         // Even the richest persona's prompt must leave the full response reserve in-window.
-        let inputTokens = PromptBudget.estimatedTokens(AIPlanService.framingInstructions)
-            + PromptBudget.estimatedTokens(rich)
+        let inputTokens = PromptBudget.tokenCount(for: AIPlanService.framingInstructions)
+            + PromptBudget.tokenCount(for: rich)
         #expect(inputTokens + PromptBudget.responseReserve <= PromptBudget.contextWindow,
                 "\(persona.name): prompt overran the token budget")
     }

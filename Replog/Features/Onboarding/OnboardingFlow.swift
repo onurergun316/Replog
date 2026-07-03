@@ -23,6 +23,7 @@ struct OnboardingFlow: View {
     @Environment(\.exerciseCatalog) private var catalog
     @State private var vm = OnboardingViewModel()
     @State private var showReport = false
+    @State private var showProgram = false
     @State private var previewRef: GeneratedWorkoutRef?
     @State private var didConfigure = false
 
@@ -59,6 +60,13 @@ struct OnboardingFlow: View {
         }
         .sheet(item: $previewRef) { ref in
             GeneratedWorkoutPreview(workout: ref.workout, catalog: catalog)
+        }
+        .sheet(isPresented: $showProgram) {
+            if let program = vm.chosenProgram {
+                NavigationStack {
+                    ProgramDetailView(program: program, showsDoneButton: true)
+                }
+            }
         }
     }
 
@@ -363,6 +371,28 @@ struct OnboardingFlow: View {
                 Pill(text: vm.answers.goal.shortName, style: .soft)
             }
 
+            if let program = vm.chosenProgram {
+                Button { showProgram = true } label: {
+                    HStack(spacing: 10) {
+                        Image(systemName: "book.pages.fill")
+                            .font(.system(size: 16, weight: .bold)).foregroundStyle(Color.accent)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(program.name)
+                                .font(.rounded(15, .heavy)).foregroundStyle(Color.textPrimary)
+                                .lineLimit(2)
+                            Text(programRationale(program))
+                                .font(.rounded(12, .semibold)).foregroundStyle(Color.text2)
+                                .lineLimit(2)
+                        }
+                        Spacer()
+                        Image(systemName: "chevron.right").font(.system(size: 13, weight: .bold))
+                            .foregroundStyle(Color.text3)
+                    }
+                    .padding(14).cardSurface()
+                }
+                .buttonStyle(.plain)
+            }
+
             if !vm.reportMarkdown.isEmpty {
                 Button { showReport = true } label: {
                     HStack(spacing: 10) {
@@ -428,6 +458,13 @@ struct OnboardingFlow: View {
     private func toggleInjury(_ injury: Injury) {
         if vm.answers.injuries.contains(injury) { vm.answers.injuries.remove(injury) }
         else { vm.answers.injuries.insert(injury) }
+    }
+
+    /// The one-liner shown under the chosen program's name: the coach's justification when
+    /// the model wrote one, else the program's own "who it's for".
+    private func programRationale(_ program: WorkoutProgram) -> String {
+        let j = vm.programJustification.trimmingCharacters(in: .whitespacesAndNewlines)
+        return j.isEmpty ? program.whoIsItFor : j
     }
 
     private func goalSubtitle(_ g: Goal) -> String {

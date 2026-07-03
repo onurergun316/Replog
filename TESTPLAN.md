@@ -68,3 +68,53 @@ bundled library so every gate/score sees genuine data.
   fat-loss/conditioning tokens.
 - `everySurvivingProgramSatisfiesTheEquipmentGate` — invariant across 5 personas.
 - `rankingIsDeterministicAndScoreSorted` — stable order + descending score.
+
+---
+
+## Phase 3 — Program-driven AI planner
+
+**`PatternMappingTests`** (`ReplogTests/PatternMappingTests.swift`)
+- `everyKnownPatternHasFacetsWithMuscleOrKeywordOrConditioning` — mapping is total over
+  `MovementPattern`; each yields something to match on.
+- `unknownPatternFallsBackToGeneralStrength` — `.other` → general compound strength facets.
+- `everyKnownPatternYieldsCandidatesFromFullGymExceptSwim` — every pattern resolves to real
+  candidates from a full gym; only `swim` (no catalog match) is empty.
+- `squatCandidatesTrainLegMusclesAsPrimary` / `horizontalPushCandidatesTrainPushMuscles` —
+  strength patterns require the right primary movers + category.
+- `candidatesNeverUseUnavailableEquipment` — bodyweight athlete never offered gear they lack.
+- `injuryAvoidedMuscleNeverAppearsAsPrimaryMover` — knee-avoided muscles excluded as primary.
+- `slotMusclesRefineRanking` — authored slot muscles bias the ranking (glute hinge).
+- `runCandidatesAreCardioMatchingKeywords` / `stretchStaticCandidatesAreStretchingCategory` /
+  `plyometricCandidatesArePlyometricCategory` — conditioning/mobility patterns map to the
+  right catalog category (and name keywords for cardio).
+
+**`RepSchemeTests`** (`ReplogTests/RepSchemeTests.swift`)
+- Counts/ranges (lower bound), per-side flagging, seconds & minutes→seconds (clamped),
+  per-side time, unparseable prose→fallback, first-number extraction, rep clamping.
+- RPE parsing from `"RPE 8"`/`"RPE 7-8"`(ceiling)/`"@8"`, nil when absent/out-of-range.
+- `sets(for:)` builds the right count/reps/RPE/weight; default RPE; clamps set count ≥1.
+
+**`ProgramPlanBuilderTests`** (`ReplogTests/ProgramPlanBuilderTests.swift`, @MainActor)
+- `deterministicPlanCarriesProgramIdRestAndParsedReps` — real program → plan with programId,
+  progression, per-item rest, parsed reps, and a real leg-compound for a squat slot.
+- `timeBasedSlotEncodesSecondsInReps` — a `"30-60s"` core slot → 30s target.
+- `slotWithNoCandidatesIsSkipped` — a swim slot is dropped; the squat slot resolves.
+- `validModelPickIsUsedInvalidFallsBackToTopCandidate` — pick validation against the slot's
+  candidate set (right pattern/equipment); invalid → top candidate.
+- `resolveDayDoesNotRepeatAnExerciseAcrossSlots` — dedup across identical slots.
+- `reportSurfacesProgramScienceAndCautions` / `reportFoldsInjuriesIntoSafetyNotes`.
+- `insertingAProgramPlanPersistsMetadataAndRest` — end-to-end through `PlanFactory` +
+  in-memory container: programId, progression, and PlanItem.restSeconds persist and re-fetch.
+
+**`AIPlanServiceTests`** (`ReplogTests/AIPlanServiceTests.swift`, @MainActor) — rewritten for
+the program-driven flow.
+- Framing prompt embeds the profile + real candidate program list; embeds logged history and
+  differs from empty; stays under the token budget with margin worst-case; trims candidates
+  but never below the floor under pressure.
+- Slot-selection prompt lists slots + real candidates; `alignPicks` maps flat model picks
+  onto slots; instructions are science-grounded.
+- Fallback is program-driven (programId + progression ride along) and produces a valid
+  plan+report; the fallback never picks a disclaimer program.
+
+**`PlannerEvalTests`** — updated `richHistoryProducesADifferentInBudgetPromptThanEmpty` to the
+new program-driven framing prompt signature (rest unchanged, exercising `PlanGenerator`).

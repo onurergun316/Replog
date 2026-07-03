@@ -27,6 +27,13 @@ enum PromptBudget {
         Int((Double(text.count) / 3.5).rounded(.up))
     }
 
+    /// The token count our budgeting uses for a prompt. FoundationModels exposes no public
+    /// tokenizer, so this is the on-device proxy the whole planner budgets against.
+    static func tokenCount(for text: String) -> Int { estimatedTokens(text) }
+
+    /// The hard ceiling for a single prompt (context window minus the response reserve).
+    static var promptLimit: Int { contextWindow - responseReserve }
+
     /// Tokens left for additional prompt content once the fixed parts and the
     /// response reserve are accounted for. Never negative.
     static func remainingTokens(afterFixed parts: String...) -> Int {

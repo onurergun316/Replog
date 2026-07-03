@@ -2,13 +2,13 @@
 //  PlanBlueprint.swift
 //  Replog
 //
-//  Structured output types for Apple Intelligence plan generation. Generation happens in
-//  two stages so the model genuinely drives the plan and can justify every choice:
+//  Structured output types for Apple Intelligence, program-driven plan generation. Generation
+//  happens in two stages so the model genuinely drives the plan and can justify every choice:
 //
-//   1. PlanFraming — the model designs the split: per-day muscle focus, volume, rep/RPE
-//      scheme, plus the report's overall sections (philosophy, why-this-split, science…).
-//   2. DaySelection — for each day, the model picks SPECIFIC exercises (by candidate number)
-//      from a list of real catalog exercises and gives a reason for each.
+//   1. ProgramFraming — the model picks ONE program from a numbered shortlist of real library
+//      candidates and writes the report's overall sections (philosophy, science, safety…).
+//   2. DaySelection — for each program day, the model picks a real catalog exercise per slot
+//      (by candidate number) and gives a reason for each.
 //
 //  `@Generable` makes these usable with FoundationModels guided generation. They are plain
 //  value types otherwise, so the resolver, report composer, and tests use them with no model.
@@ -17,47 +17,27 @@
 import Foundation
 import FoundationModels
 
-/// One training day's programming, as designed by the model (no exercises yet).
+/// Stage 1 for program-driven planning: the model picks ONE program from a numbered
+/// shortlist of real library candidates and writes the report's overall sections. The split
+/// itself is no longer invented — it comes from the chosen program's days.
 @Generable
-struct DayFraming: Equatable, Sendable {
-    @Guide(description: "Name of the training day, e.g. 'Push Day' or 'Upper Body'.")
-    var name: String
+struct ProgramFraming: Equatable, Sendable {
+    @Guide(description: "The number of the single best program for this person from the provided candidate list.")
+    var chosenProgramNumber: Int
 
-    @Guide(description: "This day's 2-4 primary muscle groups, lowercase single words like 'chest', 'shoulders', 'triceps', 'quadriceps', 'lats'.")
-    var targetMuscles: [String]
+    @Guide(description: "One sentence: why this program is the best fit for this person's goal, experience, schedule, and equipment.")
+    var justification: String
 
-    @Guide(description: "How many exercises this day should contain, between 3 and 6.")
-    var exerciseCount: Int
-
-    @Guide(description: "Target repetitions per working set, typically 6 to 15 depending on goal.")
-    var reps: Int
-
-    @Guide(description: "Target RPE (rate of perceived exertion) per set, an integer from 6 to 10.")
-    var rpe: Int
-
-    @Guide(description: "Number of working sets per exercise, typically 3 or 4.")
-    var sets: Int
-}
-
-/// The overall plan framing + report sections.
-@Generable
-struct PlanFraming: Equatable, Sendable {
-    @Guide(description: "A short, catchy plan name, e.g. 'Push · Pull · Legs' or 'Upper / Lower'.")
-    var planName: String
-
-    @Guide(description: "A motivating headline, e.g. 'Your Hypertrophy Plan'.")
+    @Guide(description: "A motivating headline for the plan, e.g. 'Your Muscle-Building Plan'.")
     var headline: String
 
-    @Guide(description: "The training days in order. Exactly one entry per scheduled training day.")
-    var workouts: [DayFraming]
-
-    @Guide(description: "3-4 sentences on the overall training philosophy, tailored to this person's goal, level, and body.")
+    @Guide(description: "3-4 sentences on the training philosophy behind this program, tailored to this person's goal, level, and body.")
     var philosophy: String
 
-    @Guide(description: "3-5 sentences explaining WHY this split and WHY these muscles are paired on the same day, with the science (weekly frequency, recovery, antagonist pairing, muscle protein synthesis).")
+    @Guide(description: "3-5 sentences explaining WHY this program's structure works, with the science (frequency, recovery, progressive overload), in plain language.")
     var whyThisSplit: String
 
-    @Guide(description: "3-5 sentences on the evidence-based principles (progressive overload, weekly volume landmarks, rep ranges, RPE autoregulation), in plain language.")
+    @Guide(description: "3-5 sentences on the evidence-based principles behind the program (weekly volume, rep ranges, RPE autoregulation, its progression rule), in plain language.")
     var scienceNotes: String
 
     @Guide(description: "2-4 sentences on safety, recovery, and adaptations for any stated injuries or limitations. If none, give joint-friendly guidance.")

@@ -20,6 +20,12 @@ enum PlanFactory {
         let plan = Plan(name: gen.name, colorHex: gen.colorHex, order: order)
         plan.headline = gen.headline
         plan.reportMarkdown = reportMarkdown
+        plan.programId = gen.programId ?? ""
+        if let p = gen.progression {
+            plan.progressionType = p.type
+            plan.progressionRule = p.rule
+            plan.progressionDeload = p.deload
+        }
         context.insert(plan)
 
         for (wIndex, gw) in gen.workouts.enumerated() {
@@ -29,6 +35,7 @@ enum PlanFactory {
 
             for (iIndex, gi) in gw.items.enumerated() {
                 let item = PlanItem(exId: gi.exId, order: iIndex)
+                item.restSeconds = gi.restSeconds
                 item.workout = workout
                 context.insert(item)
 

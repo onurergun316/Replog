@@ -16,8 +16,14 @@ struct PlanDetailView: View {
     @Query private var settingsList: [AppSettings]
     @Bindable var plan: Plan
     @State private var showRestSheet = false
+    @State private var showProgram = false
 
     private var defaultRest: Int { (settingsList.first ?? context.appSettings()).restSeconds }
+
+    /// The library program this plan was generated from, if any.
+    private var sourceProgram: WorkoutProgram? {
+        plan.programId.isEmpty ? nil : ProgramCatalog.shared.program(id: plan.programId)
+    }
 
     var body: some View {
         List {
@@ -30,6 +36,25 @@ struct PlanDetailView: View {
                 }
                 Text("\(plan.workouts.count) workouts · \(plan.exerciseCount) exercises · swipe to delete")
                     .font(.rounded(13, .semibold)).foregroundStyle(Color.text2)
+                if let program = sourceProgram {
+                    Button { showProgram = true } label: {
+                        HStack(spacing: 10) {
+                            Image(systemName: "book.pages.fill")
+                                .font(.system(size: 15, weight: .bold)).foregroundStyle(Color.accent)
+                            VStack(alignment: .leading, spacing: 1) {
+                                Text("About this program")
+                                    .font(.rounded(14, .heavy)).foregroundStyle(Color.textPrimary)
+                                Text(program.name)
+                                    .font(.rounded(12, .semibold)).foregroundStyle(Color.text2).lineLimit(1)
+                            }
+                            Spacer()
+                            Image(systemName: "chevron.right").font(.system(size: 12, weight: .bold))
+                                .foregroundStyle(Color.text3)
+                        }
+                        .padding(12).cardSurface()
+                    }
+                    .buttonStyle(.plain)
+                }
                 SectionHeader(title: "Workouts")
             }
             .plainListRow()
@@ -70,6 +95,13 @@ struct PlanDetailView: View {
         .scrollContentBackground(.hidden)
         .background(Color.bg.ignoresSafeArea())
         .navigationBarTitleDisplayMode(.inline)
+        .sheet(isPresented: $showProgram) {
+            if let program = sourceProgram {
+                NavigationStack {
+                    ProgramDetailView(program: program, showsDoneButton: true)
+                }
+            }
+        }
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Button { showRestSheet = true } label: {

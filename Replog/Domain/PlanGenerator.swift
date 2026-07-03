@@ -20,6 +20,8 @@ struct GeneratedSet: Equatable, Sendable {
 struct GeneratedItem: Equatable, Sendable {
     var exId: String
     var sets: [GeneratedSet]
+    /// Per-exercise rest in seconds, carried from a program slot when present. `nil` = app default.
+    var restSeconds: Int? = nil
 }
 
 struct GeneratedWorkout: Equatable, Sendable {
@@ -28,12 +30,25 @@ struct GeneratedWorkout: Equatable, Sendable {
     var items: [GeneratedItem]
 }
 
+/// A plan's progression metadata, copied from the chosen program so the coach (Phase 4) and
+/// reports (Phase 6) can reason about how loads advance and when to deload.
+struct PlanProgressionMeta: Equatable, Sendable {
+    var type: String
+    var rule: String
+    var deload: String
+}
+
 struct GeneratedPlan: Equatable, Sendable {
     var name: String
     var colorHex: String
     var workouts: [GeneratedWorkout]
     /// Display header on the result screen, e.g. "Your Hypertrophy Plan".
     var headline: String
+    /// The library program this plan was built from, when program-driven. `nil` for the
+    /// legacy split-based generator path.
+    var programId: String? = nil
+    /// Progression rules from the chosen program, when program-driven.
+    var progression: PlanProgressionMeta? = nil
 }
 
 // MARK: - Generator
