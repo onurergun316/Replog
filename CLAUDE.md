@@ -98,8 +98,10 @@ The catalog facets (level, equipment, force, category, mechanic, primary/seconda
 
 ## Data model — the "onion"
 ```
-Plan ──< Workout ──< PlanItem(exId, restSeconds?) ──< SetTemplate {weightKg, reps, rpe}
+Plan ──< Workout ──< PlanItem(exId, restSeconds?) ──< SetTemplate {weightKg, reps, rpe, estimated}
 ```
+`Plan` also stores `programId` + `progression{Type,Rule,Deload}` (program-driven). `SetTemplate.estimated`
+flags a computed starting-load seed (see Key formulas) so the live log renders it as a suggestion.
 - **Rest timer**: `PlanItem.restSeconds`/`SessionExercise.restSeconds` (nil = app default) set the
   per-exercise rest; `SessionBuilder` copies plan → session. The default `AppSettings.restSeconds` is
   editable in Profile; the Workout Editor ("Rest for all exercises") and Plan Detail ("whole plan")
@@ -116,6 +118,8 @@ Plan ──< Workout ──< PlanItem(exId, restSeconds?) ──< SetTemplate {w
   active-session cover is bound to the first session where `isOpen`.
 - **Plan report**: each AI-generated `Plan` stores `reportMarkdown` + `headline` (re-readable in Profile).
 - **History**: `HistoryEntry` per exId, appended on Finish (drives Progress + next session's "previous").
+  Stores `topRPE` (the top set's logged RPE) so `LoadCalibrator`/`ProgressionEngine` can correct a
+  starting-load estimate from real felt effort. `ReadinessEntry` = subjective session-start check-ins.
 - **Singletons**: `UserProfile` (`name` = first name only, goal, `streak` = workout streak,
   `weekStreak`, doneDates, onboardingDone, totalWorkouts), `AppSettings` (units, darkMode,
   restTimerAuto, `restSeconds` = default rest, editable in Profile).
@@ -124,6 +128,16 @@ Plan ──< Workout ──< PlanItem(exId, restSeconds?) ──< SetTemplate {w
 
 ## Key formulas (Domain/)
 - Est. 1RM (Epley): `weight * (1 + reps/30)` — `Formulas.e1rm`.
+- **Starting loads are COMPUTED per user, never hardcoded** (`StartingLoadEstimator`). Program
+  slots carry only sets/reps/RPE; the absolute kg is derived from movement pattern + loading type
+  + user (sex, experience, bodyweight) via bodyweight-relative untrained-male 1RM anchors →
+  Epley/RIR working load → sex scaling of the *estimate only* (~0.55 upper / ~0.68 lower) →
+  experience multiplier → real-increment rounding with an empty-bar floor (never a sub-bar
+  barbell load) and no external load for bodyweight moves. Seeds err LOW and are flagged
+  `estimated` (SetTemplate/GeneratedSet) → shown as an "est" suggestion in the live log.
+  `LoadCalibrator` (RIR-adjusted Epley) + `HistoryEntry.topRPE` let `ProgressionEngine` (opt-in
+  `targetRPE`) recalibrate from the first logged set's felt RPE, so a bad seed self-corrects in
+  1–2 sessions. **Progression RATES are never scaled by sex** — only the starting estimate.
 - Units: store kg; display kg or lb (`kg*2.20462`, lb rounded to nearest 5). Steps: +2.5 kg / +5 lb.
 - Trend arrows: a logged value vs the **same set index last session** → up/down/flat (`TrendCalculator`).
 - Streaks: **schedule-aware**, two of them (`StreakEngine`, derived from the plans' scheduled weekdays):
@@ -152,7 +166,9 @@ Plan ──< Workout ──< PlanItem(exId, restSeconds?) ──< SetTemplate {w
   - **Program-driven planning:** `ProgramMatcher` (hard-gated + soft-scored program selection from
     `QuizAnswers`), `PatternMapping` (slot `MovementPattern` → catalog facets → real candidates),
     `RepScheme` (parses slot reps/intensity into `SetTemplate` targets — ranges→lower bound,
-    time/hold→seconds, RPE from intensity; convention in `ARCHITECTURE.md`).
+    time/hold→seconds, RPE from intensity; convention in `ARCHITECTURE.md`),
+    `StartingLoadEstimator` (science-based per-user starting kg — never hardcoded) +
+    `LoadCalibrator` (RPE→true-load, self-corrects a seed in 1–2 sessions).
   - **The coach:** `ReadinessModulator` (readiness → session modulation + weekly pattern),
     `WeeklyReportComposer`/`MonthlyReportComposer` + `ReportScheduler` (activation + best-effort
     `BGTaskScheduler`), `NotificationPlanner` (pure: what to schedule; caps + quiet hours + toggles)
