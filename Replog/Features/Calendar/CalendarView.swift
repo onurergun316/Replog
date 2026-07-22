@@ -12,6 +12,11 @@ import SwiftUI
 import SwiftData
 
 struct CalendarView: View {
+    /// True when pushed inside another tab's NavigationStack (the Progress dashboard's
+    /// Calendar card) — a pushed view must not nest a second stack, and it keeps the
+    /// navigation bar for its Back button.
+    var embedded: Bool = false
+
     @Environment(\.modelContext) private var context
     @Environment(\.exerciseCatalog) private var catalog
     @Query private var profiles: [UserProfile]
@@ -64,25 +69,34 @@ struct CalendarView: View {
     }
 
     var body: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 18) {
-                    header
-                    monthHeader
-                    monthPager
-                    detailSection
+        Group {
+            if embedded {
+                content.navigationBarTitleDisplayMode(.inline)
+            } else {
+                NavigationStack {
+                    content.toolbar(.hidden, for: .navigationBar)
                 }
-                .padding(20)
             }
-            .scrollDisabled(isSelecting)
-            .background(Color.bg.ignoresSafeArea())
-            .toolbar(.hidden, for: .navigationBar)
         }
         .onAppear { refreshCaches() }
         .onChange(of: history.count) { refreshCaches() }
         .onChange(of: profile.doneDates.count) { refreshCaches() }
         .sensoryFeedback(.impact(weight: .medium), trigger: armTicks)
         .sensoryFeedback(.selection, trigger: selection)
+    }
+
+    private var content: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 18) {
+                header
+                monthHeader
+                monthPager
+                detailSection
+            }
+            .padding(20)
+        }
+        .scrollDisabled(isSelecting)
+        .background(Color.bg.ignoresSafeArea())
     }
 
     // MARK: Header
