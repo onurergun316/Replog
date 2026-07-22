@@ -38,10 +38,8 @@ struct PlanDetailView: View {
                             .font(.screenTitle).foregroundStyle(Color.textPrimary)
                             .onChange(of: plan.name) { try? context.save() }
                     }
-                    Text("\(plan.workouts.count) workouts · \(plan.exerciseCount) exercises")
+                    Text("\(plan.workouts.count) workouts · \(plan.exerciseCount) exercises · hold to reorder · swipe to delete")
                         .font(.rounded(13, .semibold)).foregroundStyle(Color.text2)
-                    Text("Hold a card to reorder · swipe to delete")
-                        .font(.rounded(12, .semibold)).foregroundStyle(Color.text3)
                     if let program = sourceProgram {
                         Button { showProgram = true } label: {
                             HStack(spacing: 10) {

@@ -45,12 +45,8 @@ struct WorkoutEditorView: View {
 
                     dayPicker
 
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("\(workout.items.count) exercises · \(workout.setCount) sets")
-                            .font(.rounded(13, .semibold)).foregroundStyle(Color.text2)
-                        Text("Hold a card to reorder · tap to edit sets")
-                            .font(.rounded(12, .semibold)).foregroundStyle(Color.text3)
-                    }
+                    Text("\(workout.items.count) exercises · \(workout.setCount) sets · hold to reorder")
+                        .font(.rounded(13, .semibold)).foregroundStyle(Color.text2)
                 }
                 .plainListRow(top: 8, bottom: 8)
             }
