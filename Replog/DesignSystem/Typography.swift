@@ -2,17 +2,30 @@
 //  Typography.swift
 //  Replog
 //
-//  SF Rounded type scale from the spec (titles 30/900, big numbers 24-60,
-//  card titles 16-18/800, body 15, labels 11-13/800 uppercase). Tabular figures
-//  for all numbers/timers.
+//  SF Rounded type scale. Call sites pass the spec's *semantic* emphasis (up to
+//  .black); the rendered weight goes through a refined scale — display caps at bold
+//  (700), UI emphasis at semibold (600) — because SF Rounded's counters close up at
+//  800–900 and legibility research puts glanceable UI text in the 400–700 band, with
+//  hierarchy carried by size rather than uniform maximum weight. The mapping is
+//  monotonic (never inverts two call sites) and lives in exactly one place, so the
+//  whole app's voice is tuned here. Tabular figures for all numbers/timers.
 //
 
 import SwiftUI
 
 extension Font {
-    /// Rounded system font at a given size/weight.
+    /// Rounded system font at a given size and semantic weight (see header).
     static func rounded(_ size: CGFloat, _ weight: Font.Weight = .bold) -> Font {
-        .system(size: size, weight: weight, design: .rounded)
+        .system(size: size, weight: rendered(weight), design: .rounded)
+    }
+
+    /// The refined weight scale: 900→700, 800/700→600, lighter weights unchanged.
+    private static func rendered(_ weight: Font.Weight) -> Font.Weight {
+        switch weight {
+        case .black: return .bold
+        case .heavy, .bold: return .semibold
+        default: return weight
+        }
     }
 
     // Named scale
@@ -24,7 +37,7 @@ extension Font {
 }
 
 extension View {
-    /// Uppercase section/eyebrow label (11-13/800, wide tracking).
+    /// Uppercase section/eyebrow label (11-13, wide tracking).
     func eyebrow(_ size: CGFloat = 12) -> some View {
         self
             .font(.rounded(size, .heavy))

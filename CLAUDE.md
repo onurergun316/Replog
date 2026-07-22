@@ -78,7 +78,9 @@ numbered the request.
   `MonthlyReportComposer`, triggered on activation) list under Profile "Training Reports". Optional
   readiness check-in at session start modulates volume (`ReadinessModulator`). Capped, respectful local
   notifications (`NotificationPlanner`: ≤1/day, quiet hours, per-kind toggles, encouraging copy).
-- **Font: SF Rounded** (`.system(design: .rounded)`), no bundled fonts.
+- **Font: SF Rounded** (`.system(design: .rounded)`), no bundled fonts. Weights pass through
+  `Font.rounded`'s refined scale (900→700, 800/700→600 — SF Rounded closes up at 800+;
+  hierarchy comes from size). Tune the app's voice ONLY there, never per call site.
 - **Images: HEIC**, ~420 px, q42 — the full Free Exercise DB (1746 photos) ships at ~18 MB.
   `ExerciseImageView(contentMode:)` — thumbnails use `.fill` (uniform square crop, via
   `ExerciseThumbnail`); the ExerciseDetail hero uses `.fit` (whole movement, never cropped) with
