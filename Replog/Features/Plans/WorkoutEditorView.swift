@@ -5,7 +5,7 @@
 //  Edit one training day: name, weekday (taken days disabled), exercises with
 //  expandable set steppers, add/remove exercises, delete the workout. Exercise cards
 //  are long-press draggable to reorder, so this is a `List` (the only container with
-//  native reordering) styled as the app's cards via `plainListRow`.
+//  native reordering on iOS 26) styled as the app's cards via `plainListRow`.
 //
 
 import SwiftUI
@@ -169,11 +169,12 @@ struct WorkoutEditorView: View {
         withAnimation(.snappy) { expandedItemID = expandedItemID == item.id ? nil : item.id }
     }
 
-    /// Drag-to-reorder. Collapsing first keeps the lifted card a compact drag preview
-    /// instead of a full-height set editor — and guarantees no stepper is mid-edit.
+    /// Drag-to-reorder. Collapsing after a real move closes any set editor that just
+    /// slid to a new position — a half-typed stepper left open over shuffled rows reads
+    /// as the wrong exercise's sets. A drop back in place leaves the disclosure alone.
     private func moveItems(from source: IndexSet, to destination: Int) {
-        expandedItemID = nil
         guard Reordering.apply(from: source, to: destination, in: workout.orderedItems) else { return }
+        expandedItemID = nil
         try? context.save()
         moves += 1
     }
