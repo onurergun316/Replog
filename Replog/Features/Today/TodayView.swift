@@ -77,13 +77,17 @@ struct TodayView: View {
 
     private var isShowingToday: Bool { shownDay == today }
 
-    /// The workout scheduled for the shown weekday (if any).
+    /// The workout scheduled for the shown weekday (if any). Extras are day-less, so
+    /// they never claim the hero — they live in the "Add another" scroller instead.
     private var shownWorkout: Workout? {
-        allWorkouts.first { $0.day == shownDay }
+        allWorkouts.first { !$0.isExtra && $0.day == shownDay }
     }
 
+    /// Everything but the hero, extras first — "do any day" belongs at the front of
+    /// an "add another workout" shelf.
     private var otherWorkouts: [Workout] {
-        allWorkouts.filter { $0.id != shownWorkout?.id }
+        let others = allWorkouts.filter { $0.id != shownWorkout?.id }
+        return others.filter(\.isExtra) + others.filter { !$0.isExtra }
     }
 
     private var streak: Int {
