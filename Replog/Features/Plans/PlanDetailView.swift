@@ -72,7 +72,6 @@ struct PlanDetailView: View {
                         NavigationLink(value: workout) { EmptyView() }.opacity(0) // hides the List chevron
                     }
                     .plainListRow()
-                    .reorderLiftFeedback()
                     .reorderAccessibilityActions(index: index, count: workouts.count, move: moveWorkouts)
                     .swipeActions(edge: .trailing) {
                         Button(role: .destructive) { deleteWorkout(workout) } label: {

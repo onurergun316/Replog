@@ -67,7 +67,6 @@ struct WorkoutEditorView: View {
                         onChange: { try? context.save() }
                     )
                     .plainListRow(top: 8, bottom: 8)
-                    .reorderLiftFeedback()
                     .reorderAccessibilityActions(index: index, count: items.count, move: moveItems)
                 }
                 .onMove(perform: moveItems)

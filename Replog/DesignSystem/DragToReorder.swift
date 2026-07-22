@@ -2,22 +2,18 @@
 //  DragToReorder.swift
 //  Replog
 //
-//  Haptics for the reorderable card lists. A `List` row carrying `.onMove` lifts on a
-//  long press and can then be dragged — but that gesture is invisible, so we announce
-//  it: a medium impact the instant the row becomes draggable, and a soft one when the
-//  move is committed. SwiftUI exposes no hook for the lift itself (`onDragSessionUpdated`
-//  is macOS-only, `onMove` fires on drop), so the lift is detected with a *simultaneous*
-//  long press — simultaneous so it recognises alongside the row's own drag, tap and
-//  swipe actions instead of competing with them (same trick as `hideKeyboardOnTap`).
+//  Support for the reorderable card lists (`List` rows under a ForEach with `.onMove`).
+//  Hard-learned rule: attach NO custom gesture to a reorderable row. The reorder lift is
+//  a UIKit recognizer on the List's backing collection-view cell, and SwiftUI's
+//  `simultaneousGesture` composes only with *SwiftUI* gestures — a row-level long press
+//  recognises inside the lift window, steals the touch, and the row never lifts (observed
+//  on device; the system draws and announces the lift itself). So this file only adds
+//  what cannot compete for a touch: a haptic after the drop, and accessibility actions.
 //
 
 import SwiftUI
 
 extension View {
-    /// Buzzes when this row's long-press reorder gesture activates: "you're holding it —
-    /// now drag". Put this on the row content of a `ForEach` that has `.onMove`.
-    func reorderLiftFeedback() -> some View { modifier(ReorderLiftFeedback()) }
-
     /// Confirms a committed reorder. Drive `trigger` from a counter bumped inside `onMove`.
     func reorderCommitFeedback(trigger: Int) -> some View {
         sensoryFeedback(.impact(flexibility: .soft), trigger: trigger)
@@ -37,20 +33,5 @@ extension View {
                 Button("Move down") { move(IndexSet(integer: index), index + 2) }
             }
         }
-    }
-}
-
-private struct ReorderLiftFeedback: ViewModifier {
-    /// Slightly ahead of UIKit's own reorder lift so the buzz reads as the cause, not a lag.
-    private static let liftDelay: TimeInterval = 0.3
-
-    @State private var lifts = 0
-
-    func body(content: Content) -> some View {
-        content
-            .simultaneousGesture(
-                LongPressGesture(minimumDuration: Self.liftDelay).onEnded { _ in lifts += 1 }
-            )
-            .sensoryFeedback(.impact(weight: .medium), trigger: lifts)
     }
 }
