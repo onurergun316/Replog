@@ -120,4 +120,17 @@ struct CalendarDomainTests {
         #expect(totals.workouts == 2)      // the 10th (history) + the 20th (marked)
         #expect(totals.volumeKg == 500)    // May volume excluded
     }
+
+    @Test func firstOfNextMonthNeverLeaksIntoThisMonth() {
+        // A month interval's exclusive end == the next month's first instant, which is
+        // exactly where a start-of-day done mark for the 1st lands — the trailing edge.
+        let july1 = cal.startOfDay(for: date(2026, 7, 1))
+        let totals = CalendarStats.monthTotals(
+            month: date(2026, 6, 15),
+            doneDates: [july1],
+            history: [entry(july1, sets: [RecordedSet(w: 80, r: 5)], topW: 80, topR: 5)],
+            calendar: cal)
+        #expect(totals.workouts == 0)
+        #expect(totals.volumeKg == 0)
+    }
 }

@@ -89,13 +89,16 @@ enum CalendarStats {
     }
 
     /// The month-footer line's numbers: training days + volume within the month of `month`.
+    /// Month membership uses `toGranularity: .month` — `DateInterval.contains` is
+    /// end-INCLUSIVE and a month interval ends at the next month's first instant, which is
+    /// exactly where a start-of-day done mark for the 1st lands, double-counting it.
     static func monthTotals(month: Date, doneDates: [Date], history: [HistoryEntry],
                             calendar: Calendar = .current) -> (workouts: Int, volumeKg: Double) {
-        guard let interval = calendar.dateInterval(of: .month, for: month) else { return (0, 0) }
         let done = doneDays(doneDates: doneDates, history: history, calendar: calendar)
-        let workouts = done.filter { interval.contains($0) }.count
+        let workouts = done
+            .filter { calendar.isDate($0, equalTo: month, toGranularity: .month) }.count
         let volume = history
-            .filter { interval.contains($0.date) }
+            .filter { calendar.isDate($0.date, equalTo: month, toGranularity: .month) }
             .reduce(0.0) { sum, entry in
                 sum + entry.sets.reduce(0) { $0 + $1.w * Double($1.r) }
             }
