@@ -252,7 +252,8 @@ struct ActiveWorkoutView: View {
     private func addSet(to exercise: SessionExercise) {
         let last = exercise.orderedSets.last
         let set = LoggedSet(weightKg: last?.weightKg ?? 20, reps: last?.reps ?? 10, rpe: last?.rpe ?? 8,
-                            prevWeight: last?.prevWeight, prevReps: last?.prevReps, order: exercise.sets.count)
+                            prevWeight: last?.prevWeight, prevReps: last?.prevReps,
+                            order: Reordering.nextOrder(after: exercise.sets))
         set.exercise = exercise
         context.insert(set)
         try? context.save()

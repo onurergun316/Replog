@@ -20,6 +20,8 @@ extension Plan: Orderable {}
 extension Workout: Orderable {}
 extension PlanItem: Orderable {}
 extension SetTemplate: Orderable {}
+extension SessionExercise: Orderable {}
+extension LoggedSet: Orderable {}
 
 enum Reordering {
 

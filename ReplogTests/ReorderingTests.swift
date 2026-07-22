@@ -129,6 +129,25 @@ struct ReorderingModelTests {
         #expect(workout.orderedItems.map(\.exId) == ["Row", "Curl"])
     }
 
+    @Test func addingALiveSetAfterADeleteStillYieldsUniqueOrders() throws {
+        let ctx = makeContext()
+        let plan = seedPlan(ctx)
+        let workout = try #require(plan.orderedWorkouts.first)
+        let item = PlanFactory.addExercise("Bench", to: workout, into: ctx)   // 3 sets, orders 0/1/2
+        try ctx.save()
+
+        let session = SessionBuilder.start(workout: workout, into: ctx)
+        try ctx.save()
+        let exercise = try #require(session.orderedExercises.first { $0.exId == item.exId })
+        #expect(exercise.orderedSets.map(\.order) == [0, 1, 2])
+
+        ctx.delete(exercise.orderedSets[1])                                   // frees order 1
+        try ctx.save()
+
+        #expect(Reordering.nextOrder(after: exercise.sets) == 3)              // not 2 — no collision
+        #expect(Set(exercise.sets.map(\.order)).count == exercise.sets.count)
+    }
+
     @Test func nextOrderAppendsPastTheHighestOrderInUse() throws {
         let ctx = makeContext()
         let plan = seedPlan(ctx)
