@@ -126,7 +126,10 @@ struct TodayView: View {
                         }
                     }
                     .id(shownDay)
-                    .transition(.opacity)
+                    // Opacity + a touch of scale rather than a slide: a `.move` transition
+                    // overflows the enclosing ScrollView horizontally mid-animation.
+                    .transition(.opacity.combined(with: .scale(scale: 0.97)))
+                    .gesture(heroSwipe)
 
                     if !otherWorkouts.isEmpty {
                         VStack(alignment: .leading, spacing: 4) {
@@ -208,6 +211,21 @@ struct TodayView: View {
 
     private func select(_ day: Weekday) {
         withAnimation(.snappy) { browsedDay = day == today ? nil : day }
+    }
+
+    /// Swipe the hero left/right to walk the week's workouts. A horizontal-only
+    /// `DragGesture` with a real distance threshold, so it never competes with the
+    /// enclosing vertical `ScrollView` — the card's Start button keeps its own taps
+    /// because a drag and a tap are different gestures.
+    private var heroSwipe: some Gesture {
+        DragGesture(minimumDistance: 24)
+            .onEnded { value in
+                guard abs(value.translation.width) > abs(value.translation.height) else { return }
+                let day = value.translation.width < 0
+                    ? WeekBrowser.next(after: shownDay, scheduled: scheduledDays)
+                    : WeekBrowser.previous(before: shownDay, scheduled: scheduledDays)
+                if let day { select(day) }
+            }
     }
 
     // MARK: Header
