@@ -36,8 +36,17 @@ struct CalendarView: View {
     private var units: Units { settingsRows.first?.units ?? .kg }
     private var today: Date { cal.startOfDay(for: Date()) }
     private var scheduledDays: Set<Weekday> { StreakEngine.scheduledDays(in: plans) }
-    private var doneDays: Set<Date> {
-        CalendarStats.doneDays(doneDates: profile.doneDates, history: history, calendar: cal)
+
+    // Recomputed only when the data changes (see refreshCaches) — a drag re-evaluates
+    // the body on every crossed cell, and re-deriving these over all history per tick
+    // (each entry JSON-decoding its sets) is where scrolling jank would come from.
+    @State private var doneDays: Set<Date> = []
+    @State private var dayTotals: [Date: DayTotals] = [:]
+
+    private func refreshCaches() {
+        doneDays = CalendarStats.doneDays(doneDates: profile.doneDates,
+                                          history: history, calendar: cal)
+        dayTotals = CalendarStats.dayTotals(history: history, calendar: cal)
     }
 
     // Live-computed like Today/Profile — the stored profile.streak only refreshes on
@@ -69,6 +78,9 @@ struct CalendarView: View {
             .background(Color.bg.ignoresSafeArea())
             .toolbar(.hidden, for: .navigationBar)
         }
+        .onAppear { refreshCaches() }
+        .onChange(of: history.count) { refreshCaches() }
+        .onChange(of: profile.doneDates.count) { refreshCaches() }
         .sensoryFeedback(.impact(weight: .medium), trigger: armTicks)
         .sensoryFeedback(.selection, trigger: selection)
     }
@@ -152,8 +164,8 @@ struct CalendarView: View {
     }
 
     private func footerLine(for month: Date) -> String {
-        let totals = CalendarStats.monthTotals(month: month, doneDates: profile.doneDates,
-                                               history: history, calendar: cal)
+        let totals = CalendarStats.monthTotals(month: month, doneDays: doneDays,
+                                               dayTotals: dayTotals, calendar: cal)
         guard totals.workouts > 0 else { return "No workouts this month yet" }
         let volume = Formulas.formatWeight(kg: totals.volumeKg, units: units)
         return "\(totals.workouts) \(totals.workouts == 1 ? "workout" : "workouts") · \(volume) lifted"

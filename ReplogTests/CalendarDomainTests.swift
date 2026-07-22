@@ -104,6 +104,22 @@ struct CalendarDomainTests {
         #expect(abs(s.avgVolumePerTrainingDay - (1580.0 / 2)) < 0.001)
     }
 
+    @Test func dayTotalsAggregatePerDayAcrossEntries() {
+        let day = date(2026, 6, 2)
+        let history = [
+            entry(day, exId: "Bench", sets: [RecordedSet(w: 60, r: 10)], topW: 60, topR: 10),
+            entry(day, exId: "Row", sets: [RecordedSet(w: 50, r: 8), RecordedSet(w: 50, r: 8)],
+                  topW: 50, topR: 8),
+        ]
+        let totals = CalendarStats.dayTotals(history: history, calendar: cal)
+        let t = totals[cal.startOfDay(for: day)]
+        #expect(t?.sets == 3)
+        #expect(t?.reps == 26)
+        let expectedVolume: Double = 600 + 400 + 400
+        #expect(t?.volumeKg == expectedVolume)
+        #expect(totals.count == 1)
+    }
+
     @Test func emptySelectionIsAllZeros() {
         let s = CalendarStats.summary(selection: [], doneDates: [date(2026, 6, 1)],
                                       history: [], calendar: cal)

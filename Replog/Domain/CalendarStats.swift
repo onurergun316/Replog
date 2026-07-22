@@ -38,7 +38,32 @@ struct BestLift: Equatable {
     var e1rm: Int
 }
 
+/// One day's aggregated training numbers — precomputed once so the calendar UI never
+/// re-decodes history mid-drag.
+struct DayTotals: Equatable {
+    var sets = 0
+    var reps = 0
+    var volumeKg = 0.0
+}
+
 enum CalendarStats {
+
+    /// Per-day totals over the whole history — decode each entry's sets exactly once.
+    static func dayTotals(history: [HistoryEntry],
+                          calendar: Calendar = .current) -> [Date: DayTotals] {
+        var totals: [Date: DayTotals] = [:]
+        for entry in history {
+            let day = calendar.startOfDay(for: entry.date)
+            var t = totals[day, default: DayTotals()]
+            for set in entry.sets {
+                t.sets += 1
+                t.reps += set.r
+                t.volumeKg += set.w * Double(set.r)
+            }
+            totals[day] = t
+        }
+        return totals
+    }
 
     /// Every day (start-of-day) with a completed workout or logged sets — the union of
     /// the completion calendar and history days, matching `WorkoutHistory.completedDays`.
@@ -88,20 +113,28 @@ enum CalendarStats {
         return result
     }
 
-    /// The month-footer line's numbers: training days + volume within the month of `month`.
-    /// Month membership uses `toGranularity: .month` — `DateInterval.contains` is
-    /// end-INCLUSIVE and a month interval ends at the next month's first instant, which is
-    /// exactly where a start-of-day done mark for the 1st lands, double-counting it.
+    /// The month-footer line's numbers from precomputed caches: training days + volume
+    /// within the month of `month`. Month membership uses `toGranularity: .month` —
+    /// `DateInterval.contains` is end-INCLUSIVE and a month interval ends at the next
+    /// month's first instant, which is exactly where a start-of-day done mark for the
+    /// 1st lands, double-counting it.
+    static func monthTotals(month: Date, doneDays: Set<Date>, dayTotals: [Date: DayTotals],
+                            calendar: Calendar = .current) -> (workouts: Int, volumeKg: Double) {
+        let workouts = doneDays
+            .filter { calendar.isDate($0, equalTo: month, toGranularity: .month) }.count
+        let volume = dayTotals.reduce(0.0) { sum, item in
+            calendar.isDate(item.key, equalTo: month, toGranularity: .month)
+                ? sum + item.value.volumeKg : sum
+        }
+        return (workouts, volume)
+    }
+
+    /// Convenience over raw data (tests, one-shot callers) — derives both caches.
     static func monthTotals(month: Date, doneDates: [Date], history: [HistoryEntry],
                             calendar: Calendar = .current) -> (workouts: Int, volumeKg: Double) {
-        let done = doneDays(doneDates: doneDates, history: history, calendar: calendar)
-        let workouts = done
-            .filter { calendar.isDate($0, equalTo: month, toGranularity: .month) }.count
-        let volume = history
-            .filter { calendar.isDate($0.date, equalTo: month, toGranularity: .month) }
-            .reduce(0.0) { sum, entry in
-                sum + entry.sets.reduce(0) { $0 + $1.w * Double($1.r) }
-            }
-        return (workouts, volume)
+        monthTotals(month: month,
+                    doneDays: doneDays(doneDates: doneDates, history: history, calendar: calendar),
+                    dayTotals: dayTotals(history: history, calendar: calendar),
+                    calendar: calendar)
     }
 }
