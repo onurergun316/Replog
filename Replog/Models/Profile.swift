@@ -44,7 +44,8 @@ final class UserProfile {
     /// The user's full name ("First Last"), captured during onboarding.
     var name: String = ""
     var goalRaw: String = Goal.buildMuscle.rawValue
-    /// Consecutive scheduled workouts completed (see `StreakEngine.workoutStreak`).
+    /// Consecutive done training days — any completed workout marks its day, a missed
+    /// scheduled day breaks the run (see `StreakEngine.workoutStreak`).
     var streak: Int = 0
     /// Consecutive "perfect weeks" (see `StreakEngine.weekStreak`).
     var weekStreak: Int = 0

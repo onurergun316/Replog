@@ -2,17 +2,18 @@
 //  StreakEngine.swift
 //  Replog
 //
-//  Schedule-aware streaks. Unlike a Duolingo daily streak, these are driven by the
-//  user's *plan schedule* (which weekdays have a workout):
+//  Schedule-aware streaks over binary days. A day is "done" when ANY workout was fully
+//  completed that day — it doesn't matter which weekday the workout was assigned to,
+//  or whether it was a day-less Extra; finishing twice still counts once:
 //
-//   • Workout streak — consecutive scheduled workouts completed. A scheduled weekday
-//     that ends without its workout done resets it to 0. Today's scheduled workout,
-//     while still undone, does not break it (in-progress grace).
+//   • Workout streak — every done day counts (+1), scheduled or not. The run breaks at
+//     a *past* scheduled weekday that ended with nothing done. Undone rest days pass
+//     through silently; today's scheduled workout, while still undone, gets grace.
+//     With no schedule at all (extras-only), it's plain consecutive done days.
 //
-//   • Week streak — consecutive "perfect weeks" (every scheduled workout that week
-//     completed). Because a missed workout breaks the workout streak, it also breaks
-//     the week streak ("grouped inside"): the workout streak counts sessions, the week
-//     streak counts whole weeks, and a single miss resets both.
+//   • Week streak — consecutive "perfect weeks": every scheduled day of the week done
+//     (by any workout). A missed scheduled day breaks both streaks; extras on rest
+//     days boost the workout streak but can't perfect a week.
 //
 //  All functions are pure (no SwiftData), so they're fully unit-testable.
 //
@@ -27,37 +28,37 @@ enum StreakEngine {
         Set(plans.flatMap(\.workouts).filter { !$0.isExtra }.map(\.day))
     }
 
-    /// Consecutive scheduled workouts completed, counting back from `today`.
-    /// Stops at the first *past* scheduled weekday with no completion. A scheduled
-    /// workout that is still due today (undone) is skipped, not counted as a miss.
+    /// Consecutive done days, counting back from `today`. Every day with a completed
+    /// workout counts — scheduled or not, whichever workout it was. The run stops at
+    /// the first *past* scheduled weekday with nothing done; undone rest days pass
+    /// through. Today's scheduled workout, while still due, is grace — not a miss.
+    /// With an empty schedule (extras-only), every day is "expected", which degrades
+    /// to plain consecutive done days.
     static func workoutStreak(
         scheduledDays: Set<Weekday>,
         doneDates: [Date],
         today: Date = Date(),
         calendar: Calendar = .current
     ) -> Int {
-        guard !scheduledDays.isEmpty else { return 0 }
         let doneDays = Set(doneDates.map { calendar.startOfDay(for: $0) })
         guard !doneDays.isEmpty else { return 0 }
+        let required = scheduledDays.isEmpty ? Set(Weekday.allCases) : scheduledDays
 
         let startOfToday = calendar.startOfDay(for: today)
         var cursor = startOfToday
         var count = 0
         // Safety bound: never walk more than ~2 years of days.
         for _ in 0..<732 {
-            let weekday = Weekday.from(cursor, calendar: calendar)
-            if scheduledDays.contains(weekday) {
-                if doneDays.contains(cursor) {
-                    count += 1
-                } else if cursor != startOfToday {
-                    // A past scheduled workout was missed → streak ends here.
-                    break
-                }
-                // else: today's scheduled workout is still due — grace, don't break.
+            if doneDays.contains(cursor) {
+                count += 1
+            } else if required.contains(Weekday.from(cursor, calendar: calendar)),
+                      cursor != startOfToday {
+                break // a past required day ended with nothing done — streak ends here
             }
+            // else: rest day with nothing done, or today still due — pass through.
             guard let prev = calendar.date(byAdding: .day, value: -1, to: cursor) else { break }
             cursor = prev
-            // Once we're older than every completion, the next scheduled day is a miss.
+            // Once we're older than every completion, the next required day is a miss.
             if let earliest = doneDays.min(), cursor < earliest { break }
         }
         return count
