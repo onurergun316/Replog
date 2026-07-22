@@ -52,7 +52,8 @@ struct WorkoutEditorView: View {
             }
 
             Section {
-                ForEach(workout.orderedItems) { item in
+                let items = workout.orderedItems
+                ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
                     ExerciseEditRow(
                         item: item,
                         exercise: catalog.exercise(id: item.exId),
@@ -67,6 +68,7 @@ struct WorkoutEditorView: View {
                     )
                     .plainListRow(top: 8, bottom: 8)
                     .reorderLiftFeedback()
+                    .reorderAccessibilityActions(index: index, count: items.count, move: moveItems)
                 }
                 .onMove(perform: moveItems)
             }

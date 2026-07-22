@@ -65,13 +65,15 @@ struct PlanDetailView: View {
             }
 
             Section {
-                ForEach(plan.orderedWorkouts) { workout in
+                let workouts = plan.orderedWorkouts
+                ForEach(Array(workouts.enumerated()), id: \.element.id) { index, workout in
                     ZStack {
                         WorkoutCard(workout: workout, catalog: catalog) { start(workout) }
                         NavigationLink(value: workout) { EmptyView() }.opacity(0) // hides the List chevron
                     }
                     .plainListRow()
                     .reorderLiftFeedback()
+                    .reorderAccessibilityActions(index: index, count: workouts.count, move: moveWorkouts)
                     .swipeActions(edge: .trailing) {
                         Button(role: .destructive) { deleteWorkout(workout) } label: {
                             Label("Delete", systemImage: "trash")

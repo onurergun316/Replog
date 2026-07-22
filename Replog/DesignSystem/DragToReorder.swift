@@ -22,6 +22,22 @@ extension View {
     func reorderCommitFeedback(trigger: Int) -> some View {
         sensoryFeedback(.impact(flexibility: .soft), trigger: trigger)
     }
+
+    /// Exposes the drag as VoiceOver / Switch Control rotor actions, since a long-press
+    /// drag is unreachable with either. `move` takes the same `(IndexSet, Int)` as
+    /// `onMove`, so a row hands it the very handler its `ForEach` already uses — note the
+    /// `+2` for "down", which is `onMove`'s pre-move destination convention.
+    func reorderAccessibilityActions(index: Int, count: Int,
+                                     move: @escaping (IndexSet, Int) -> Void) -> some View {
+        accessibilityActions {
+            if index > 0 {
+                Button("Move up") { move(IndexSet(integer: index), index - 1) }
+            }
+            if index < count - 1 {
+                Button("Move down") { move(IndexSet(integer: index), index + 2) }
+            }
+        }
+    }
 }
 
 private struct ReorderLiftFeedback: ViewModifier {
