@@ -40,6 +40,15 @@ struct CalendarView: View {
         CalendarStats.doneDays(doneDates: profile.doneDates, history: history, calendar: cal)
     }
 
+    // Live-computed like Today/Profile — the stored profile.streak only refreshes on
+    // finish/launch, so it can lag a missed day and contradict the other tabs.
+    private var streak: Int {
+        StreakEngine.workoutStreak(scheduledDays: scheduledDays, doneDates: profile.doneDates)
+    }
+    private var weekStreak: Int {
+        StreakEngine.weekStreak(scheduledDays: scheduledDays, doneDates: profile.doneDates)
+    }
+
     /// Months the pager can reach: three years back, one year forward.
     private var months: [Date] {
         (-36...12).compactMap { CalendarMath.month($0, from: Date(), calendar: cal) }
@@ -74,8 +83,8 @@ struct CalendarView: View {
             }
             Spacer()
             HStack(spacing: 6) {
-                streakChip(icon: "flame.fill", value: "\(profile.streak)")
-                streakChip(icon: "calendar.badge.checkmark", value: "\(profile.weekStreak)w")
+                streakChip(icon: "flame.fill", value: "\(streak)")
+                streakChip(icon: "calendar.badge.checkmark", value: "\(weekStreak)w")
             }
         }
     }
