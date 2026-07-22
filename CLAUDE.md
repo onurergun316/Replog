@@ -186,7 +186,9 @@ flags a computed starting-load seed (see Key formulas) so the live log renders i
 - `Domain/` — pure logic: `Formulas`, `PlanGenerator`/`PlanFactory`, `QuizAnswers`, `TrendCalculator`,
   `ProgressAggregator`, `ProgressionEngine`, `StallDetector`, `StreakCalendar`, `StreakEngine`,
   `Scheduling` (incl. `WeekBrowser`), `SessionBuilder`, `SessionFinisher`, `BodyweightTracker`,
-  `Reordering`, `CalendarMath`/`CalendarStats` (Calendar tab grid math + range statistics).
+  `Reordering`, `CalendarMath`/`CalendarStats` (calendar grid math + range statistics),
+  `ProgressAnalytics` (weekly volume buckets, muscle shares, rep-range mix, adherence, PR
+  events, relative strength — the Progress dashboard's derivations).
   - **Program-driven planning:** `ProgramMatcher` (hard-gated + soft-scored program selection from
     `QuizAnswers`), `PatternMapping` (slot `MovementPattern` → catalog facets → real candidates),
     `RepScheme` (parses slot reps/intensity into `SetTemplate` targets — ranges→lower bound,
@@ -219,12 +221,19 @@ flags a computed starting-load seed (see Key formulas) so the live log renders i
   to add one/many exercises to one/many workouts), `ExerciseDetail` (tag grid = Equipment/Level/Force/
   Type only — **mechanic is a filter, not shown here**; "In your workouts" grouped by plan via pure
   `Domain/WorkoutMembership.grouped`; "Add to workout" → `AddToWorkoutSheet`; when opened from Progress
-  it defaults to the **Progress** tab (left)), `Calendar`
-  (the 4th tab — see **`CALENDAR_DESIGN.md`**, repo root: paged Sunday-first month grid
-  (`MonthGridView` + pure `CalendarMath`), tap for a day's detail, long-press-drag multi-select
-  (`DragSelectGesture`, a UIKit recognizer via `UIGestureRecognizerRepresentable` — never a SwiftUI
-  long press, see DragToReorder) → `RangeSummaryView` totals/averages from pure `CalendarStats`),
-  `Progress` (no tab slot — pushed from Profile's "Progress & Trends" card, `embedded: true`),
+  it defaults to the **Progress** tab (left)), `Progress`
+  (the 4th tab — a 4-layer "onion" dashboard: L1 `ProgressHomeView` = Calendar push card + Swift
+  Charts cards (Strength hero, Volume, Muscle balance donut, Consistency, Body) → L2 domain screens
+  with `RangePicker` windows (`StrengthDetailView` incl. the PR feed, `VolumeDetailView` incl.
+  rep-range mix, `BalanceDetailView` incl. push/pull, `ConsistencyDetailView`, `BodyDetailView`
+  incl. relative strength + readiness) → L3 one muscle (`MuscleDetailView`) or one exercise
+  (`ExerciseDetailView`) → L4 the tap-to-expand session log. Charts use the monochrome accent ramp
+  (`ProgressPalette`), driven by pure `Domain/ProgressAnalytics`),
+  `Calendar` (inside Progress, pushed `embedded: true` — see **`CALENDAR_DESIGN.md`**, repo root:
+  paged Sunday-first month grid (`MonthGridView` + pure `CalendarMath`), tap for a day's detail,
+  long-press-drag multi-select (`DragSelectGesture`, a UIKit recognizer via
+  `UIGestureRecognizerRepresentable` — never a SwiftUI long press, see DragToReorder) →
+  `RangeSummaryView` totals/averages from pure `CalendarStats`),
   `Profile` (saved AI Coach Reports via `CoachReportView`; the three
   lifetime-stat cards open `StatDetailSheet`), `ActiveSession` (typeable weight/reps via
   `NumericStepperField`; `RestTimerModel`; a native confetti+haptics `CelebrationOverlay` when every
@@ -262,7 +271,7 @@ There is no "iPhone 16" simulator installed here; use **iPhone 17**.
 
 ### DEBUG visual checks (no UI automation available)
 Launch envs (DEBUG only, via `SIMCTL_CHILD_*`): `REPLOG_SEED=1` seeds a demo PPL plan + history +
-marks onboarding done; `REPLOG_TAB=today|plans|library|calendar|profile` picks the initial tab;
+marks onboarding done; `REPLOG_TAB=today|plans|library|progress|profile` picks the initial tab ("calendar" → progress);
 `REPLOG_ACTIVE=1` drops into a live workout. Example:
-`SIMCTL_CHILD_REPLOG_SEED=1 SIMCTL_CHILD_REPLOG_TAB=calendar xcrun simctl launch <sim> test.Replog`
+`SIMCTL_CHILD_REPLOG_SEED=1 SIMCTL_CHILD_REPLOG_TAB=progress xcrun simctl launch <sim> test.Replog`
 (uninstall first for a deterministic, empty store).
