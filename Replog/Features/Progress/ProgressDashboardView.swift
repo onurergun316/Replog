@@ -16,6 +16,11 @@ struct ProgressDashboardView: View {
     @Query private var allHistory: [HistoryEntry]
     @State private var selectedPlanID: UUID?
 
+    /// True when pushed inside another tab's NavigationStack (Profile's "Progress &
+    /// Trends" card) rather than standing alone — a pushed view must not nest a second
+    /// stack, and it keeps the navigation bar for its Back button.
+    var embedded: Bool = false
+
     private var selectedPlan: Plan? {
         plans.first { $0.id == selectedPlanID } ?? plans.first
     }
@@ -25,29 +30,36 @@ struct ProgressDashboardView: View {
     }
 
     var body: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 18) {
-                    Text("Progress").font(.screenTitle).foregroundStyle(Color.textPrimary)
+        if embedded {
+            content.navigationBarTitleDisplayMode(.inline)
+        } else {
+            NavigationStack {
+                content.toolbar(.hidden, for: .navigationBar)
+            }
+        }
+    }
 
-                    if plans.isEmpty {
-                        emptyState
-                    } else {
-                        planPills
-                        if let plan = selectedPlan {
-                            ForEach(plan.orderedWorkouts) { workout in
-                                workoutSection(workout)
-                            }
+    private var content: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 18) {
+                Text("Progress").font(.screenTitle).foregroundStyle(Color.textPrimary)
+
+                if plans.isEmpty {
+                    emptyState
+                } else {
+                    planPills
+                    if let plan = selectedPlan {
+                        ForEach(plan.orderedWorkouts) { workout in
+                            workoutSection(workout)
                         }
                     }
                 }
-                .padding(20)
             }
-            .background(Color.bg.ignoresSafeArea())
-            .toolbar(.hidden, for: .navigationBar)
-            .navigationDestination(for: ExerciseRef.self) { ref in
-                ExerciseDetailView(exId: ref.id, showProgress: true)
-            }
+            .padding(20)
+        }
+        .background(Color.bg.ignoresSafeArea())
+        .navigationDestination(for: ExerciseRef.self) { ref in
+            ExerciseDetailView(exId: ref.id, showProgress: true)
         }
     }
 

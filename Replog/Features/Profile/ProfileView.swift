@@ -44,6 +44,7 @@ struct ProfileView: View {
                 VStack(alignment: .leading, spacing: 18) {
                     Text("Profile").font(.screenTitle).foregroundStyle(Color.textPrimary)
                     profileHeader
+                    progressCard
                     statsRow
                     if !plansWithReports.isEmpty { coachReports }
                     if !trainingReports.isEmpty { trainingReportsSection }
@@ -77,6 +78,31 @@ struct ProfileView: View {
                 }
             }
         }
+    }
+
+    /// Progress lost its tab slot to Calendar — this card is its front door now.
+    private var progressCard: some View {
+        NavigationLink { ProgressDashboardView(embedded: true) } label: {
+            HStack(spacing: 12) {
+                Image(systemName: "chart.line.uptrend.xyaxis")
+                    .font(.system(size: 16, weight: .bold)).foregroundStyle(Color.accent)
+                    .frame(width: 36, height: 36)
+                    .background(RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .fill(Color.accentSoft))
+                VStack(alignment: .leading, spacing: 1) {
+                    Text("Progress & Trends")
+                        .font(.rounded(15, .heavy)).foregroundStyle(Color.textPrimary)
+                    Text("Est. 1RM, trends and sparklines per exercise")
+                        .font(.rounded(12, .semibold)).foregroundStyle(Color.text2)
+                }
+                Spacer()
+                Image(systemName: "chevron.right").font(.system(size: 13, weight: .bold))
+                    .foregroundStyle(Color.text3)
+            }
+            .padding(14)
+            .cardSurface()
+        }
+        .buttonStyle(.plain)
     }
 
     private var profileHeader: some View {
