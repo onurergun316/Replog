@@ -208,7 +208,7 @@ struct TodayView: View {
     }
 
     private func createPlanAndOpen() {
-        let plan = PlanFactory.emptyPlan(into: context, order: plans.count)
+        let plan = PlanFactory.emptyPlan(into: context, order: Reordering.nextOrder(after: plans))
         try? context.save()
         path.append(plan)
     }

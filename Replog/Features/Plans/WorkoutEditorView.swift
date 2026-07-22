@@ -163,7 +163,7 @@ struct WorkoutEditorView: View {
     private func addSet(to item: PlanItem) {
         let last = item.orderedSets.last
         let set = SetTemplate(weightKg: last?.weightKg ?? 20, reps: last?.reps ?? 10,
-                              rpe: last?.rpe ?? 8, order: item.sets.count)
+                              rpe: last?.rpe ?? 8, order: Reordering.nextOrder(after: item.sets))
         set.item = item
         context.insert(set)
         try? context.save()

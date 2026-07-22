@@ -88,7 +88,7 @@ struct PlansListView: View {
     }
 
     private func buildYourOwn() {
-        let plan = PlanFactory.emptyPlan(into: context, order: plans.count)
+        let plan = PlanFactory.emptyPlan(into: context, order: Reordering.nextOrder(after: plans))
         try? context.save()
         path.append(plan)
     }

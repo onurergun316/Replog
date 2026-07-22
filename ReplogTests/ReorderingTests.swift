@@ -105,6 +105,30 @@ struct ReorderingModelTests {
         #expect(workout.orderedItems.map(\.order) == [0, 1, 2])
     }
 
+    @Test func addingAfterADeleteStillYieldsUniqueOrders() throws {
+        let ctx = makeContext()
+        let plan = seedPlan(ctx)
+        ctx.delete(plan.orderedWorkouts[1])                     // frees order 1, max stays 2
+        try ctx.save()
+
+        let added = PlanFactory.addWorkout(to: plan, into: ctx)
+        try ctx.save()
+        #expect(added.order == 3)
+        #expect(Set(plan.workouts.map(\.order)).count == plan.workouts.count)
+
+        let workout = try #require(plan.orderedWorkouts.first)
+        PlanFactory.addExercise("Bench", to: workout, into: ctx)
+        PlanFactory.addExercise("Row", to: workout, into: ctx)
+        try ctx.save()
+        ctx.delete(workout.orderedItems[0])                     // frees order 0
+        try ctx.save()
+
+        PlanFactory.addExercise("Curl", to: workout, into: ctx)
+        try ctx.save()
+        #expect(Set(workout.items.map(\.order)).count == workout.items.count)
+        #expect(workout.orderedItems.map(\.exId) == ["Row", "Curl"])
+    }
+
     @Test func nextOrderAppendsPastTheHighestOrderInUse() throws {
         let ctx = makeContext()
         let plan = seedPlan(ctx)
