@@ -150,12 +150,13 @@ struct NumericStepperField: View {
 
     @State private var draft = ""
     @State private var taps = 0
+    @State private var selection: TextSelection?
     @FocusState private var focused: Bool
 
     var body: some View {
         HStack(spacing: 8) {
             stepButton("minus", action: onMinus)
-            TextField("", text: $draft)
+            TextField("", text: $draft, selection: $selection)
                 .keyboardType(keyboard)
                 .multilineTextAlignment(.center)
                 .font(.rounded(17, .heavy)).tabularNumbers()
@@ -165,8 +166,24 @@ struct NumericStepperField: View {
                 .submitLabel(.done)
                 .onSubmit { commit() }
                 .onAppear { draft = display }
-                .onChange(of: display) { _, new in if !focused { draft = new } }
-                .onChange(of: focused) { _, isFocused in if !isFocused { commit() } }
+                // Drop the selection before replacing the text from outside: TextSelection
+                // holds String.Index values into the CURRENT string, and applying a stale
+                // one against new text is an out-of-bounds trap.
+                .onChange(of: display) { _, new in
+                    if !focused { selection = nil; draft = new }
+                }
+                .onChange(of: focused) { _, isFocused in
+                    if isFocused {
+                        // Wherever the tap landed, the caret belongs after the number so a
+                        // backspace immediately eats the last digit. Deferred one runloop
+                        // so it wins over UIKit's tap-position placement.
+                        Task { @MainActor in
+                            selection = TextSelection(insertionPoint: draft.endIndex)
+                        }
+                    } else {
+                        commit()
+                    }
+                }
                 .toolbar {
                     // Number/decimal pads have no return key — give focus a way out.
                     if focused {
@@ -183,6 +200,7 @@ struct NumericStepperField: View {
     }
 
     private func commit() {
+        selection = nil // about to replace the text — a stale index must never outlive it
         onCommit(draft)
         // Re-sync to canonical formatting (parent may clamp/round the value).
         draft = display

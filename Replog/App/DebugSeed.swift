@@ -28,6 +28,7 @@ enum DebugSeed {
         switch ProcessInfo.processInfo.environment["REPLOG_TAB"] {
         case "plans": return .plans
         case "library": return .library
+        case "calendar": return .progress // the calendar lives inside the Progress tab
         case "progress": return .progress
         case "profile": return .profile
         case "today": return .today

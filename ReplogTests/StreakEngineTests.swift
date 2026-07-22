@@ -38,11 +38,31 @@ struct StreakEngineTests {
     /// "Today" is this week's Wednesday.
     private var today: Date { day(weeksBack: 0, wed) }
 
-    @Test func emptyScheduleOrHistoryIsZero() {
-        #expect(StreakEngine.workoutStreak(scheduledDays: [], doneDates: [today], today: today, calendar: cal) == 0)
+    @Test func emptyHistoryIsZeroAndEmptyScheduleCountsPlainDays() {
         #expect(StreakEngine.workoutStreak(scheduledDays: mwf, doneDates: [], today: today, calendar: cal) == 0)
+        // Extras-only (no schedule): the streak is plain consecutive done days.
+        #expect(StreakEngine.workoutStreak(scheduledDays: [], doneDates: [today], today: today, calendar: cal) == 1)
+        let twoDays = [today, cal.date(byAdding: .day, value: -1, to: today)!]
+        #expect(StreakEngine.workoutStreak(scheduledDays: [], doneDates: twoDays, today: today, calendar: cal) == 2)
+        let gapped = [today, cal.date(byAdding: .day, value: -2, to: today)!]
+        #expect(StreakEngine.workoutStreak(scheduledDays: [], doneDates: gapped, today: today, calendar: cal) == 1)
+        // A perfect week needs a schedule; without one it stays 0.
         #expect(StreakEngine.weekStreak(scheduledDays: [], doneDates: [today], today: today, calendar: cal) == 0)
         #expect(StreakEngine.weekStreak(scheduledDays: mwf, doneDates: [], today: today, calendar: cal) == 0)
+    }
+
+    @Test func restDayCompletionCountsTowardTheStreak() {
+        // Mon (scheduled) + Tue (rest day — an extra) + Wed (today) all done → 3, not 2.
+        let done = [day(weeksBack: 0, mon), day(weeksBack: 0, 2), day(weeksBack: 0, wed)]
+        let s = StreakEngine.workoutStreak(scheduledDays: mwf, doneDates: done, today: today, calendar: cal)
+        #expect(s == 3)
+    }
+
+    @Test func restDayCompletionDoesNotSaveAMissedScheduledDay() {
+        // Monday (scheduled) skipped; Tuesday extra + today done → streak restarts at the miss.
+        let done = [day(weeksBack: 0, 2), day(weeksBack: 0, wed)]
+        let s = StreakEngine.workoutStreak(scheduledDays: mwf, doneDates: done, today: today, calendar: cal)
+        #expect(s == 2)
     }
 
     @Test func workoutStreakCountsConsecutiveScheduledSessions() {

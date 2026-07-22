@@ -58,13 +58,16 @@ enum PlanFactory {
         return plan
     }
 
-    /// Adds a new empty workout to a plan on its first free weekday.
+    /// Adds a new empty workout to a plan on its first free weekday. When all seven
+    /// weekdays are taken, the new workout becomes a day-less "Extra" instead of
+    /// silently doubling up a day.
     @discardableResult
     static func addWorkout(to plan: Plan, into context: ModelContext) -> Workout {
-        let used = Set(plan.workouts.map(\.day))
-        let day = WeekdayPlanner.firstFreeDay(excluding: used) ?? .sun
-        let workout = Workout(name: "New Day", day: day,
+        let used = Set(plan.workouts.filter { !$0.isExtra }.map(\.day))
+        let day = WeekdayPlanner.firstFreeDay(excluding: used)
+        let workout = Workout(name: "New Day", day: day ?? .sun,
                               order: Reordering.nextOrder(after: plan.workouts))
+        workout.isExtra = day == nil
         workout.plan = plan
         context.insert(workout)
         return workout

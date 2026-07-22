@@ -50,11 +50,14 @@ final class Plan {
     /// Total prescribed exercises across all workouts.
     var exerciseCount: Int { workouts.reduce(0) { $0 + $1.items.count } }
 
-    /// Distinct scheduled weekdays, in week order.
+    /// Distinct scheduled weekdays, in week order. Extras are day-less, so they don't appear.
     var scheduledDays: [Weekday] {
-        let days = Set(workouts.map(\.day))
+        let days = Set(workouts.filter { !$0.isExtra }.map(\.day))
         return Weekday.allCases.filter { days.contains($0) }
     }
+
+    /// Whether the plan carries any day-less "Extra" workouts.
+    var hasExtras: Bool { workouts.contains(where: \.isExtra) }
 }
 
 @Model
@@ -63,6 +66,10 @@ final class Workout {
     var name: String = ""
     /// Stored as `Weekday.rawValue`; use `day` for typed access.
     var dayRaw: String = Weekday.mon.rawValue
+    /// True when this workout isn't tied to a weekday — an "Extra" the user can run on
+    /// any day (its `day` is then ignored). Extras never join the schedule: they don't
+    /// create scheduled days for streaks and don't consume a weekday in the picker.
+    var isExtra: Bool = false
     var order: Int = 0
     var plan: Plan?
 
@@ -82,6 +89,11 @@ final class Workout {
 
     var orderedItems: [PlanItem] { items.sorted { $0.order < $1.order } }
     var setCount: Int { items.reduce(0) { $0 + $1.sets.count } }
+
+    /// Chip label for cards: the weekday ("Mon") or "Extra".
+    var slotLabel: String { isExtra ? "Extra" : day.short }
+    /// Uppercase tag for the Today hero: "MON" or "EXTRA".
+    var slotTag: String { isExtra ? "EXTRA" : day.tag }
 }
 
 @Model

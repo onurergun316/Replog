@@ -28,8 +28,9 @@ struct WorkoutEditorView: View {
     private var defaultRest: Int { (settingsList.first ?? context.appSettings()).restSeconds }
 
     /// Weekdays used by the plan's other workouts (disabled in the picker).
+    /// Extras don't hold a weekday, so they never lock one.
     private var takenDays: Set<Weekday> {
-        Set((workout.plan?.workouts ?? []).filter { $0.id != workout.id }.map(\.day))
+        Set((workout.plan?.workouts ?? []).filter { $0.id != workout.id && !$0.isExtra }.map(\.day))
     }
 
     var body: some View {
@@ -133,26 +134,37 @@ struct WorkoutEditorView: View {
     private var dayPicker: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 8) {
+                // "Extra" first: a day-less slot the user can run any time. Never locked —
+                // a plan can hold any number of extras.
+                dayPill(label: "Extra", icon: "sparkles",
+                        isSelected: workout.isExtra, disabled: false) { setExtra() }
                 ForEach(Weekday.allCases) { day in
-                    let disabled = takenDays.contains(day)
-                    let isSelected = workout.day == day
-                    Button { setDay(day) } label: {
-                        HStack(spacing: 4) {
-                            if disabled {
-                                Image(systemName: "lock.fill").font(.system(size: 8, weight: .black))
-                            }
-                            Text(day.short).font(.rounded(13, .heavy))
-                        }
-                        .foregroundStyle(isSelected ? .white : (disabled ? Color.text3 : Color.textPrimary))
-                        .padding(.horizontal, 14).padding(.vertical, 9)
-                        .background(Capsule().fill(isSelected ? Color.accent : Color.surface2))
-                    }
-                    .buttonStyle(.plain)
-                    .disabled(disabled)
-                    .opacity(disabled ? 0.45 : 1)
+                    dayPill(label: day.short, icon: nil,
+                            isSelected: !workout.isExtra && workout.day == day,
+                            disabled: takenDays.contains(day)) { setDay(day) }
                 }
             }
         }
+    }
+
+    private func dayPill(label: String, icon: String?, isSelected: Bool, disabled: Bool,
+                         action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack(spacing: 4) {
+                if disabled {
+                    Image(systemName: "lock.fill").font(.system(size: 8, weight: .black))
+                } else if let icon {
+                    Image(systemName: icon).font(.system(size: 10, weight: .black))
+                }
+                Text(label).font(.rounded(13, .heavy))
+            }
+            .foregroundStyle(isSelected ? .white : (disabled ? Color.text3 : Color.textPrimary))
+            .padding(.horizontal, 14).padding(.vertical, 9)
+            .background(Capsule().fill(isSelected ? Color.accent : Color.surface2))
+        }
+        .buttonStyle(.plain)
+        .disabled(disabled)
+        .opacity(disabled ? 0.45 : 1)
     }
 
     private func dashedLabel(icon: String, title: String, color: Color) -> some View {
@@ -183,6 +195,12 @@ struct WorkoutEditorView: View {
     private func setDay(_ day: Weekday) {
         guard !takenDays.contains(day) else { return }
         workout.day = day
+        workout.isExtra = false
+        try? context.save()
+    }
+
+    private func setExtra() {
+        workout.isExtra = true
         try? context.save()
     }
 

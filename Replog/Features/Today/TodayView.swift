@@ -77,13 +77,17 @@ struct TodayView: View {
 
     private var isShowingToday: Bool { shownDay == today }
 
-    /// The workout scheduled for the shown weekday (if any).
+    /// The workout scheduled for the shown weekday (if any). Extras are day-less, so
+    /// they never claim the hero — they live in the "Add another" scroller instead.
     private var shownWorkout: Workout? {
-        allWorkouts.first { $0.day == shownDay }
+        allWorkouts.first { !$0.isExtra && $0.day == shownDay }
     }
 
+    /// Everything but the hero, extras first — "do any day" belongs at the front of
+    /// an "add another workout" shelf.
     private var otherWorkouts: [Workout] {
-        allWorkouts.filter { $0.id != shownWorkout?.id }
+        let others = allWorkouts.filter { $0.id != shownWorkout?.id }
+        return others.filter(\.isExtra) + others.filter { !$0.isExtra }
     }
 
     private var streak: Int {
@@ -400,7 +404,7 @@ private struct TodayHeroCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Text("\(workout.plan?.name ?? "") · \(workout.day.tag)")
+            Text("\(workout.plan?.name ?? "") · \(workout.slotTag)")
                 .font(.rounded(12, .heavy)).foregroundStyle(.white.opacity(0.9))
             Text(workout.name).font(.rounded(28, .black)).foregroundStyle(.white)
 
@@ -461,7 +465,7 @@ private struct OtherWorkoutCard: View {
             VStack(alignment: .leading, spacing: 8) {
                 HStack(spacing: 5) {
                     Circle().fill(Color(hex: workout.plan?.colorHex ?? "#FF6A3D")).frame(width: 7, height: 7)
-                    Text(workout.day.short).font(.rounded(11, .heavy)).foregroundStyle(Color.text3)
+                    Text(workout.slotLabel).font(.rounded(11, .heavy)).foregroundStyle(Color.text3)
                 }
                 Text(workout.name).font(.cardTitle).foregroundStyle(Color.textPrimary)
                 Text(workout.plan?.name ?? "").font(.rounded(12, .semibold)).foregroundStyle(Color.text3)

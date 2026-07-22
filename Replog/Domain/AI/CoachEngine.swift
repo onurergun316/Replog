@@ -312,7 +312,7 @@ enum CoachEngine {
         return [CoachInsight(
             kind: .adherenceInsight, priority: .high,
             title: "Keep your streak alive",
-            body: "Your \(ctx.workoutStreak)-workout streak is on the line — today's session is still waiting. A quick session keeps it going.",
+            body: "Your \(ctx.workoutStreak)-day streak is on the line — today's session is still waiting. A quick session keeps it going.",
             metrics: ["workoutStreak": Double(ctx.workoutStreak)])]
     }
 
@@ -323,8 +323,8 @@ enum CoachEngine {
         if streakMilestones.contains(ctx.workoutStreak) {
             out.append(CoachInsight(
                 kind: .milestone, priority: .normal,
-                title: "\(ctx.workoutStreak)-workout streak!",
-                body: "\(ctx.workoutStreak) scheduled workouts in a row. Consistency like this is what actually drives long-term results.",
+                title: "\(ctx.workoutStreak)-day streak!",
+                body: "\(ctx.workoutStreak) training days in a row. Consistency like this is what actually drives long-term results.",
                 metrics: ["workoutStreak": Double(ctx.workoutStreak)]))
         }
         if let weeks = ctx.programWeeksCompleted, weeks > 0, weeks % 4 == 0 {

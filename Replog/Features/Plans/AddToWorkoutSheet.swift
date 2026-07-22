@@ -87,7 +87,7 @@ struct AddToWorkoutSheet: View {
         let allIn = exIds.allSatisfy { WorkoutMembership.contains($0, in: workout) }
         return Button { toggle(workout) } label: {
             HStack(spacing: 12) {
-                Pill(text: workout.day.short, style: .accentSoft)
+                Pill(text: workout.slotLabel, style: .accentSoft)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(workout.name).font(.rounded(15, .heavy)).foregroundStyle(Color.textPrimary).lineLimit(1)
                     Text("\(workout.items.count) exercises")

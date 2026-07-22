@@ -124,6 +124,10 @@ flags a computed starting-load seed (see Key formulas) so the live log renders i
   `DragToReorder` therefore adds only the drop-commit haptic and the VoiceOver "Move up/down"
   actions; the system draws and announces the lift itself. Dragging a workout changes reading order
   only, never its weekday.
+- **Extra workouts**: `Workout.isExtra` = a day-less workout run on any day ("Extra" pill left of
+  Sunday in the editor's day picker; `slotLabel`/`slotTag` render "Extra" on cards). Extras never
+  join the schedule (`scheduledDays` filters them), never lock a weekday, lead Today's "Add
+  another" shelf, never claim the Today hero, and the 8th workout of a full week is created as one.
 - **Static catalog** (read-only, bundled): `Exercise` + enums in `Catalog/`; 873 exercises loaded
   from `Resources/exercises.json` by `ExerciseCatalog`. User data references exercises by `exId`.
 - **Live logging**: `ActiveSession ──< SessionExercise ──< LoggedSet` (with `done`, `prevWeight/Reps`).
@@ -155,12 +159,15 @@ flags a computed starting-load seed (see Key formulas) so the live log renders i
   1–2 sessions. **Progression RATES are never scaled by sex** — only the starting estimate.
 - Units: store kg; display kg or lb (`kg*2.20462`, lb rounded to nearest 5). Steps: +2.5 kg / +5 lb.
 - Trend arrows: a logged value vs the **same set index last session** → up/down/flat (`TrendCalculator`).
-- Streaks: **schedule-aware**, two of them (`StreakEngine`, derived from the plans' scheduled weekdays):
-  **workout streak** = consecutive scheduled workouts completed (a scheduled day that ends undone
-  resets it; today's still-due workout gets grace); **week streak** = consecutive "perfect weeks"
-  (every scheduled workout that week done) — a missed workout breaks both. `StreakCalendar` still
-  provides the Today week-strip + completed-day recording. Finish only counts a **fully complete**
-  workout toward streaks/history-day; a partial Finish saves history but warns and doesn't count.
+- Streaks: **schedule-aware over binary days** (`StreakEngine`): a day is *done* when ANY workout
+  was fully completed that day — whichever weekday it was assigned to, or a day-less **Extra**;
+  several finishes still count once. **Workout streak** = consecutive done days (rest days pass
+  through; a past scheduled day with nothing done breaks it; today's still-due workout gets grace;
+  empty schedule → plain consecutive done days). **Week streak** = consecutive "perfect weeks"
+  (every scheduled day that week done, by any workout) — a missed scheduled day breaks both.
+  `StreakCalendar` still provides the Today week-strip + completed-day recording. Finish only counts
+  a **fully complete** workout toward streaks/history-day; a partial Finish saves history but warns
+  and doesn't count.
 
 ## Project layout (`Replog/`)
 - `App/` — entry, `RootView` (onboarding vs main + dark mode + active-session cover), `MainTabView`,
@@ -178,7 +185,10 @@ flags a computed starting-load seed (see Key formulas) so the live log renders i
   Includes `ReadinessEntry` (subjective check-ins) and the notification prefs on `AppSettings`.
 - `Domain/` — pure logic: `Formulas`, `PlanGenerator`/`PlanFactory`, `QuizAnswers`, `TrendCalculator`,
   `ProgressAggregator`, `ProgressionEngine`, `StallDetector`, `StreakCalendar`, `StreakEngine`,
-  `Scheduling`, `SessionBuilder`, `SessionFinisher`, `BodyweightTracker`, `Reordering`.
+  `Scheduling` (incl. `WeekBrowser`), `SessionBuilder`, `SessionFinisher`, `BodyweightTracker`,
+  `Reordering`, `CalendarMath`/`CalendarStats` (calendar grid math + range statistics),
+  `ProgressAnalytics` (weekly volume buckets, muscle shares, rep-range mix, adherence, PR
+  events, relative strength — the Progress dashboard's derivations).
   - **Program-driven planning:** `ProgramMatcher` (hard-gated + soft-scored program selection from
     `QuizAnswers`), `PatternMapping` (slot `MovementPattern` → catalog facets → real candidates),
     `RepScheme` (parses slot reps/intensity into `SetTemplate` targets — ranges→lower bound,
@@ -211,7 +221,19 @@ flags a computed starting-load seed (see Key formulas) so the live log renders i
   to add one/many exercises to one/many workouts), `ExerciseDetail` (tag grid = Equipment/Level/Force/
   Type only — **mechanic is a filter, not shown here**; "In your workouts" grouped by plan via pure
   `Domain/WorkoutMembership.grouped`; "Add to workout" → `AddToWorkoutSheet`; when opened from Progress
-  it defaults to the **Progress** tab (left)), `Progress`,
+  it defaults to the **Progress** tab (left)), `Progress`
+  (the 4th tab — a 4-layer "onion" dashboard: L1 `ProgressHomeView` = Calendar push card + Swift
+  Charts cards (Strength hero, Volume, Muscle balance donut, Consistency, Body) → L2 domain screens
+  with `RangePicker` windows (`StrengthDetailView` incl. the PR feed, `VolumeDetailView` incl.
+  rep-range mix, `BalanceDetailView` incl. push/pull, `ConsistencyDetailView`, `BodyDetailView`
+  incl. relative strength + readiness) → L3 one muscle (`MuscleDetailView`) or one exercise
+  (`ExerciseDetailView`) → L4 the tap-to-expand session log. Charts use the monochrome accent ramp
+  (`ProgressPalette`), driven by pure `Domain/ProgressAnalytics`),
+  `Calendar` (inside Progress, pushed `embedded: true` — see **`CALENDAR_DESIGN.md`**, repo root:
+  paged Sunday-first month grid (`MonthGridView` + pure `CalendarMath`), tap for a day's detail,
+  long-press-drag multi-select (`DragSelectGesture`, a UIKit recognizer via
+  `UIGestureRecognizerRepresentable` — never a SwiftUI long press, see DragToReorder) →
+  `RangeSummaryView` totals/averages from pure `CalendarStats`),
   `Profile` (saved AI Coach Reports via `CoachReportView`; the three
   lifetime-stat cards open `StatDetailSheet`), `ActiveSession` (typeable weight/reps via
   `NumericStepperField`; `RestTimerModel`; a native confetti+haptics `CelebrationOverlay` when every
@@ -249,7 +271,7 @@ There is no "iPhone 16" simulator installed here; use **iPhone 17**.
 
 ### DEBUG visual checks (no UI automation available)
 Launch envs (DEBUG only, via `SIMCTL_CHILD_*`): `REPLOG_SEED=1` seeds a demo PPL plan + history +
-marks onboarding done; `REPLOG_TAB=today|plans|library|progress|profile` picks the initial tab;
+marks onboarding done; `REPLOG_TAB=today|plans|library|progress|profile` picks the initial tab ("calendar" → progress);
 `REPLOG_ACTIVE=1` drops into a live workout. Example:
 `SIMCTL_CHILD_REPLOG_SEED=1 SIMCTL_CHILD_REPLOG_TAB=progress xcrun simctl launch <sim> test.Replog`
 (uninstall first for a deterministic, empty store).

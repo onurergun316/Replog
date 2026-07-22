@@ -195,7 +195,7 @@ struct WorkoutCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
-                Pill(text: workout.day.short, style: .accentSoft)
+                Pill(text: workout.slotLabel, style: .accentSoft)
                 Text(workout.name).font(.cardTitle).foregroundStyle(Color.textPrimary)
                 Spacer()
                 Button(action: onStart) {
