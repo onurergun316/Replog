@@ -109,6 +109,21 @@ flags a computed starting-load seed (see Key formulas) so the live log renders i
   bulk-applies. In the live workout, completing **any** set (re)starts the timer when `restTimerAuto`
   is on **or a timer is already running** (so checking a set resets the active countdown) —
   `RestTimerModel`. Profile Preferences order: Rest duration → auto-start → Units → Dark mode.
+- **Ordering & drag-to-reorder**: every level of the onion carries an `order` (`Orderable`).
+  Appends allocate `Reordering.nextOrder(after:)` — **never `collection.count`**, which collides
+  after a delete and makes the `order` sort unstable. Plan Detail's workout cards and the Workout
+  Editor's exercise cards are long-press draggable: `.onMove` → `Reordering.apply` (contiguous
+  renumber + save). `List` is the *only* container with native reordering on iOS 26 (the
+  `dragContainer`/`draggable(containerItemID:)` family is `@available(iOS, unavailable)`), hence the
+  Workout Editor is a `List` styled with `plainListRow`, split into header/rows/actions sections so
+  the drop indicator stays inside the draggable run. **No `EditButton`** — edit mode disables row
+  content (the hidden `NavigationLink` and the Start button). **Never attach a custom gesture to a
+  reorderable row**: the lift is a UIKit recognizer on the backing cell, `simultaneousGesture`
+  composes only with *SwiftUI* gestures, and a row-level long press steals the touch so the row
+  never lifts (learned on device — there is also no SwiftUI hook for the lift moment on iOS).
+  `DragToReorder` therefore adds only the drop-commit haptic and the VoiceOver "Move up/down"
+  actions; the system draws and announces the lift itself. Dragging a workout changes reading order
+  only, never its weekday.
 - **Static catalog** (read-only, bundled): `Exercise` + enums in `Catalog/`; 873 exercises loaded
   from `Resources/exercises.json` by `ExerciseCatalog`. User data references exercises by `exId`.
 - **Live logging**: `ActiveSession ──< SessionExercise ──< LoggedSet` (with `done`, `prevWeight/Reps`).
@@ -152,7 +167,8 @@ flags a computed starting-load seed (see Key formulas) so the live log renders i
   navigation, environment, `DebugSeed` (DEBUG-only launch-env seeding — see below).
 - `DesignSystem/` — color tokens (`Theme`), SF Rounded typography, reusable components
   (Pill, StepperControl, `NumericStepperField` (typeable +/- field), TrendArrow, SegmentedToggle,
-  WeekStripView, Sparkline, FlowLayout, …).
+  WeekStripView, Sparkline, FlowLayout, `DragToReorder` (reorder commit haptic + a11y move
+  actions — never gestures on reorderable rows), …).
 - `Catalog/` — `Exercise` + enums (lenient decoding), `ExerciseCatalog` (incl. `search(_:filter:)`),
   `ExerciseImageView` (HEIC + cache, `contentMode`) + `ExerciseThumbnail` (uniform list thumbnail).
   - `Catalog/ProgramLibrary/` — the bundled **62-program library** (`Resources/programs.json`):
@@ -162,7 +178,7 @@ flags a computed starting-load seed (see Key formulas) so the live log renders i
   Includes `ReadinessEntry` (subjective check-ins) and the notification prefs on `AppSettings`.
 - `Domain/` — pure logic: `Formulas`, `PlanGenerator`/`PlanFactory`, `QuizAnswers`, `TrendCalculator`,
   `ProgressAggregator`, `ProgressionEngine`, `StallDetector`, `StreakCalendar`, `StreakEngine`,
-  `Scheduling`, `SessionBuilder`, `SessionFinisher`, `BodyweightTracker`.
+  `Scheduling`, `SessionBuilder`, `SessionFinisher`, `BodyweightTracker`, `Reordering`.
   - **Program-driven planning:** `ProgramMatcher` (hard-gated + soft-scored program selection from
     `QuizAnswers`), `PatternMapping` (slot `MovementPattern` → catalog facets → real candidates),
     `RepScheme` (parses slot reps/intensity into `SetTemplate` targets — ranges→lower bound,

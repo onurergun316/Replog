@@ -128,6 +128,19 @@ enum Weekday: String, Codable, CaseIterable, Identifiable, Sendable {
     /// Uppercase tag used on the Today hero ("MON").
     var tag: String { rawValue.uppercased() }
 
+    /// Full name for prose, e.g. "Monday" — used when Today is browsing another day.
+    var displayName: String {
+        switch self {
+        case .sun: return "Sunday"
+        case .mon: return "Monday"
+        case .tue: return "Tuesday"
+        case .wed: return "Wednesday"
+        case .thu: return "Thursday"
+        case .fri: return "Friday"
+        case .sat: return "Saturday"
+        }
+    }
+
     /// Calendar weekday number (1 = Sunday … 7 = Saturday), matching `Calendar`.
     var calendarWeekday: Int { (Weekday.allCases.firstIndex(of: self) ?? 0) + 1 }
 

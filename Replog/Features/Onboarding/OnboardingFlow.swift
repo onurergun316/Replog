@@ -481,7 +481,8 @@ struct OnboardingFlow: View {
         let report = vm.reportMarkdown.isEmpty
             ? ReportComposer.fallbackMarkdown(answers: vm.answers, plan: generated)
             : vm.reportMarkdown
-        let plan = PlanFactory.insert(generated, into: context, order: plans.count,
+        let plan = PlanFactory.insert(generated, into: context,
+                                      order: Reordering.nextOrder(after: plans),
                                       reportMarkdown: report)
         let profile = profiles.first ?? context.userProfile()
         if !vm.answers.fullName.isEmpty { profile.name = vm.answers.fullName }

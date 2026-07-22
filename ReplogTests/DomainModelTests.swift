@@ -19,6 +19,7 @@ struct DomainModelTests {
         #expect(Weekday.sat.calendarWeekday == 7)
         #expect(Weekday.mon.tag == "MON")
         #expect(Weekday.wed.short == "Wed")
+        #expect(Weekday.wed.displayName == "Wednesday")
     }
 
     @Test func weekdayFromDate() {
@@ -82,6 +83,24 @@ struct DomainModelTests {
         #expect(WeekdayPlanner.firstFreeDay(excluding: Set(Weekday.allCases)) == nil)
         #expect(WeekdayPlanner.isAvailable(.tue, usedByOthers: [.mon]))
         #expect(!WeekdayPlanner.isAvailable(.mon, usedByOthers: [.mon]))
+    }
+
+    // MARK: Week browsing (Today)
+
+    @Test func weekBrowserSkipsRestDays() {
+        let mwf: Set<Weekday> = [.mon, .wed, .fri]
+        #expect(WeekBrowser.next(after: .mon, scheduled: mwf) == .wed)
+        #expect(WeekBrowser.next(after: .tue, scheduled: mwf) == .wed)   // from a rest day
+        #expect(WeekBrowser.previous(before: .fri, scheduled: mwf) == .wed)
+        #expect(WeekBrowser.previous(before: .thu, scheduled: mwf) == .wed)
+    }
+
+    @Test func weekBrowserStopsAtTheEndsOfTheWeek() {
+        let mwf: Set<Weekday> = [.mon, .wed, .fri]
+        #expect(WeekBrowser.next(after: .fri, scheduled: mwf) == nil)    // no wrap to Monday
+        #expect(WeekBrowser.previous(before: .mon, scheduled: mwf) == nil)
+        #expect(WeekBrowser.next(after: .sun, scheduled: []) == nil)
+        #expect(WeekBrowser.next(after: .sun, scheduled: [.sun]) == nil) // never returns itself
     }
 
     // MARK: Image resource naming

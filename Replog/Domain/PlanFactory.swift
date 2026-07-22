@@ -63,7 +63,8 @@ enum PlanFactory {
     static func addWorkout(to plan: Plan, into context: ModelContext) -> Workout {
         let used = Set(plan.workouts.map(\.day))
         let day = WeekdayPlanner.firstFreeDay(excluding: used) ?? .sun
-        let workout = Workout(name: "New Day", day: day, order: plan.workouts.count)
+        let workout = Workout(name: "New Day", day: day,
+                              order: Reordering.nextOrder(after: plan.workouts))
         workout.plan = plan
         context.insert(workout)
         return workout
@@ -72,7 +73,7 @@ enum PlanFactory {
     /// Adds a default 3-set prescription for an exercise to a workout.
     @discardableResult
     static func addExercise(_ exId: String, to workout: Workout, into context: ModelContext) -> PlanItem {
-        let item = PlanItem(exId: exId, order: workout.items.count)
+        let item = PlanItem(exId: exId, order: Reordering.nextOrder(after: workout.items))
         item.workout = workout
         context.insert(item)
         for i in 0..<3 {

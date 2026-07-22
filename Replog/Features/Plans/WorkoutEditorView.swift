@@ -3,7 +3,9 @@
 //  Replog
 //
 //  Edit one training day: name, weekday (taken days disabled), exercises with
-//  expandable set steppers, add/remove exercises, delete the workout.
+//  expandable set steppers, add/remove exercises, delete the workout. Exercise cards
+//  are long-press draggable to reorder, so this is a `List` (the only container with
+//  native reordering on iOS 26) styled as the app's cards via `plainListRow`.
 //
 
 import SwiftUI
@@ -20,6 +22,8 @@ struct WorkoutEditorView: View {
     @State private var showPicker = false
     @State private var showRestSheet = false
     @State private var detailRef: ExerciseRef?
+    /// Bumped on every committed drag, purely to drive the confirmation haptic.
+    @State private var moves = 0
 
     private var defaultRest: Int { (settingsList.first ?? context.appSettings()).restSeconds }
 
@@ -29,21 +33,27 @@ struct WorkoutEditorView: View {
     }
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(workout.plan?.name ?? "Plan").eyebrow()
-                    TextField("Workout name", text: $workout.name)
-                        .font(.screenTitle).foregroundStyle(Color.textPrimary)
-                        .onChange(of: workout.name) { try? context.save() }
+        List {
+            Section {
+                Group {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(workout.plan?.name ?? "Plan").eyebrow()
+                        TextField("Workout name", text: $workout.name)
+                            .font(.screenTitle).foregroundStyle(Color.textPrimary)
+                            .onChange(of: workout.name) { try? context.save() }
+                    }
+
+                    dayPicker
+
+                    Text("\(workout.items.count) exercises · \(workout.setCount) sets · hold to reorder")
+                        .font(.rounded(13, .semibold)).foregroundStyle(Color.text2)
                 }
+                .plainListRow(top: 8, bottom: 8)
+            }
 
-                dayPicker
-
-                Text("\(workout.items.count) exercises · \(workout.setCount) sets")
-                    .font(.rounded(13, .semibold)).foregroundStyle(Color.text2)
-
-                ForEach(workout.orderedItems) { item in
+            Section {
+                let items = workout.orderedItems
+                ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
                     ExerciseEditRow(
                         item: item,
                         exercise: catalog.exercise(id: item.exId),
@@ -56,23 +66,34 @@ struct WorkoutEditorView: View {
                         onRemoveSet: { removeSet($0, from: item) },
                         onChange: { try? context.save() }
                     )
+                    .plainListRow(top: 8, bottom: 8)
+                    .reorderAccessibilityActions(index: index, count: items.count, move: moveItems)
                 }
-
-                Button { showPicker = true } label: {
-                    dashedLabel(icon: "plus", title: "Add exercise", color: .accent)
-                }
-                .buttonStyle(.plain)
-
-                Button(role: .destructive) { deleteWorkout() } label: {
-                    HStack(spacing: 6) { Image(systemName: "trash"); Text("Delete workout") }
-                        .font(.rounded(15, .heavy)).foregroundStyle(Color.down)
-                        .frame(maxWidth: .infinity).padding(.vertical, 14)
-                        .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(Color.down.opacity(0.12)))
-                }
-                .buttonStyle(.plain)
+                .onMove(perform: moveItems)
             }
-            .padding(20)
+
+            Section {
+                Group {
+                    Button { showPicker = true } label: {
+                        dashedLabel(icon: "plus", title: "Add exercise", color: .accent)
+                    }
+                    .buttonStyle(.plain)
+
+                    Button(role: .destructive) { deleteWorkout() } label: {
+                        HStack(spacing: 6) { Image(systemName: "trash"); Text("Delete workout") }
+                            .font(.rounded(15, .heavy)).foregroundStyle(Color.down)
+                            .frame(maxWidth: .infinity).padding(.vertical, 14)
+                            .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(Color.down.opacity(0.12)))
+                    }
+                    .buttonStyle(.plain)
+                }
+                .plainListRow(top: 8, bottom: 8)
+            }
         }
+        .listStyle(.plain)
+        .listSectionSpacing(0)          // the three sections only scope the drag, not the rhythm
+        .reorderCommitFeedback(trigger: moves)
+        .scrollContentBackground(.hidden)
         .scrollDismissesKeyboard(.immediately)
         .hideKeyboardOnTap()
         .background(Color.bg.ignoresSafeArea())
@@ -149,6 +170,16 @@ struct WorkoutEditorView: View {
         withAnimation(.snappy) { expandedItemID = expandedItemID == item.id ? nil : item.id }
     }
 
+    /// Drag-to-reorder. Collapsing after a real move closes any set editor that just
+    /// slid to a new position — a half-typed stepper left open over shuffled rows reads
+    /// as the wrong exercise's sets. A drop back in place leaves the disclosure alone.
+    private func moveItems(from source: IndexSet, to destination: Int) {
+        guard Reordering.apply(from: source, to: destination, in: workout.orderedItems) else { return }
+        expandedItemID = nil
+        try? context.save()
+        moves += 1
+    }
+
     private func setDay(_ day: Weekday) {
         guard !takenDays.contains(day) else { return }
         workout.day = day
@@ -163,7 +194,7 @@ struct WorkoutEditorView: View {
     private func addSet(to item: PlanItem) {
         let last = item.orderedSets.last
         let set = SetTemplate(weightKg: last?.weightKg ?? 20, reps: last?.reps ?? 10,
-                              rpe: last?.rpe ?? 8, order: item.sets.count)
+                              rpe: last?.rpe ?? 8, order: Reordering.nextOrder(after: item.sets))
         set.item = item
         context.insert(set)
         try? context.save()
