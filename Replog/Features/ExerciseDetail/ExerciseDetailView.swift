@@ -226,6 +226,7 @@ private struct FlowChips: View {
 // MARK: - Progress
 
 private struct ProgressContent: View {
+    @State private var expandedEntryID: UUID?
     let exId: String
     let history: [HistoryEntry]
 
@@ -276,15 +277,60 @@ private struct ProgressContent: View {
         VStack(alignment: .leading, spacing: 10) {
             SectionHeader(title: "Session Log")
             ForEach(history.sorted { $0.date > $1.date }) { entry in
-                HStack(alignment: .top) {
+                SessionLogRow(entry: entry, isExpanded: expandedEntryID == entry.id) {
+                    withAnimation(.snappy) {
+                        expandedEntryID = expandedEntryID == entry.id ? nil : entry.id
+                    }
+                }
+                Divider()
+            }
+        }
+    }
+}
+
+/// One logged session, collapsed to its headline (deepest onion layer): date, top set,
+/// set count. Tapping expands the set-by-set breakdown — detail on request, never dumped.
+private struct SessionLogRow: View {
+    let entry: HistoryEntry
+    let isExpanded: Bool
+    let onTap: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Button(action: onTap) {
+                HStack {
                     Text(entry.date, format: .dateTime.month().day())
-                        .font(.rounded(13, .heavy)).foregroundStyle(Color.text2).frame(width: 60, alignment: .leading)
-                    Text(entry.sets.map { "\(Int($0.w))kg × \($0.r)" }.joined(separator: " · "))
+                        .font(.rounded(13, .heavy)).foregroundStyle(Color.text2)
+                        .frame(width: 60, alignment: .leading)
+                    Text("\(Int(entry.topW))kg × \(entry.topR) top set · \(entry.sets.count) set\(entry.sets.count == 1 ? "" : "s")")
                         .font(.rounded(13, .semibold)).foregroundStyle(Color.textPrimary)
                     Spacer()
+                    Text("\(entry.e1rm)").font(.rounded(13, .black))
+                        .foregroundStyle(Color.accent).tabularNumbers()
+                    Image(systemName: "chevron.down")
+                        .font(.system(size: 11, weight: .bold)).foregroundStyle(Color.text3)
+                        .rotationEffect(.degrees(isExpanded ? 180 : 0))
                 }
-                .padding(.vertical, 6)
-                Divider()
+                .padding(.vertical, 8)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+
+            if isExpanded {
+                VStack(alignment: .leading, spacing: 4) {
+                    ForEach(Array(entry.sets.enumerated()), id: \.offset) { index, set in
+                        HStack {
+                            Text("Set \(index + 1)")
+                                .font(.rounded(12, .bold)).foregroundStyle(Color.text3)
+                                .frame(width: 60, alignment: .leading)
+                            Text("\(Int(set.w)) kg × \(set.r)")
+                                .font(.rounded(12, .semibold)).foregroundStyle(Color.textPrimary)
+                                .tabularNumbers()
+                            Spacer()
+                        }
+                    }
+                }
+                .padding(.bottom, 10)
             }
         }
     }
