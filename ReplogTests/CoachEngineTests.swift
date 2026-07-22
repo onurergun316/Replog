@@ -93,7 +93,7 @@ struct CoachEngineTests {
         let top = try #require(CoachEngine.topInsight(ctx))
         #expect(top.kind == .adherenceInsight)
         #expect(top.priority == .high)
-        #expect(top.body.contains("5-workout streak"))
+        #expect(top.body.contains("5-day streak"))
         #expect(top.body.contains("on the line"))
     }
 

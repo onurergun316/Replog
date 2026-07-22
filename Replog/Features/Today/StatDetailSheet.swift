@@ -71,7 +71,7 @@ struct StatDetailSheet: View {
     private var workoutStreakContent: some View {
         VStack(alignment: .leading, spacing: 12) {
             summary(value: "\(workoutStreakValue)",
-                    caption: workoutStreakValue == 1 ? "workout in a row" : "workouts in a row")
+                    caption: workoutStreakValue == 1 ? "training day in a row" : "training days in a row")
             Text("Complete each scheduled workout to keep the streak alive. A missed scheduled day resets it.")
                 .font(.rounded(13, .semibold)).foregroundStyle(Color.text3)
             if completedDays.isEmpty {

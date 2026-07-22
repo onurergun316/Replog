@@ -118,7 +118,7 @@ struct ActiveWorkoutView: View {
         var msg = "You still have \(remaining) set\(remaining == 1 ? "" : "s") to go. "
         if profile.streak > 0 {
             msg += "Finishing now won't count this workout, and you'll lose your "
-                + "\(profile.streak)-workout streak. "
+                + "\(profile.streak)-day streak. "
         } else {
             msg += "Finishing now won't count this workout toward your streak. "
         }

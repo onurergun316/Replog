@@ -63,7 +63,7 @@ final class UserProfile {
         set { goalRaw = newValue.rawValue }
     }
 
-    /// The consecutive-workout streak (alias for `streak`, for readable call sites).
+    /// The consecutive-training-days streak (alias for `streak`, for readable call sites).
     var workoutStreak: Int {
         get { streak }
         set { streak = newValue }

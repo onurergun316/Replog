@@ -158,7 +158,7 @@ enum NotificationPlanner {
         return PlannedNotification(
             kind: .streakRisk, fireDate: fire,
             title: "Keep your streak going",
-            body: "A quick session today keeps your \(inputs.workoutStreak)-workout streak alive — you've got this.")
+            body: "A quick session today keeps your \(inputs.workoutStreak)-day streak alive — you've got this.")
     }
 
     private static func reportReady(_ prefs: NotificationPreferences, now: Date,
