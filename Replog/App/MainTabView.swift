@@ -2,9 +2,9 @@
 //  MainTabView.swift
 //  Replog
 //
-//  The five-tab shell: Today · Plans · Library · Calendar · Profile.
-//  (iPhone tab bars hold five — a sixth folds into a system "More" list — so Calendar
-//  took Progress's slot; Progress lives behind a card at the top of Profile.)
+//  The five-tab shell: Today · Plans · Library · Progress · Profile.
+//  (iPhone tab bars hold five — a sixth folds into a system "More" list — so the
+//  Progress dashboard owns the fourth slot and the Calendar lives one tap inside it.)
 //  Each tab owns a NavigationStack for drill-downs.
 //
 
@@ -13,7 +13,7 @@ import SwiftUI
 struct MainTabView: View {
     @State private var selection: Tab = .today
 
-    enum Tab: Hashable { case today, plans, library, calendar, profile }
+    enum Tab: Hashable { case today, plans, library, progress, profile }
 
     init() {
         #if DEBUG
@@ -29,8 +29,8 @@ struct MainTabView: View {
                 .tabItem { Label("Plans", systemImage: "square.stack.3d.up") }.tag(Tab.plans)
             LibraryView()
                 .tabItem { Label("Library", systemImage: "books.vertical") }.tag(Tab.library)
-            CalendarView()
-                .tabItem { Label("Calendar", systemImage: "calendar") }.tag(Tab.calendar)
+            ProgressHomeView()
+                .tabItem { Label("Progress", systemImage: "chart.line.uptrend.xyaxis") }.tag(Tab.progress)
             ProfileView()
                 .tabItem { Label("Profile", systemImage: "person") }.tag(Tab.profile)
         }
