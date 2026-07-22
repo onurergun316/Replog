@@ -24,6 +24,9 @@ struct TodayView: View {
     @State private var showingBodyweightSheet = false
     /// The workout awaiting the readiness check before its session begins.
     @State private var pendingWorkout: Workout?
+    /// The day the hero card is showing. Nil = follow today, so the screen re-anchors
+    /// itself when the app is left open past midnight.
+    @State private var browsedDay: Weekday?
     /// Which calendar day the Today coach card was dismissed on (max one card per day).
     @AppStorage("coachCardDismissedDay") private var coachCardDismissedDay = ""
 
@@ -67,14 +70,20 @@ struct TodayView: View {
         plans.flatMap(\.orderedWorkouts)
     }
 
-    /// The workout scheduled for today's weekday (if any).
-    private var todaysWorkout: Workout? {
-        let today = Weekday.from(Date())
-        return allWorkouts.first { $0.day == today }
+    private var today: Weekday { Weekday.from(Date()) }
+
+    /// The day the hero card is showing — today unless the user browsed elsewhere.
+    private var shownDay: Weekday { browsedDay ?? today }
+
+    private var isShowingToday: Bool { shownDay == today }
+
+    /// The workout scheduled for the shown weekday (if any).
+    private var shownWorkout: Workout? {
+        allWorkouts.first { $0.day == shownDay }
     }
 
     private var otherWorkouts: [Workout] {
-        allWorkouts.filter { $0.id != todaysWorkout?.id }
+        allWorkouts.filter { $0.id != shownWorkout?.id }
     }
 
     private var streak: Int {
@@ -90,7 +99,9 @@ struct TodayView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 22) {
                     header
-                    WeekStripView(cells: StreakCalendar.weekStrip(doneDates: profile.doneDates))
+                    WeekStripView(cells: StreakCalendar.weekStrip(doneDates: profile.doneDates),
+                                  scheduled: scheduledDays,
+                                  selected: shownDay) { select($0) }
 
                     if let insight = coachInsight {
                         CoachCardView(insight: insight) { coachCardDismissedDay = todayKey }
@@ -105,14 +116,17 @@ struct TodayView: View {
                         resumeBanner(session)
                     }
 
-                    if let workout = todaysWorkout {
-                        SectionHeader(title: "Today's Workout")
-                        TodayHeroCard(workout: workout, catalog: catalog,
-                                      isResuming: isActive(workout)) { start(workout) }
-                    } else {
-                        SectionHeader(title: "Today")
-                        restDayCard
+                    heroSectionHeader
+                    Group {
+                        if let workout = shownWorkout {
+                            TodayHeroCard(workout: workout, catalog: catalog,
+                                          isResuming: isActive(workout)) { start(workout) }
+                        } else {
+                            restDayCard
+                        }
                     }
+                    .id(shownDay)
+                    .transition(.opacity)
 
                     if !otherWorkouts.isEmpty {
                         VStack(alignment: .leading, spacing: 4) {
@@ -164,6 +178,36 @@ struct TodayView: View {
                                 totalWorkouts: profile.totalWorkouts)
             }
         }
+    }
+
+    // MARK: Hero section header
+
+    /// "Today's Workout" while anchored to today, otherwise the browsed day's name with
+    /// a one-tap way back — the strip's today ring alone is easy to miss mid-scroll.
+    private var heroSectionHeader: some View {
+        HStack {
+            SectionHeader(title: isShowingToday
+                          ? (shownWorkout == nil ? "Today" : "Today's Workout")
+                          : "\(shownDay.displayName)\(shownWorkout == nil ? "" : "'s Workout")")
+            if !isShowingToday {
+                Button { select(today) } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: "arrow.uturn.backward")
+                            .font(.system(size: 10, weight: .black))
+                        Text("Today").font(.rounded(12, .heavy))
+                    }
+                    .foregroundStyle(Color.accent)
+                    .padding(.horizontal, 10).padding(.vertical, 5)
+                    .background(Capsule().fill(Color.accentSoft))
+                }
+                .buttonStyle(.plain)
+                .transition(.opacity.combined(with: .scale))
+            }
+        }
+    }
+
+    private func select(_ day: Weekday) {
+        withAnimation(.snappy) { browsedDay = day == today ? nil : day }
     }
 
     // MARK: Header
@@ -282,7 +326,9 @@ struct TodayView: View {
         VStack(spacing: 8) {
             Image(systemName: "moon.zzz.fill").font(.system(size: 28)).foregroundStyle(Color.text3)
             Text("Rest day").font(.cardTitle).foregroundStyle(Color.textPrimary)
-            Text("No workout scheduled for today. Start an extra from below or your Plans.")
+            Text(isShowingToday
+                 ? "No workout scheduled for today. Start an extra from below or your Plans."
+                 : "Nothing scheduled for \(shownDay.displayName). Swipe or tap a day to keep looking.")
                 .font(.rounded(13, .semibold)).foregroundStyle(Color.text3)
                 .multilineTextAlignment(.center)
         }
