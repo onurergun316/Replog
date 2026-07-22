@@ -166,7 +166,12 @@ struct NumericStepperField: View {
                 .submitLabel(.done)
                 .onSubmit { commit() }
                 .onAppear { draft = display }
-                .onChange(of: display) { _, new in if !focused { draft = new } }
+                // Drop the selection before replacing the text from outside: TextSelection
+                // holds String.Index values into the CURRENT string, and applying a stale
+                // one against new text is an out-of-bounds trap.
+                .onChange(of: display) { _, new in
+                    if !focused { selection = nil; draft = new }
+                }
                 .onChange(of: focused) { _, isFocused in
                     if isFocused {
                         // Wherever the tap landed, the caret belongs after the number so a
@@ -195,6 +200,7 @@ struct NumericStepperField: View {
     }
 
     private func commit() {
+        selection = nil // about to replace the text — a stale index must never outlive it
         onCommit(draft)
         // Re-sync to canonical formatting (parent may clamp/round the value).
         draft = display
