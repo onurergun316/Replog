@@ -98,7 +98,7 @@ enum CoachContextBuilder {
         }
 
         let today = Weekday.from(now)
-        let scheduledToday = plans.flatMap(\.workouts).contains { $0.day == today }
+        let scheduledToday = plans.flatMap(\.workouts).contains { !$0.isExtra && $0.day == today }
         let completedToday = Calendar.current.isDateInToday(profile.doneDates.max() ?? .distantPast)
 
         let bwEntries = (try? context.fetch(FetchDescriptor<BodyweightEntry>())) ?? []

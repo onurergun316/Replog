@@ -28,8 +28,9 @@ struct WorkoutEditorView: View {
     private var defaultRest: Int { (settingsList.first ?? context.appSettings()).restSeconds }
 
     /// Weekdays used by the plan's other workouts (disabled in the picker).
+    /// Extras don't hold a weekday, so they never lock one.
     private var takenDays: Set<Weekday> {
-        Set((workout.plan?.workouts ?? []).filter { $0.id != workout.id }.map(\.day))
+        Set((workout.plan?.workouts ?? []).filter { $0.id != workout.id && !$0.isExtra }.map(\.day))
     }
 
     var body: some View {

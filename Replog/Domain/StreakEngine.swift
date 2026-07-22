@@ -22,8 +22,9 @@ import Foundation
 enum StreakEngine {
 
     /// Distinct weekdays that have at least one scheduled workout across the given plans.
+    /// "Extra" workouts are day-less by definition, so they never create a scheduled day.
     static func scheduledDays(in plans: [Plan]) -> Set<Weekday> {
-        Set(plans.flatMap(\.workouts).map(\.day))
+        Set(plans.flatMap(\.workouts).filter { !$0.isExtra }.map(\.day))
     }
 
     /// Consecutive scheduled workouts completed, counting back from `today`.

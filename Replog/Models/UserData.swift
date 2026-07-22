@@ -50,11 +50,14 @@ final class Plan {
     /// Total prescribed exercises across all workouts.
     var exerciseCount: Int { workouts.reduce(0) { $0 + $1.items.count } }
 
-    /// Distinct scheduled weekdays, in week order.
+    /// Distinct scheduled weekdays, in week order. Extras are day-less, so they don't appear.
     var scheduledDays: [Weekday] {
-        let days = Set(workouts.map(\.day))
+        let days = Set(workouts.filter { !$0.isExtra }.map(\.day))
         return Weekday.allCases.filter { days.contains($0) }
     }
+
+    /// Whether the plan carries any day-less "Extra" workouts.
+    var hasExtras: Bool { workouts.contains(where: \.isExtra) }
 }
 
 @Model
