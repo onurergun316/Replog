@@ -158,6 +158,9 @@ private struct PlanCard: View {
                 ForEach(plan.scheduledDays) { day in
                     Pill(text: day.short, style: .accentSoft)
                 }
+                if plan.hasExtras {
+                    Pill(text: "Extra", style: .accentSoft)
+                }
             }
         }
         .padding(16)

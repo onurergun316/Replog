@@ -400,7 +400,7 @@ private struct TodayHeroCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Text("\(workout.plan?.name ?? "") · \(workout.day.tag)")
+            Text("\(workout.plan?.name ?? "") · \(workout.slotTag)")
                 .font(.rounded(12, .heavy)).foregroundStyle(.white.opacity(0.9))
             Text(workout.name).font(.rounded(28, .black)).foregroundStyle(.white)
 
@@ -461,7 +461,7 @@ private struct OtherWorkoutCard: View {
             VStack(alignment: .leading, spacing: 8) {
                 HStack(spacing: 5) {
                     Circle().fill(Color(hex: workout.plan?.colorHex ?? "#FF6A3D")).frame(width: 7, height: 7)
-                    Text(workout.day.short).font(.rounded(11, .heavy)).foregroundStyle(Color.text3)
+                    Text(workout.slotLabel).font(.rounded(11, .heavy)).foregroundStyle(Color.text3)
                 }
                 Text(workout.name).font(.cardTitle).foregroundStyle(Color.textPrimary)
                 Text(workout.plan?.name ?? "").font(.rounded(12, .semibold)).foregroundStyle(Color.text3)

@@ -72,7 +72,7 @@ struct ProgressDashboardView: View {
     private func workoutSection(_ workout: Workout) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 8) {
-                Pill(text: workout.day.short, style: .accentSoft)
+                Pill(text: workout.slotLabel, style: .accentSoft)
                 Text(workout.name).font(.cardTitle).foregroundStyle(Color.textPrimary)
             }
             ForEach(workout.orderedItems) { item in
