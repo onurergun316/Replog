@@ -3,7 +3,8 @@
 //  Replog
 //
 //  A plan's workouts: editable name, per-workout cards with Start, add a workout on
-//  a free weekday, delete the plan.
+//  a free weekday, delete the plan. Cards are long-press draggable to reorder — the
+//  three sections keep that drag visually clamped to the workouts.
 //
 
 import SwiftUI
@@ -17,6 +18,8 @@ struct PlanDetailView: View {
     @Bindable var plan: Plan
     @State private var showRestSheet = false
     @State private var showProgram = false
+    /// Bumped on every committed drag, purely to drive the confirmation haptic.
+    @State private var moves = 0
 
     private var defaultRest: Int { (settingsList.first ?? context.appSettings()).restSeconds }
 
@@ -27,71 +30,83 @@ struct PlanDetailView: View {
 
     var body: some View {
         List {
-            Group {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Plan").eyebrow()
-                    TextField("Plan name", text: $plan.name)
-                        .font(.screenTitle).foregroundStyle(Color.textPrimary)
-                        .onChange(of: plan.name) { try? context.save() }
-                }
-                Text("\(plan.workouts.count) workouts · \(plan.exerciseCount) exercises · swipe to delete")
-                    .font(.rounded(13, .semibold)).foregroundStyle(Color.text2)
-                if let program = sourceProgram {
-                    Button { showProgram = true } label: {
-                        HStack(spacing: 10) {
-                            Image(systemName: "book.pages.fill")
-                                .font(.system(size: 15, weight: .bold)).foregroundStyle(Color.accent)
-                            VStack(alignment: .leading, spacing: 1) {
-                                Text("About this program")
-                                    .font(.rounded(14, .heavy)).foregroundStyle(Color.textPrimary)
-                                Text(program.name)
-                                    .font(.rounded(12, .semibold)).foregroundStyle(Color.text2).lineLimit(1)
+            Section {
+                Group {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Plan").eyebrow()
+                        TextField("Plan name", text: $plan.name)
+                            .font(.screenTitle).foregroundStyle(Color.textPrimary)
+                            .onChange(of: plan.name) { try? context.save() }
+                    }
+                    Text("\(plan.workouts.count) workouts · \(plan.exerciseCount) exercises")
+                        .font(.rounded(13, .semibold)).foregroundStyle(Color.text2)
+                    Text("Hold a card to reorder · swipe to delete")
+                        .font(.rounded(12, .semibold)).foregroundStyle(Color.text3)
+                    if let program = sourceProgram {
+                        Button { showProgram = true } label: {
+                            HStack(spacing: 10) {
+                                Image(systemName: "book.pages.fill")
+                                    .font(.system(size: 15, weight: .bold)).foregroundStyle(Color.accent)
+                                VStack(alignment: .leading, spacing: 1) {
+                                    Text("About this program")
+                                        .font(.rounded(14, .heavy)).foregroundStyle(Color.textPrimary)
+                                    Text(program.name)
+                                        .font(.rounded(12, .semibold)).foregroundStyle(Color.text2).lineLimit(1)
+                                }
+                                Spacer()
+                                Image(systemName: "chevron.right").font(.system(size: 12, weight: .bold))
+                                    .foregroundStyle(Color.text3)
                             }
-                            Spacer()
-                            Image(systemName: "chevron.right").font(.system(size: 12, weight: .bold))
-                                .foregroundStyle(Color.text3)
+                            .padding(12).cardSurface()
                         }
-                        .padding(12).cardSurface()
+                        .buttonStyle(.plain)
+                    }
+                    SectionHeader(title: "Workouts")
+                }
+                .plainListRow()
+            }
+
+            Section {
+                ForEach(plan.orderedWorkouts) { workout in
+                    ZStack {
+                        WorkoutCard(workout: workout, catalog: catalog) { start(workout) }
+                        NavigationLink(value: workout) { EmptyView() }.opacity(0) // hides the List chevron
+                    }
+                    .plainListRow()
+                    .reorderLiftFeedback()
+                    .swipeActions(edge: .trailing) {
+                        Button(role: .destructive) { deleteWorkout(workout) } label: {
+                            Label("Delete", systemImage: "trash")
+                        }
+                    }
+                }
+                .onMove(perform: moveWorkouts)
+            }
+
+            Section {
+                Group {
+                    Button { addWorkout() } label: {
+                        dashedButtonLabel(icon: "plus", title: "Add workout")
+                    }
+                    .buttonStyle(.plain)
+
+                    Button(role: .destructive) { deletePlan() } label: {
+                        HStack(spacing: 6) {
+                            Image(systemName: "trash")
+                            Text("Delete plan")
+                        }
+                        .font(.rounded(15, .heavy)).foregroundStyle(Color.down)
+                        .frame(maxWidth: .infinity).padding(.vertical, 14)
+                        .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(Color.down.opacity(0.12)))
                     }
                     .buttonStyle(.plain)
                 }
-                SectionHeader(title: "Workouts")
-            }
-            .plainListRow()
-
-            ForEach(plan.orderedWorkouts) { workout in
-                ZStack {
-                    WorkoutCard(workout: workout, catalog: catalog) { start(workout) }
-                    NavigationLink(value: workout) { EmptyView() }.opacity(0) // hides the List chevron
-                }
                 .plainListRow()
-                .swipeActions(edge: .trailing) {
-                    Button(role: .destructive) { deleteWorkout(workout) } label: {
-                        Label("Delete", systemImage: "trash")
-                    }
-                }
             }
-
-            Group {
-                Button { addWorkout() } label: {
-                    dashedButtonLabel(icon: "plus", title: "Add workout")
-                }
-                .buttonStyle(.plain)
-
-                Button(role: .destructive) { deletePlan() } label: {
-                    HStack(spacing: 6) {
-                        Image(systemName: "trash")
-                        Text("Delete plan")
-                    }
-                    .font(.rounded(15, .heavy)).foregroundStyle(Color.down)
-                    .frame(maxWidth: .infinity).padding(.vertical, 14)
-                    .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(Color.down.opacity(0.12)))
-                }
-                .buttonStyle(.plain)
-            }
-            .plainListRow()
         }
         .listStyle(.plain)
+        .listSectionSpacing(0)          // the three sections only scope the drag, not the rhythm
+        .reorderCommitFeedback(trigger: moves)
         .scrollContentBackground(.hidden)
         .background(Color.bg.ignoresSafeArea())
         .navigationBarTitleDisplayMode(.inline)
@@ -120,6 +135,14 @@ struct PlanDetailView: View {
             for item in workout.items { item.restSeconds = seconds }
         }
         try? context.save()
+    }
+
+    /// Drag-to-reorder: renumbers every workout's `order`, leaving each card's weekday
+    /// alone — the drag sets the plan's reading order, not the schedule.
+    private func moveWorkouts(from source: IndexSet, to destination: Int) {
+        guard Reordering.apply(from: source, to: destination, in: plan.orderedWorkouts) else { return }
+        try? context.save()
+        moves += 1
     }
 
     private func deleteWorkout(_ workout: Workout) {
