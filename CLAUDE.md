@@ -262,7 +262,7 @@ There is no "iPhone 16" simulator installed here; use **iPhone 17**.
 
 ### DEBUG visual checks (no UI automation available)
 Launch envs (DEBUG only, via `SIMCTL_CHILD_*`): `REPLOG_SEED=1` seeds a demo PPL plan + history +
-marks onboarding done; `REPLOG_TAB=today|plans|library|progress|profile` picks the initial tab;
+marks onboarding done; `REPLOG_TAB=today|plans|library|calendar|profile` picks the initial tab;
 `REPLOG_ACTIVE=1` drops into a live workout. Example:
-`SIMCTL_CHILD_REPLOG_SEED=1 SIMCTL_CHILD_REPLOG_TAB=progress xcrun simctl launch <sim> test.Replog`
+`SIMCTL_CHILD_REPLOG_SEED=1 SIMCTL_CHILD_REPLOG_TAB=calendar xcrun simctl launch <sim> test.Replog`
 (uninstall first for a deterministic, empty store).
