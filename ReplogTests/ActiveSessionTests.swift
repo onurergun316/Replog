@@ -159,6 +159,33 @@ struct ActiveSessionTests {
         #expect(templates.map(\.reps) == [5, 3])
     }
 
+    @Test func finishStampsSessionAttributionOntoHistory() throws {
+        let ctx = makeContext()
+        let workout = seedWorkout(ctx)
+        let started = Date().addingTimeInterval(-45 * 60)
+        let session = ActiveSession(workoutId: workout.id, name: workout.name,
+                                    planName: workout.plan?.name ?? "", startedAt: started)
+        ctx.insert(session)
+        let exercise = SessionExercise(exId: "Bench", order: 0)
+        exercise.session = session; ctx.insert(exercise)
+        let set = LoggedSet(weightKg: 60, reps: 8, rpe: 8, order: 0)
+        set.done = true; set.exercise = exercise; ctx.insert(set)
+        try ctx.save()
+
+        let finishedAt = started.addingTimeInterval(45 * 60)
+        SessionFinisher.finish(session, profile: ctx.userProfile(), context: ctx, date: finishedAt)
+        try ctx.save()
+
+        // The live session is deleted on finish, so this context only survives if it is
+        // copied across — it is what makes per-workout and per-plan tonnage derivable.
+        let entry = try #require(ctx.history(forExercise: "Bench").first)
+        #expect(entry.sessionId == session.id)
+        #expect(entry.workoutId == workout.id)
+        #expect(entry.workoutName == "Day 5")
+        #expect(entry.planName == "PPL")
+        #expect(entry.durationSeconds == 45 * 60)
+    }
+
     @Test func estimatedSeedFlagPropagatesThenClearsOnceLogged() throws {
         let ctx = makeContext()
         let workout = seedWorkout(ctx)

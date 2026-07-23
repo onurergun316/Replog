@@ -33,6 +33,8 @@ enum SessionFinisher {
     static func finish(_ session: ActiveSession, profile: UserProfile,
                        context: ModelContext, date: Date = Date()) -> Summary {
         let isComplete = session.isComplete
+        // Captured before the session is deleted — otherwise this context is lost for good.
+        let duration = max(0, Int(date.timeIntervalSince(session.startedAt)))
 
         var logged = 0
         for exercise in session.exercises {
@@ -49,7 +51,12 @@ enum SessionFinisher {
                 topR: top.reps,
                 e1rm: Formulas.e1rmRounded(kg: top.weightKg, reps: top.reps),
                 sets: doneSets.sorted { $0.order < $1.order }.map { RecordedSet(w: $0.weightKg, r: $0.reps) },
-                topRPE: top.rpe
+                topRPE: top.rpe,
+                sessionId: session.id,
+                workoutId: session.workoutId,
+                workoutName: session.name.isEmpty ? nil : session.name,
+                planName: session.planName.isEmpty ? nil : session.planName,
+                durationSeconds: duration
             )
             context.insert(entry)
             logged += 1

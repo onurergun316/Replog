@@ -30,7 +30,29 @@ final class HistoryEntry {
     /// JSON-encoded `[RecordedSet]` of every set done that day (for the Session Log).
     var setsJSON: String = "[]"
 
-    init(exId: String, date: Date, topW: Double, topR: Int, e1rm: Int, sets: [RecordedSet], topRPE: Int = 8) {
+    // MARK: Session attribution
+    //
+    // The live session knows which workout and plan it came from and when it started,
+    // and all of that used to be destroyed when the session was deleted on finish —
+    // leaving history as a flat per-exercise-per-day trail. Stamping it here is what
+    // makes "tonnage by plan / by workout" and session duration derivable at all.
+    // Optional throughout: rows written before this existed simply have none, and no
+    // backfill is possible.
+
+    /// Groups the entries written by one finish. Sessions are also reconstructible from
+    /// the shared exact timestamp; this makes it explicit rather than incidental.
+    var sessionId: UUID?
+    /// The `Workout` this session was built from, if it still exists.
+    var workoutId: UUID?
+    /// Names captured at finish time, so a later rename or deletion can't orphan history.
+    var workoutName: String?
+    var planName: String?
+    /// Wall-clock length of the session, in seconds.
+    var durationSeconds: Int?
+
+    init(exId: String, date: Date, topW: Double, topR: Int, e1rm: Int, sets: [RecordedSet],
+         topRPE: Int = 8, sessionId: UUID? = nil, workoutId: UUID? = nil,
+         workoutName: String? = nil, planName: String? = nil, durationSeconds: Int? = nil) {
         self.exId = exId
         self.date = date
         self.topW = topW
@@ -38,6 +60,11 @@ final class HistoryEntry {
         self.e1rm = e1rm
         self.topRPE = topRPE
         self.sets = sets
+        self.sessionId = sessionId
+        self.workoutId = workoutId
+        self.workoutName = workoutName
+        self.planName = planName
+        self.durationSeconds = durationSeconds
     }
 
     /// Decoded sets done that day.
