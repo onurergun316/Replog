@@ -382,6 +382,8 @@ struct TodayView: View {
 
 // MARK: - Hero card
 
+/// Tapping the card body opens the workout's detail; the Start button is an independent
+/// tap target inside it — the same split the "Add another" cards below already use.
 private struct TodayHeroCard: View {
     let workout: Workout
     let catalog: ExerciseCatalog
@@ -404,24 +406,43 @@ private struct TodayHeroCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Text("\(workout.plan?.name ?? "") · \(workout.slotTag)")
-                .font(.rounded(12, .heavy)).foregroundStyle(.white.opacity(0.9))
-            Text(workout.name).font(.rounded(28, .black)).foregroundStyle(.white)
+            // Everything above the button opens the workout; the button starts it.
+            NavigationLink(value: workout) {
+                VStack(alignment: .leading, spacing: 16) {
+                    HStack(spacing: 6) {
+                        Text("\(workout.plan?.name ?? "") · \(workout.slotTag)")
+                            .font(.rounded(12, .heavy)).foregroundStyle(.white.opacity(0.9))
+                        Spacer(minLength: 0)
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 12, weight: .bold))
+                            .foregroundStyle(.white.opacity(0.7))
+                    }
+                    Text(workout.name).font(.rounded(28, .black)).foregroundStyle(.white)
+                        .frame(maxWidth: .infinity, alignment: .leading)
 
-            HStack(spacing: 24) {
-                heroStat("\(workout.items.count)", "exercises")
-                heroStat("\(minutesEstimate)", "min est.")
-                heroStat("\(workout.setCount)", "sets")
-            }
+                    HStack(spacing: 24) {
+                        heroStat("\(workout.items.count)", "exercises")
+                        heroStat("\(minutesEstimate)", "min est.")
+                        heroStat("\(workout.setCount)", "sets")
+                        Spacer(minLength: 0)
+                    }
 
-            HStack(spacing: 8) {
-                ForEach(muscleChips, id: \.self) { chip in
-                    Text(chip)
-                        .font(.rounded(12, .heavy)).foregroundStyle(.white)
-                        .padding(.horizontal, 10).padding(.vertical, 5)
-                        .background(Capsule().fill(.white.opacity(0.2)))
+                    if !muscleChips.isEmpty {
+                        HStack(spacing: 8) {
+                            ForEach(muscleChips, id: \.self) { chip in
+                                Text(chip)
+                                    .font(.rounded(12, .heavy)).foregroundStyle(.white)
+                                    .padding(.horizontal, 10).padding(.vertical, 5)
+                                    .background(Capsule().fill(.white.opacity(0.2)))
+                            }
+                            Spacer(minLength: 0)
+                        }
+                    }
                 }
+                .contentShape(Rectangle())
             }
+            .buttonStyle(.plain)
+            .accessibilityHint("Opens this workout")
 
             Button(action: onStart) {
                 HStack(spacing: 8) {
