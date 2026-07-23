@@ -256,19 +256,61 @@ private struct ProgressContent: View {
         }
     }
 
+    private var sorted: [HistoryEntry] { history.sorted { $0.date < $1.date } }
+
+    /// One session is a picture of a session, not a trend: a single point plotted against
+    /// a hidden ordinal axis was the "chart shows nothing" the athlete saw after two
+    /// workouts. Below three sessions this renders that session's sets instead.
+    @ViewBuilder
     private var chart: some View {
-        Chart(Array(history.sorted { $0.date < $1.date }.enumerated()), id: \.offset) { index, entry in
-            LineMark(x: .value("Session", index), y: .value("1RM", entry.e1rm))
+        if sorted.count < 2, let latest = sorted.last {
+            setBreakdownChart(latest)
+        } else {
+            trendChart
+        }
+    }
+
+    /// Estimated 1RM over real dates — two sessions three days apart no longer look
+    /// identical to two sessions three months apart.
+    private var trendChart: some View {
+        Chart(sorted, id: \.id) { entry in
+            LineMark(x: .value("Date", entry.date), y: .value("1RM", entry.e1rm))
                 .foregroundStyle(Color.accent)
-                .interpolationMethod(.catmullRom)
-            AreaMark(x: .value("Session", index), y: .value("1RM", entry.e1rm))
+                .interpolationMethod(.monotone)
+            AreaMark(x: .value("Date", entry.date), y: .value("1RM", entry.e1rm))
                 .foregroundStyle(LinearGradient(colors: [Color.accent.opacity(0.25), .clear],
                                                 startPoint: .top, endPoint: .bottom))
-                .interpolationMethod(.catmullRom)
+                .interpolationMethod(.monotone)
+            PointMark(x: .value("Date", entry.date), y: .value("1RM", entry.e1rm))
+                .foregroundStyle(Color.accent)
+                .symbolSize(40)
         }
         .chartYAxis { AxisMarks(position: .leading) }
-        .chartXAxis(.hidden)
+        .chartXAxis { AxisMarks(format: .dateTime.month(.abbreviated).day()) }
+        .chartYScale(domain: .automatic(includesZero: false))
         .frame(height: 180)
+        .padding(14)
+        .cardSurface()
+    }
+
+    /// The baseline view: every set of the only logged session, so the screen carries
+    /// real information from the very first workout.
+    private func setBreakdownChart(_ entry: HistoryEntry) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Chart(Array(entry.sets.enumerated()), id: \.offset) { index, set in
+                BarMark(x: .value("Set", "\(index + 1)"),
+                        y: .value("Weight", set.w))
+                    .foregroundStyle(Color.accent)
+                    .cornerRadius(3)
+                    .annotation(position: .top) {
+                        Text("\(set.r)").font(.rounded(10, .bold)).foregroundStyle(Color.text3)
+                    }
+            }
+            .chartYAxis { AxisMarks(position: .leading) }
+            .frame(height: 150)
+            Text("Your baseline — log this again to see a trend")
+                .font(.rounded(11, .semibold)).foregroundStyle(Color.text3)
+        }
         .padding(14)
         .cardSurface()
     }

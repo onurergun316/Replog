@@ -74,7 +74,7 @@ struct BodyDetailView: View {
         Chart(windowed, id: \.id) { entry in
             LineMark(x: .value("Date", entry.date), y: .value("Weight", entry.weightKg))
                 .foregroundStyle(Color.accent)
-                .interpolationMethod(.catmullRom)
+                .interpolationMethod(.monotone)
             PointMark(x: .value("Date", entry.date), y: .value("Weight", entry.weightKg))
                 .foregroundStyle(Color.accent)
                 .symbolSize(20)

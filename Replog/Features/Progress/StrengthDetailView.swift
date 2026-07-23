@@ -127,7 +127,12 @@ struct StrengthDetailView: View {
             Chart(Array(series.enumerated()), id: \.offset) { _, point in
                 LineMark(x: .value("Date", point.date), y: .value("1RM", point.e1rm))
                     .foregroundStyle(by: .value("Exercise", point.name))
-                    .interpolationMethod(.catmullRom)
+                    .interpolationMethod(.monotone)
+                // Most lifts have a single session early on, and a one-point line is
+                // invisible — which is why this chart read as empty after two workouts.
+                PointMark(x: .value("Date", point.date), y: .value("1RM", point.e1rm))
+                    .foregroundStyle(by: .value("Exercise", point.name))
+                    .symbolSize(40)
             }
             .chartForegroundStyleScale(range: [ProgressPalette.ramp(0), ProgressPalette.ramp(1),
                                                ProgressPalette.ramp(2)])

@@ -111,11 +111,15 @@ struct ProgressHomeView: View {
                 Chart(Array(top.series.suffix(20).enumerated()), id: \.offset) { index, value in
                     LineMark(x: .value("Session", index), y: .value("1RM", value))
                         .foregroundStyle(Color.accent)
-                        .interpolationMethod(.catmullRom)
+                        .interpolationMethod(.monotone)
                     AreaMark(x: .value("Session", index), y: .value("1RM", value))
                         .foregroundStyle(LinearGradient(colors: [Color.accent.opacity(0.22), .clear],
                                                         startPoint: .top, endPoint: .bottom))
-                        .interpolationMethod(.catmullRom)
+                        .interpolationMethod(.monotone)
+                    // A line through one point draws nothing; the point always shows.
+                    PointMark(x: .value("Session", index), y: .value("1RM", value))
+                        .foregroundStyle(Color.accent)
+                        .symbolSize(36)
                 }
                 .chartXAxis(.hidden).chartYAxis(.hidden)
                 .frame(height: 72)
@@ -220,7 +224,10 @@ struct ProgressHomeView: View {
             Chart(Array(series), id: \.id) { entry in
                 LineMark(x: .value("Date", entry.date), y: .value("Weight", entry.weightKg))
                     .foregroundStyle(Color.accent)
-                    .interpolationMethod(.catmullRom)
+                    .interpolationMethod(.monotone)
+                PointMark(x: .value("Date", entry.date), y: .value("Weight", entry.weightKg))
+                    .foregroundStyle(Color.accent)
+                    .symbolSize(28)
             }
             .chartYScale(domain: .automatic(includesZero: false))
             .chartXAxis(.hidden).chartYAxis(.hidden)
