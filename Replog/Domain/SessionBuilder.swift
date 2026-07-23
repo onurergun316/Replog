@@ -43,13 +43,23 @@ enum SessionBuilder {
 
             for (setIndex, template) in item.orderedSets.enumerated() {
                 let prev = previous?.sets[safe: setIndex]
+                // Start from what was actually lifted last time.
+                //
+                // `SessionFinisher` normally writes logged values back onto the template,
+                // so the two agree. This covers every case where it couldn't: sessions
+                // finished before write-back existed, partial finishes, and a plan whose
+                // exercise was swapped. `estimated` is the guard — it means the number is
+                // still a computed seed nobody has touched, so history is strictly better
+                // information. Once a human edits the template, or a finished session
+                // writes to it, the flag clears and the template wins.
+                let seed = template.estimated ? prev : nil
                 let logged = LoggedSet(
-                    weightKg: template.weightKg,
-                    reps: template.reps,
+                    weightKg: seed?.w ?? template.weightKg,
+                    reps: seed?.r ?? template.reps,
                     rpe: template.rpe,
                     prevWeight: prev?.w,
                     prevReps: prev?.r,
-                    estimated: template.estimated,
+                    estimated: template.estimated && seed == nil,
                     order: setIndex
                 )
                 logged.exercise = sessionExercise

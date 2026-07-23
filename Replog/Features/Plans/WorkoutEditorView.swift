@@ -332,17 +332,19 @@ private struct SetEditorRow: View {
 
             VStack(spacing: 2) {
                 Text("WEIGHT (kg)").font(.rounded(10, .heavy)).foregroundStyle(Color.text3)
+                // Editing clears `estimated`: the number is the athlete's now, not a
+                // computed seed — which also stops a later session overwriting it.
                 NumericStepperField(display: weightText, keyboard: .decimalPad,
-                                    onMinus: { template.weightKg = max(0, template.weightKg - 2.5); onChange() },
-                                    onPlus: { template.weightKg += 2.5; onChange() },
-                                    onCommit: { if let kg = Formulas.parseWeightKg($0, units: .kg) { template.weightKg = kg; onChange() } })
+                                    onMinus: { template.weightKg = max(0, template.weightKg - 2.5); template.estimated = false; onChange() },
+                                    onPlus: { template.weightKg += 2.5; template.estimated = false; onChange() },
+                                    onCommit: { if let kg = Formulas.parseWeightKg($0, units: .kg) { template.weightKg = kg; template.estimated = false; onChange() } })
             }
             VStack(spacing: 2) {
                 Text("REPS").font(.rounded(10, .heavy)).foregroundStyle(Color.text3)
                 NumericStepperField(display: "\(template.reps)", keyboard: .numberPad,
-                                    onMinus: { template.reps = max(1, template.reps - 1); onChange() },
-                                    onPlus: { template.reps += 1; onChange() },
-                                    onCommit: { if let reps = Formulas.parseReps($0) { template.reps = reps; onChange() } })
+                                    onMinus: { template.reps = max(1, template.reps - 1); template.estimated = false; onChange() },
+                                    onPlus: { template.reps += 1; template.estimated = false; onChange() },
+                                    onCommit: { if let reps = Formulas.parseReps($0) { template.reps = reps; template.estimated = false; onChange() } })
             }
             if canRemove {
                 Button(action: onRemove) {

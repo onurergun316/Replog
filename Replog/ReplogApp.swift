@@ -23,6 +23,8 @@ struct ReplogApp: App {
         _ = context.userProfile()
         _ = context.appSettings()
         try? context.save()
+        // One-time repair for plans logged before finishing wrote its numbers back.
+        TemplateBackfill.run(context: context)
         // Register the best-effort background report refresh (no-ops if not permitted).
         ReportScheduler.registerBackgroundTask(container: container)
     }

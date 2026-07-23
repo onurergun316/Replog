@@ -3,7 +3,7 @@
 //  Replog
 //
 //  Date math for the Calendar tab's month grid. Pages are a fixed 42 cells (6 rows × 7
-//  Sunday-first columns) so month heights never jump; leading/trailing cells belong to
+//  Sunday-first columns) so month heights never jump; leading/trailing cells belong toyou ha
 //  the adjacent months. Sunday-first matches the Today week strip and StreakEngine's
 //  weeks regardless of locale. Pure and fully testable.
 //
