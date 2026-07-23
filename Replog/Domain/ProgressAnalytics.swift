@@ -91,6 +91,23 @@ enum ProgressAnalytics {
         }
     }
 
+    /// Drops the run of empty weeks at the *start* of a series, so a first training week
+    /// reads at the chart's left edge instead of stranded at the far right.
+    ///
+    /// `weekBuckets` zero-fills a fixed trailing window ending at the current week, and
+    /// Swift Charts takes its x-domain from whatever it is handed — so a new athlete's
+    /// only bar sat in the last twelfth of a 12-week chart, or the last 1% of an "All"
+    /// one, preceded by empty space from before they had started training.
+    ///
+    /// Interior and trailing gaps are kept: a week you skipped is information, and the
+    /// current week must stay the right edge. Keyed on `sets`, not `volumeKg` — a week of
+    /// nothing but bodyweight work is zero kilograms under the default resolver, and it
+    /// would be a lie to call that untrained.
+    static func trimmingLeadingEmptyWeeks(_ buckets: [WeekBucket]) -> [WeekBucket] {
+        guard let first = buckets.firstIndex(where: { $0.sets > 0 }) else { return buckets }
+        return Array(buckets[first...])
+    }
+
     /// Volume attributed to each primary muscle over the last `days` days, largest first.
     /// A set's full volume goes to every primary muscle of its exercise; shares are
     /// normalized over the attributed total so they always sum to 1.
@@ -142,16 +159,23 @@ enum ProgressAnalytics {
     /// The last `weeks` weeks of schedule adherence (oldest → newest). Only *elapsed*
     /// scheduled days count in the current week, so today's still-due workout doesn't
     /// read as a miss.
+    ///
+    /// `since` drops the weeks before the athlete's first activity. Without it a brand-new
+    /// account reads as months of missed sessions against a schedule it didn't have yet —
+    /// an adherence percentage in the single digits on day three.
     static func adherence(scheduledDays: Set<Weekday>, doneDates: [Date], weeks: Int,
+                          since firstActivity: Date? = nil,
                           today: Date = Date(),
                           calendar: Calendar = .current) -> [AdherenceWeek] {
         guard weeks > 0, !scheduledDays.isEmpty,
               let thisWeek = StreakEngine.startOfWeek(for: today, calendar: calendar) else { return [] }
         let done = Set(doneDates.map { calendar.startOfDay(for: $0) })
         let startOfToday = calendar.startOfDay(for: today)
+        let firstWeek = firstActivity.flatMap { StreakEngine.startOfWeek(for: $0, calendar: calendar) }
         return stride(from: -(weeks - 1), through: 0, by: 1).compactMap { offset in
             guard let weekStart = calendar.date(byAdding: .day, value: offset * 7, to: thisWeek)
             else { return nil }
+            if let firstWeek, weekStart < firstWeek { return nil }
             var scheduled = 0, doneCount = 0
             for day in 0..<7 {
                 guard let date = calendar.date(byAdding: .day, value: day, to: weekStart),
@@ -179,6 +203,14 @@ enum ProgressAnalytics {
             }
         }
         return events.sorted { $0.date > $1.date }
+    }
+
+    /// The athlete's first day of training: the earlier of their first logged set and
+    /// their first completed day. `nil` before they have trained at all. Charts clamp
+    /// their x-domain to this so nothing is drawn from before they started.
+    static func firstActivity(history: [HistoryEntry], doneDates: [Date]) -> Date? {
+        let dates = history.map(\.date) + doneDates
+        return dates.min()
     }
 
     /// Estimated 1RM as a multiple of bodyweight — the classic strength-standard read.

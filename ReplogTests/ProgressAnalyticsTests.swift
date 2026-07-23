@@ -44,6 +44,78 @@ struct ProgressAnalyticsTests {
         #expect(buckets.last?.workouts == 1)                 // two entries, one training day
     }
 
+    // MARK: - X-domain: where the series starts
+
+    @Test func leadingEmptyWeeksAreTrimmedSoFirstTrainingReadsAtTheLeft() {
+        // A new athlete who started this week: the raw window pads 11 weeks of nothing
+        // in front of them, which put their only bar at the chart's far right edge.
+        let history = [entry(date(2026, 6, 8), sets: [RecordedSet(w: 100, r: 10)])]
+        let raw = ProgressAnalytics.weekBuckets(history: history, weeks: 12,
+                                                today: today, calendar: cal)
+        #expect(raw.count == 12)
+        #expect(raw.first?.sets == 0)
+
+        let trimmed = ProgressAnalytics.trimmingLeadingEmptyWeeks(raw)
+        #expect(trimmed.count == 1)
+        #expect(trimmed.first?.volumeKg == 1000)
+    }
+
+    @Test func trimmingKeepsInteriorAndTrailingGaps() {
+        // A week you skipped is information; the current week must stay the right edge.
+        let history = [
+            entry(date(2026, 5, 25), sets: [RecordedSet(w: 80, r: 5)]),   // two weeks back
+        ]
+        let buckets = ProgressAnalytics.trimmingLeadingEmptyWeeks(
+            ProgressAnalytics.weekBuckets(history: history, weeks: 4, today: today, calendar: cal))
+
+        #expect(buckets.count == 3)                       // one leading empty week dropped
+        #expect(buckets.map(\.sets) == [1, 0, 0])         // the gap and this week survive
+    }
+
+    @Test func trimmingCountsABodyweightOnlyWeekAsTrained() {
+        // Zero kilograms under the default resolver, but unquestionably a training week —
+        // keying the trim on volume would delete it.
+        let history = [entry(date(2026, 6, 8), sets: [RecordedSet(w: 0, r: 20)])]
+        let buckets = ProgressAnalytics.trimmingLeadingEmptyWeeks(
+            ProgressAnalytics.weekBuckets(history: history, weeks: 6, today: today, calendar: cal))
+
+        #expect(buckets.count == 1)
+        #expect(buckets.first?.volumeKg == 0)
+        #expect(buckets.first?.sets == 1)
+    }
+
+    @Test func trimmingAnEmptyHistoryLeavesTheWindowAlone() {
+        let buckets = ProgressAnalytics.weekBuckets(history: [], weeks: 4,
+                                                    today: today, calendar: cal)
+        #expect(ProgressAnalytics.trimmingLeadingEmptyWeeks(buckets).count == 4)
+    }
+
+    @Test func adherenceIgnoresWeeksBeforeTheAthleteStarted() {
+        // Started this week, trains Mondays, did Monday. Without the clamp the previous
+        // 11 weeks count as missed sessions against a schedule that did not exist yet.
+        let started = date(2026, 6, 8)
+        let unclamped = ProgressAnalytics.adherence(scheduledDays: [.mon], doneDates: [started],
+                                                    weeks: 12, today: today, calendar: cal)
+        #expect(unclamped.count == 12)
+        #expect(unclamped.reduce(0) { $0 + $1.scheduled } == 12)
+        #expect(unclamped.reduce(0) { $0 + $1.done } == 1)      // reads as 8% adherence
+
+        let clamped = ProgressAnalytics.adherence(scheduledDays: [.mon], doneDates: [started],
+                                                  weeks: 12, since: started,
+                                                  today: today, calendar: cal)
+        #expect(clamped.count == 1)
+        #expect(clamped.first?.scheduled == 1)
+        #expect(clamped.first?.done == 1)                       // 100%, which is the truth
+    }
+
+    @Test func firstActivityIsTheEarliestOfHistoryAndCompletedDays() {
+        let history = [entry(date(2026, 6, 8), sets: [RecordedSet(w: 100, r: 5)])]
+        #expect(ProgressAnalytics.firstActivity(history: history,
+                                                doneDates: [date(2026, 6, 1)]) == date(2026, 6, 1))
+        #expect(ProgressAnalytics.firstActivity(history: history, doneDates: []) == date(2026, 6, 8))
+        #expect(ProgressAnalytics.firstActivity(history: [], doneDates: []) == nil)
+    }
+
     @Test func muscleSharesNormalizeAndSortLargestFirst() {
         let history = [
             entry(date(2026, 6, 8), exId: "Bench", sets: [RecordedSet(w: 100, r: 10)]),  // 1000 → chest
