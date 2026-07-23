@@ -13,6 +13,8 @@ import Charts
 struct ConsistencyDetailView: View {
     @Query(sort: \Plan.order) private var plans: [Plan]
     @Query private var profiles: [UserProfile]
+    /// Only for the first-activity clamp: adherence itself is computed from doneDates.
+    @Query private var history: [HistoryEntry]
     @State private var window: RangeWindow = .twelveWeeks
 
     /// Read-only: the singletons are bootstrapped in `ReplogApp.init`, so a view body
@@ -21,9 +23,10 @@ struct ConsistencyDetailView: View {
     private var scheduledDays: Set<Weekday> { StreakEngine.scheduledDays(in: plans) }
 
     private var weeks: [AdherenceWeek] {
-        ProgressAnalytics.adherence(scheduledDays: scheduledDays,
-                                    doneDates: doneDates,
-                                    weeks: window.weeks ?? 104)
+        ProgressAnalytics.adherence(
+            scheduledDays: scheduledDays, doneDates: doneDates,
+            weeks: window.weeks ?? 104,
+            since: ProgressAnalytics.firstActivity(history: history, doneDates: doneDates))
     }
 
     private var streak: Int {

@@ -157,16 +157,23 @@ struct MuscleDetailView: View {
     @Environment(\.exerciseCatalog) private var catalog
     @Query private var history: [HistoryEntry]
     @Query private var settingsRows: [AppSettings]
+    @State private var window: RangeWindow = .twelveWeeks
 
     private var units: Units { settingsRows.first?.units ?? .kg }
 
-    /// History entries whose exercise trains this muscle as a primary.
+    /// History entries whose exercise trains this muscle as a primary, within the window.
     private var relevant: [HistoryEntry] {
-        history.filter { catalog.exercise(id: $0.exId)?.primaryMuscles.contains(muscle) == true }
+        let cutoff = window.days.flatMap {
+            Calendar.current.date(byAdding: .day, value: -$0, to: Date())
+        } ?? .distantPast
+        return history.filter {
+            $0.date >= cutoff && catalog.exercise(id: $0.exId)?.primaryMuscles.contains(muscle) == true
+        }
     }
 
     private var buckets: [WeekBucket] {
-        ProgressAnalytics.weekBuckets(history: relevant, weeks: 12)
+        ProgressAnalytics.trimmingLeadingEmptyWeeks(
+            ProgressAnalytics.weekBuckets(history: relevant, weeks: window.weeks ?? 104))
     }
 
     /// This muscle's exercises ranked by window volume.
@@ -183,6 +190,7 @@ struct MuscleDetailView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
                 Text(muscle.displayName).font(.screenTitle).foregroundStyle(Color.textPrimary)
+                RangePicker(selection: $window)
 
                 if relevant.isEmpty {
                     ProgressEmptyCard(text: "Nothing logged for this muscle yet.")

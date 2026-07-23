@@ -19,7 +19,8 @@ struct VolumeDetailView: View {
     private var units: Units { settingsRows.first?.units ?? .kg }
 
     private var buckets: [WeekBucket] {
-        ProgressAnalytics.weekBuckets(history: history, weeks: window.weeks ?? 104)
+        ProgressAnalytics.trimmingLeadingEmptyWeeks(
+            ProgressAnalytics.weekBuckets(history: history, weeks: window.weeks ?? 104))
     }
 
     private var mix: RepRangeMix {

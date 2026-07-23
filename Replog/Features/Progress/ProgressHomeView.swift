@@ -126,7 +126,8 @@ struct ProgressHomeView: View {
     // MARK: Volume
 
     private var weekBuckets: [WeekBucket] {
-        ProgressAnalytics.weekBuckets(history: history, weeks: 8)
+        ProgressAnalytics.trimmingLeadingEmptyWeeks(
+            ProgressAnalytics.weekBuckets(history: history, weeks: 8))
     }
 
     private var volumeCard: some View {
@@ -177,8 +178,9 @@ struct ProgressHomeView: View {
     // MARK: Consistency
 
     private var consistencyCard: some View {
-        let weeks = ProgressAnalytics.adherence(scheduledDays: scheduledDays,
-                                                doneDates: doneDates, weeks: 4)
+        let weeks = ProgressAnalytics.adherence(
+            scheduledDays: scheduledDays, doneDates: doneDates, weeks: 4,
+            since: ProgressAnalytics.firstActivity(history: history, doneDates: doneDates))
         let scheduled = weeks.reduce(0) { $0 + $1.scheduled }
         let done = weeks.reduce(0) { $0 + $1.done }
         let percent = scheduled == 0 ? 0 : Int((Double(done) / Double(scheduled) * 100).rounded())
