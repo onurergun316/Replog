@@ -17,7 +17,6 @@ struct CalendarView: View {
     /// navigation bar for its Back button.
     var embedded: Bool = false
 
-    @Environment(\.modelContext) private var context
     @Environment(\.exerciseCatalog) private var catalog
     @Query private var profiles: [UserProfile]
     @Query private var history: [HistoryEntry]
@@ -37,7 +36,9 @@ struct CalendarView: View {
     @State private var armTicks = 0
 
     private var cal: Calendar { Self.calendar }
-    private var profile: UserProfile { profiles.first ?? context.userProfile() }
+    /// Read-only: the singletons are bootstrapped in `ReplogApp.init`, so a view body
+    /// never needs to create one — and must not, mid-render.
+    private var doneDates: [Date] { profiles.first?.doneDates ?? [] }
     private var units: Units { settingsRows.first?.units ?? .kg }
     private var today: Date { cal.startOfDay(for: Date()) }
     private var scheduledDays: Set<Weekday> { StreakEngine.scheduledDays(in: plans) }
@@ -49,7 +50,7 @@ struct CalendarView: View {
     @State private var dayTotals: [Date: DayTotals] = [:]
 
     private func refreshCaches() {
-        doneDays = CalendarStats.doneDays(doneDates: profile.doneDates,
+        doneDays = CalendarStats.doneDays(doneDates: doneDates,
                                           history: history, calendar: cal)
         dayTotals = CalendarStats.dayTotals(history: history, calendar: cal)
     }
@@ -57,10 +58,10 @@ struct CalendarView: View {
     // Live-computed like Today/Profile — the stored profile.streak only refreshes on
     // finish/launch, so it can lag a missed day and contradict the other tabs.
     private var streak: Int {
-        StreakEngine.workoutStreak(scheduledDays: scheduledDays, doneDates: profile.doneDates)
+        StreakEngine.workoutStreak(scheduledDays: scheduledDays, doneDates: doneDates)
     }
     private var weekStreak: Int {
-        StreakEngine.weekStreak(scheduledDays: scheduledDays, doneDates: profile.doneDates)
+        StreakEngine.weekStreak(scheduledDays: scheduledDays, doneDates: doneDates)
     }
 
     /// Months the pager can reach: three years back, one year forward.
@@ -80,7 +81,7 @@ struct CalendarView: View {
         }
         .onAppear { refreshCaches() }
         .onChange(of: history.count) { refreshCaches() }
-        .onChange(of: profile.doneDates.count) { refreshCaches() }
+        .onChange(of: doneDates.count) { refreshCaches() }
         .sensoryFeedback(.impact(weight: .medium), trigger: armTicks)
         .sensoryFeedback(.selection, trigger: selection)
     }
@@ -220,7 +221,7 @@ struct CalendarView: View {
         if selection.count > 1 {
             RangeSummaryView(
                 summary: CalendarStats.summary(selection: selection,
-                                               doneDates: profile.doneDates,
+                                               doneDates: doneDates,
                                                history: history, calendar: cal),
                 units: units, catalog: catalog,
                 onClear: { withAnimation(.snappy) { selection = [] } }

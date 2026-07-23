@@ -11,25 +11,26 @@ import SwiftData
 import Charts
 
 struct ConsistencyDetailView: View {
-    @Environment(\.modelContext) private var context
     @Query(sort: \Plan.order) private var plans: [Plan]
     @Query private var profiles: [UserProfile]
     @State private var window: RangeWindow = .twelveWeeks
 
-    private var profile: UserProfile { profiles.first ?? context.userProfile() }
+    /// Read-only: the singletons are bootstrapped in `ReplogApp.init`, so a view body
+    /// never needs to create one — and must not, mid-render.
+    private var doneDates: [Date] { profiles.first?.doneDates ?? [] }
     private var scheduledDays: Set<Weekday> { StreakEngine.scheduledDays(in: plans) }
 
     private var weeks: [AdherenceWeek] {
         ProgressAnalytics.adherence(scheduledDays: scheduledDays,
-                                    doneDates: profile.doneDates,
+                                    doneDates: doneDates,
                                     weeks: window.weeks ?? 104)
     }
 
     private var streak: Int {
-        StreakEngine.workoutStreak(scheduledDays: scheduledDays, doneDates: profile.doneDates)
+        StreakEngine.workoutStreak(scheduledDays: scheduledDays, doneDates: doneDates)
     }
     private var weekStreak: Int {
-        StreakEngine.weekStreak(scheduledDays: scheduledDays, doneDates: profile.doneDates)
+        StreakEngine.weekStreak(scheduledDays: scheduledDays, doneDates: doneDates)
     }
 
     var body: some View {

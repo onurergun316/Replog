@@ -12,7 +12,6 @@ import SwiftData
 import Charts
 
 struct ProgressHomeView: View {
-    @Environment(\.modelContext) private var context
     @Environment(\.exerciseCatalog) private var catalog
     @Query private var history: [HistoryEntry]
     @Query(sort: \Plan.order) private var plans: [Plan]
@@ -21,7 +20,9 @@ struct ProgressHomeView: View {
     @Query private var settingsRows: [AppSettings]
     @State private var path = NavigationPath()
 
-    private var profile: UserProfile { profiles.first ?? context.userProfile() }
+    /// Read-only: `ReplogApp.init` bootstraps the singletons at launch precisely so no
+    /// view body mutates the context. Fetch-or-create here would re-introduce that.
+    private var doneDates: [Date] { profiles.first?.doneDates ?? [] }
     private var units: Units { settingsRows.first?.units ?? .kg }
     private var scheduledDays: Set<Weekday> { StreakEngine.scheduledDays(in: plans) }
 
@@ -177,7 +178,7 @@ struct ProgressHomeView: View {
 
     private var consistencyCard: some View {
         let weeks = ProgressAnalytics.adherence(scheduledDays: scheduledDays,
-                                                doneDates: profile.doneDates, weeks: 4)
+                                                doneDates: doneDates, weeks: 4)
         let scheduled = weeks.reduce(0) { $0 + $1.scheduled }
         let done = weeks.reduce(0) { $0 + $1.done }
         let percent = scheduled == 0 ? 0 : Int((Double(done) / Double(scheduled) * 100).rounded())
