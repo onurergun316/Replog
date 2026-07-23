@@ -194,13 +194,15 @@ struct ProgressHomeView: View {
             caption: "of scheduled days, 4 weeks",
             route: .consistency
         ) {
+            // Spans from zero so the done bar overlays the scheduled track rather than
+            // stacking on top of it (see ConsistencyDetailView).
             Chart(weeks) { week in
                 BarMark(x: .value("Week", week.weekStart, unit: .weekOfYear),
-                        y: .value("Scheduled", week.scheduled))
+                        yStart: .value("From", 0), yEnd: .value("Scheduled", week.scheduled))
                     .foregroundStyle(Color.track)
                     .cornerRadius(3)
                 BarMark(x: .value("Week", week.weekStart, unit: .weekOfYear),
-                        y: .value("Done", week.done))
+                        yStart: .value("From", 0), yEnd: .value("Done", week.done))
                     .foregroundStyle(Color.accent)
                     .cornerRadius(3)
             }

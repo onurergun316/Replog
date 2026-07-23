@@ -78,13 +78,16 @@ struct ConsistencyDetailView: View {
     }
 
     private var adherenceChart: some View {
+        // Explicit spans from zero, NOT two y-values: Swift Charts stacks marks sharing
+        // an x position, so a perfect 3-of-3 week drew as a bar of height 6 that looked
+        // half empty. The done bar overlays the scheduled track instead.
         Chart(weeks) { week in
             BarMark(x: .value("Week", week.weekStart, unit: .weekOfYear),
-                    y: .value("Scheduled", week.scheduled))
+                    yStart: .value("From", 0), yEnd: .value("Scheduled", week.scheduled))
                 .foregroundStyle(Color.track)
                 .cornerRadius(3)
             BarMark(x: .value("Week", week.weekStart, unit: .weekOfYear),
-                    y: .value("Done", week.done))
+                    yStart: .value("From", 0), yEnd: .value("Done", week.done))
                 .foregroundStyle(Color.accent)
                 .cornerRadius(3)
         }
