@@ -19,6 +19,20 @@ struct StrengthDetailView: View {
 
     private var load: LoadResolver { .live(catalog: catalog, bodyweightEntries: bodyweightEntries) }
 
+    /// The trained-exercise list is only useful if you can find a movement in it.
+    @State private var filter = ProgressListFilter()
+
+    private var filtered: [ExerciseProgress] {
+        let ids = filter.apply(to: ranked.map(\.exId), catalog: { catalog.exercise(id: $0) })
+        let keep = Set(ids)
+        return ranked.filter { keep.contains($0.exId) }
+    }
+
+    private var muscleOptions: [Muscle] {
+        ProgressListFilter.availableMuscles(in: ranked.map(\.exId),
+                                            catalog: { catalog.exercise(id: $0) })
+    }
+
     private var cutoff: Date? {
         window.days.flatMap { Calendar.current.date(byAdding: .day, value: -$0, to: Date()) }
     }
@@ -78,8 +92,17 @@ struct StrengthDetailView: View {
                     }
 
                     SectionHeader(title: "All Exercises")
+                    SearchField(placeholder: "Search your exercises", text: $filter.query)
+                    if muscleOptions.count > 1 {
+                        FilterChipRow(options: muscleOptions.map { ($0, $0.displayName) },
+                                      selection: $filter.muscle,
+                                      allLabel: "All muscles")
+                    }
+                    if filtered.isEmpty {
+                        ProgressEmptyCard(text: "No trained exercises match.")
+                    } else {
                     VStack(spacing: 0) {
-                        ForEach(Array(ranked.enumerated()), id: \.element.exId) { index, progress in
+                        ForEach(Array(filtered.enumerated()), id: \.element.exId) { index, progress in
                             if index > 0 { Divider() }
                             NavigationLink(value: ExerciseRef(id: progress.exId)) {
                                 HStack(spacing: 10) {
@@ -108,6 +131,7 @@ struct StrengthDetailView: View {
                     }
                     .padding(.horizontal, 14)
                     .cardSurface()
+                    }
                 }
             }
             .padding(20)

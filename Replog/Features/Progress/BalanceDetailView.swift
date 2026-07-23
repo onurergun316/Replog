@@ -166,6 +166,8 @@ struct MuscleDetailView: View {
     private var units: Units { settingsRows.first?.units ?? .kg }
     private var load: LoadResolver { .live(catalog: catalog, bodyweightEntries: bodyweightEntries) }
 
+    @State private var query = ""
+
     /// History entries whose exercise trains this muscle as a primary, within the window.
     private var relevant: [HistoryEntry] {
         let cutoff = window.days.flatMap {
@@ -190,6 +192,13 @@ struct MuscleDetailView: View {
             .sorted { $0.volume > $1.volume }
     }
 
+    private var filteredExercises: [(exId: String, volume: Double)] {
+        let filter = ProgressListFilter(query: query)
+        let keep = Set(filter.apply(to: rankedExercises.map(\.exId),
+                                    catalog: { catalog.exercise(id: $0) }))
+        return rankedExercises.filter { keep.contains($0.exId) }
+    }
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
@@ -211,8 +220,12 @@ struct MuscleDetailView: View {
                     .cardSurface()
 
                     SectionHeader(title: "Exercises")
+                    // The muscle is fixed by context here, so a name search is enough.
+                    if rankedExercises.count > 6 {
+                        SearchField(placeholder: "Search exercises", text: $query)
+                    }
                     VStack(spacing: 0) {
-                        ForEach(Array(rankedExercises.enumerated()), id: \.element.exId) { index, item in
+                        ForEach(Array(filteredExercises.enumerated()), id: \.element.exId) { index, item in
                             if index > 0 { Divider() }
                             NavigationLink(value: ExerciseRef(id: item.exId)) {
                                 HStack(spacing: 10) {
