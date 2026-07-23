@@ -12,19 +12,22 @@ import SwiftData
 import Charts
 
 struct VolumeDetailView: View {
+    @Environment(\.exerciseCatalog) private var catalog
     @Query private var history: [HistoryEntry]
     @Query private var settingsRows: [AppSettings]
+    @Query(sort: \BodyweightEntry.date) private var bodyweightEntries: [BodyweightEntry]
     @State private var window: RangeWindow = .twelveWeeks
 
     private var units: Units { settingsRows.first?.units ?? .kg }
+    private var load: LoadResolver { .live(catalog: catalog, bodyweightEntries: bodyweightEntries) }
 
     private var buckets: [WeekBucket] {
         ProgressAnalytics.trimmingLeadingEmptyWeeks(
-            ProgressAnalytics.weekBuckets(history: history, weeks: window.weeks ?? 104))
+            ProgressAnalytics.weekBuckets(history: history, weeks: window.weeks ?? 104, load: load))
     }
 
     private var mix: RepRangeMix {
-        ProgressAnalytics.repRangeMix(history: history, days: window.days ?? 730)
+        ProgressAnalytics.repRangeMix(history: history, days: window.days ?? 730, load: load)
     }
 
     var body: some View {

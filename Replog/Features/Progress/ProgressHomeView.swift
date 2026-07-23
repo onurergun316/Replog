@@ -25,6 +25,8 @@ struct ProgressHomeView: View {
     private var doneDates: [Date] { profiles.first?.doneDates ?? [] }
     private var units: Units { settingsRows.first?.units ?? .kg }
     private var scheduledDays: Set<Weekday> { StreakEngine.scheduledDays(in: plans) }
+    /// Credits bodyweight movements at their share of the athlete's weight.
+    private var load: LoadResolver { .live(catalog: catalog, bodyweightEntries: bodyweightEntries) }
 
     var body: some View {
         NavigationStack(path: $path) {
@@ -131,7 +133,7 @@ struct ProgressHomeView: View {
 
     private var weekBuckets: [WeekBucket] {
         ProgressAnalytics.trimmingLeadingEmptyWeeks(
-            ProgressAnalytics.weekBuckets(history: history, weeks: 8))
+            ProgressAnalytics.weekBuckets(history: history, weeks: 8, load: load))
     }
 
     private var volumeCard: some View {
@@ -158,7 +160,8 @@ struct ProgressHomeView: View {
 
     private var muscleShares: [MuscleShare] {
         ProgressAnalytics.muscleShares(history: history, days: 28,
-                                       muscles: { catalog.exercise(id: $0)?.primaryMuscles ?? [] })
+                                       muscles: { catalog.exercise(id: $0)?.primaryMuscles ?? [] },
+                                       load: load)
     }
 
     private var balanceCard: some View {

@@ -15,13 +15,16 @@ struct BalanceDetailView: View {
     @Environment(\.exerciseCatalog) private var catalog
     @Query private var history: [HistoryEntry]
     @Query private var settingsRows: [AppSettings]
+    @Query(sort: \BodyweightEntry.date) private var bodyweightEntries: [BodyweightEntry]
     @State private var window: RangeWindow = .fourWeeks
 
     private var units: Units { settingsRows.first?.units ?? .kg }
+    private var load: LoadResolver { .live(catalog: catalog, bodyweightEntries: bodyweightEntries) }
 
     private var shares: [MuscleShare] {
         ProgressAnalytics.muscleShares(history: history, days: window.days ?? 730,
-                                       muscles: { catalog.exercise(id: $0)?.primaryMuscles ?? [] })
+                                       muscles: { catalog.exercise(id: $0)?.primaryMuscles ?? [] },
+                                       load: load)
     }
 
     /// Push vs pull vs static volume within the window, from the catalog's force facet.
@@ -32,7 +35,7 @@ struct BalanceDetailView: View {
         var byForce: [Force: Double] = [:]
         for entry in history where entry.date >= cutoff {
             guard let force = catalog.exercise(id: entry.exId)?.force else { continue }
-            byForce[force, default: 0] += entry.sets.reduce(0.0) { $0 + $1.w * Double($1.r) }
+            byForce[force, default: 0] += load.volumeKg(entry)
         }
         return [("Push", byForce[.push] ?? 0), ("Pull", byForce[.pull] ?? 0),
                 ("Static", byForce[.static] ?? 0)].filter { $0.volume > 0 }
@@ -157,9 +160,11 @@ struct MuscleDetailView: View {
     @Environment(\.exerciseCatalog) private var catalog
     @Query private var history: [HistoryEntry]
     @Query private var settingsRows: [AppSettings]
+    @Query(sort: \BodyweightEntry.date) private var bodyweightEntries: [BodyweightEntry]
     @State private var window: RangeWindow = .twelveWeeks
 
     private var units: Units { settingsRows.first?.units ?? .kg }
+    private var load: LoadResolver { .live(catalog: catalog, bodyweightEntries: bodyweightEntries) }
 
     /// History entries whose exercise trains this muscle as a primary, within the window.
     private var relevant: [HistoryEntry] {
@@ -173,15 +178,14 @@ struct MuscleDetailView: View {
 
     private var buckets: [WeekBucket] {
         ProgressAnalytics.trimmingLeadingEmptyWeeks(
-            ProgressAnalytics.weekBuckets(history: relevant, weeks: window.weeks ?? 104))
+            ProgressAnalytics.weekBuckets(history: relevant, weeks: window.weeks ?? 104, load: load))
     }
 
     /// This muscle's exercises ranked by window volume.
     private var rankedExercises: [(exId: String, volume: Double)] {
         Dictionary(grouping: relevant, by: \.exId)
             .map { (exId: $0.key,
-                    volume: $0.value.reduce(0.0) { sum, e in
-                        sum + e.sets.reduce(0.0) { $0 + $1.w * Double($1.r) } })
+                    volume: $0.value.reduce(0.0) { sum, e in sum + load.volumeKg(e) })
             }
             .sorted { $0.volume > $1.volume }
     }
