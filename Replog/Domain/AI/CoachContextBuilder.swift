@@ -25,26 +25,37 @@ enum CoachContextBuilder {
         var totalVolume = 0.0
         var previousTotal = 0.0
         var hadPrevious = false
+        // Bodyweight work counts here too — otherwise the debrief tells an athlete who
+        // just did 60 push-ups that they moved nothing and beat no record.
+        let load = LoadResolver.live(catalog: catalog,
+                                     bodyweightEntries: context.bodyweightEntries())
+        let now = Date()
 
         for exercise in session.orderedExercises {
             let done = exercise.sets.filter(\.done)
             guard !done.isEmpty else { continue }
-            let top = done.max {
-                Formulas.e1rm(kg: $0.weightKg, reps: $0.reps) < Formulas.e1rm(kg: $1.weightKg, reps: $1.reps)
+            let recorded = done.map { RecordedSet(w: $0.weightKg, r: $0.reps) }
+            let effective = { (set: RecordedSet) in
+                load.kg(exId: exercise.exId, set: set, on: now)
+            }
+            let top = recorded.max {
+                Formulas.e1rm(kg: effective($0), reps: $0.r) < Formulas.e1rm(kg: effective($1), reps: $1.r)
             }!
-            let e1rm = Formulas.e1rmRounded(kg: top.weightKg, reps: top.reps)
+            let e1rm = Formulas.e1rmRounded(kg: effective(top), reps: top.r)
             let prior = context.history(forExercise: exercise.exId)
-            let priorBest = prior.map(\.e1rm).max() ?? 0
-            let volume = done.reduce(0.0) { $0 + $1.weightKg * Double($1.reps) }
+            let priorBest = prior.map { load.e1rm($0) }.max() ?? 0
+            let volume = recorded.reduce(0.0) {
+                $0 + load.volumeKg(exId: exercise.exId, set: $1, on: now)
+            }
             totalVolume += volume
             if let last = prior.max(by: { $0.date < $1.date }) {
-                previousTotal += last.sets.reduce(0.0) { $0 + $1.w * Double($1.r) }
+                previousTotal += load.volumeKg(last)
                 hadPrevious = true
             }
             lifts.append(FinishedLift(
                 exId: exercise.exId,
                 name: catalog.exercise(id: exercise.exId)?.name ?? ReportComposer.prettyName(exercise.exId),
-                topWeightKg: top.weightKg, topReps: top.reps, e1rm: e1rm,
+                topWeightKg: top.w, topReps: top.r, e1rm: e1rm,
                 isPR: e1rm > priorBest && priorBest > 0,   // first-ever session isn't a "PR"
                 volumeKg: volume))
         }

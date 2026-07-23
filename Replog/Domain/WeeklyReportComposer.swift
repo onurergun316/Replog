@@ -80,11 +80,15 @@ enum WeeklyReportComposer {
         bodyweightEntries: [BodyweightEntry],
         goal: Goal,
         units: Units,
+        load: LoadResolver? = nil,
         calendar: Calendar = .current
     ) -> Report? {
         guard let weekEnd = calendar.date(byAdding: .day, value: 7, to: weekStart) else { return nil }
         let week = weekStart..<weekEnd
 
+        // Defaulted in-body rather than as a default argument: default-argument
+        // expressions are evaluated outside the callee's actor isolation.
+        let resolver = load ?? .stored
         let inWeek = history.filter { week.contains($0.date) }
         var trainedDays = Set(doneDates.filter(week.contains).map { calendar.startOfDay(for: $0) })
         trainedDays.formUnion(inWeek.map { calendar.startOfDay(for: $0.date) })
@@ -104,7 +108,7 @@ enum WeeklyReportComposer {
         for entry in inWeek {
             let sets = entry.sets
             totalSets += sets.count
-            for set in sets { totalVolumeKg += set.w * Double(set.r) }
+            for set in sets { totalVolumeKg += resolver.volumeKg(exId: entry.exId, set: set, on: entry.date) }
         }
         let stats = WeekStats(
             daysTrained: trainedDays.count,
@@ -237,6 +241,7 @@ enum WeeklyReportComposer {
             bodyweightEntries: context.bodyweightEntries(),
             goal: profile.goal,
             units: context.appSettings().units,
+            load: .live(catalog: .shared, bodyweightEntries: context.bodyweightEntries()),
             calendar: calendar
         ) else { return nil }
 

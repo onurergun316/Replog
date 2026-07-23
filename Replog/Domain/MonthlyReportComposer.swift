@@ -74,11 +74,15 @@ enum MonthlyReportComposer {
         bodyweightEntries: [BodyweightEntry],
         goal: Goal,
         units: Units,
+        load: LoadResolver? = nil,
         calendar: Calendar = .current
     ) -> Report? {
         guard let monthEnd = calendar.date(byAdding: .month, value: 1, to: monthStart) else { return nil }
         let month = monthStart..<monthEnd
 
+        // Defaulted in-body rather than as a default argument: default-argument
+        // expressions are evaluated outside the callee's actor isolation.
+        let resolver = load ?? .stored
         let inMonth = history.filter { month.contains($0.date) }
         var trainedDays = Set(doneDates.filter(month.contains).map { calendar.startOfDay(for: $0) })
         trainedDays.formUnion(inMonth.map { calendar.startOfDay(for: $0.date) })
@@ -97,7 +101,7 @@ enum MonthlyReportComposer {
         for entry in inMonth {
             let sets = entry.sets
             totalSets += sets.count
-            for set in sets { totalVolumeKg += set.w * Double(set.r) }
+            for set in sets { totalVolumeKg += resolver.volumeKg(exId: entry.exId, set: set, on: entry.date) }
         }
         let stats = MonthStats(
             daysTrained: trainedDays.count,
@@ -223,6 +227,7 @@ enum MonthlyReportComposer {
             bodyweightEntries: context.bodyweightEntries(),
             goal: profile.goal,
             units: context.appSettings().units,
+            load: .live(catalog: .shared, bodyweightEntries: context.bodyweightEntries()),
             calendar: calendar
         ) else { return nil }
 
