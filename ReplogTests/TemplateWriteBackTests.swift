@@ -85,17 +85,48 @@ struct TemplateWriteBackTests {
         #expect(bench.orderedSets.map(\.reps) == [8, 8, 7])
     }
 
-    @Test func rpeCarriesForwardToo() throws {
+    @Test func theTargetRpeIsNotOverwrittenByHowHardItFelt() throws {
         let ctx = makeContext()
         let workout = seedWorkout(ctx, sets: 1)
         let session = SessionBuilder.start(workout: workout, into: ctx)
         let set = session.exercises.first!.orderedSets[0]
-        set.rpe = 10
+        set.rpe = 10                       // "that was everything I had"
+        set.weightKg = 60
         set.done = true
         try ctx.save()
 
         TemplateWriteBack.applyIfComplete(session: session, context: ctx)
-        #expect(workout.orderedItems[0].orderedSets[0].rpe == 10)
+
+        // The template's RPE is the program's *target*, not the athlete's *felt* effort.
+        // ProgressionEngine reads it to calibrate a starting-load estimate, so copying
+        // felt over target would permanently re-prescribe the workout as RPE 10.
+        let template = workout.orderedItems[0].orderedSets[0]
+        #expect(template.rpe == 8)
+        #expect(template.weightKg == 60)   // weight and reps still carry forward
+    }
+
+    @Test func aDeletedSetDoesNotShiftLaterSetsOntoTheWrongTemplate() throws {
+        let ctx = makeContext()
+        let workout = seedWorkout(ctx, sets: 3)
+        let item = workout.orderedItems[0]
+        item.orderedSets[0].weightKg = 40          // a light opener at order 0
+        let session = SessionBuilder.start(workout: workout, into: ctx)
+        let bench = session.exercises.first!
+
+        // The athlete swipes the opener away and logs the remaining two.
+        ctx.delete(bench.orderedSets[0])
+        try ctx.save()
+        for (set, kg) in zip(bench.orderedSets, [60.0, 62.5]) {
+            set.weightKg = kg; set.reps = 8; set.done = true
+        }
+        try ctx.save()
+
+        TemplateWriteBack.apply(session: session, to: workout, context: ctx)
+
+        // Matching on order, not array position: the surviving sets land on templates
+        // 1 and 2, and the deleted opener's template keeps its own numbers.
+        #expect(item.orderedSets.map(\.weightKg) == [40, 60, 62.5])
+        #expect(item.orderedSets[0].estimated)
     }
 
     // MARK: - Only a complete workout writes back

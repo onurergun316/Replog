@@ -93,13 +93,16 @@ struct StrengthDetailView: View {
 
                     SectionHeader(title: "All Exercises")
                     SearchField(placeholder: "Search your exercises", text: $filter.query)
-                    if muscleOptions.count > 1 {
+                    // Keep the chip row while a muscle is selected even if the window no
+                    // longer offers it — otherwise changing range hides the only control
+                    // that could clear the filter, stranding the athlete on an empty list.
+                    if muscleOptions.count > 1 || filter.muscle != nil {
                         FilterChipRow(options: muscleOptions.map { ($0, $0.displayName) },
                                       selection: $filter.muscle,
                                       allLabel: "All muscles")
                     }
                     if filtered.isEmpty {
-                        ProgressEmptyCard(text: "No trained exercises match.")
+                        ProgressEmptyCard(text: "No trained exercises match — clear the filters above.")
                     } else {
                     VStack(spacing: 0) {
                         ForEach(Array(filtered.enumerated()), id: \.element.exId) { index, progress in

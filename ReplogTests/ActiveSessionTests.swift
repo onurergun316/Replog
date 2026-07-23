@@ -181,7 +181,7 @@ struct ActiveSessionTests {
         let entry = try #require(ctx.history(forExercise: "Bench").first)
         #expect(entry.sessionId == session.id)
         #expect(entry.workoutId == workout.id)
-        #expect(entry.workoutName == "Day 5")
+        #expect(entry.workoutName == "Push Day")
         #expect(entry.planName == "PPL")
         #expect(entry.durationSeconds == 45 * 60)
     }

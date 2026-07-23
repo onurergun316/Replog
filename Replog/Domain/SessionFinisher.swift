@@ -40,8 +40,14 @@ enum SessionFinisher {
         for exercise in session.exercises {
             let doneSets = exercise.sets.filter(\.done)
             guard !doneSets.isEmpty else { continue }
+            // Reps break the tie. Every set of a bodyweight movement scores an estimated
+            // 1RM of zero (0 kg x anything), so ranking on that alone picked an arbitrary
+            // set — a 5-rep warm-up could be recorded as the top set of a 12-rep session,
+            // hiding a real personal record.
             let top = doneSets.max {
-                Formulas.e1rm(kg: $0.weightKg, reps: $0.reps) < Formulas.e1rm(kg: $1.weightKg, reps: $1.reps)
+                let a = Formulas.e1rm(kg: $0.weightKg, reps: $0.reps)
+                let b = Formulas.e1rm(kg: $1.weightKg, reps: $1.reps)
+                return a == b ? $0.reps < $1.reps : a < b
             }!
             let prior = context.history(forExercise: exercise.exId)
             let entry = HistoryEntry(

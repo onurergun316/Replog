@@ -16,6 +16,7 @@ struct ExerciseDetailView: View {
     @Environment(\.modelContext) private var context
     @Query(sort: \Plan.order) private var plans: [Plan]
     @Query(sort: \BodyweightEntry.date) private var bodyweightEntries: [BodyweightEntry]
+    @Query private var settingsRows: [AppSettings]
     let exId: String
     var showProgress: Bool = false
 
@@ -45,7 +46,8 @@ struct ExerciseDetailView: View {
                     } else {
                         ProgressContent(exId: exId, history: context.history(forExercise: exId),
                                         load: .live(catalog: catalog,
-                                                    bodyweightEntries: bodyweightEntries))
+                                                    bodyweightEntries: bodyweightEntries),
+                                        units: settingsRows.first?.units ?? .kg)
                     }
                 } else {
                     Text("Exercise not found").foregroundStyle(Color.text2)
@@ -233,6 +235,7 @@ private struct ProgressContent: View {
     let exId: String
     let history: [HistoryEntry]
     let load: LoadResolver
+    let units: Units
 
     private var progress: ExerciseProgress {
         ProgressAggregator.summarize(exId: exId, history: history, load: load)
@@ -264,7 +267,7 @@ private struct ProgressContent: View {
 
     /// One session is a picture of a session, not a trend: a single point plotted against
     /// a hidden ordinal axis was the "chart shows nothing" the athlete saw after two
-    /// workouts. Below three sessions this renders that session's sets instead.
+    /// workouts. With only one session logged this renders that session's sets instead.
     @ViewBuilder
     private var chart: some View {
         if sorted.count < 2, let latest = sorted.last {
@@ -302,8 +305,10 @@ private struct ProgressContent: View {
     private func setBreakdownChart(_ entry: HistoryEntry) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             Chart(Array(entry.sets.enumerated()), id: \.offset) { index, set in
+                // Effective load, so a bodyweight session renders real bars rather than
+                // three zero-height ones — the exact blankness this chart exists to fix.
                 BarMark(x: .value("Set", "\(index + 1)"),
-                        y: .value("Weight", set.w))
+                        y: .value("Load", load.kg(exId: exId, set: set, on: entry.date)))
                     .foregroundStyle(Color.accent)
                     .cornerRadius(3)
                     .annotation(position: .top) {
@@ -323,7 +328,8 @@ private struct ProgressContent: View {
         VStack(alignment: .leading, spacing: 10) {
             SectionHeader(title: "Session Log")
             ForEach(history.sorted { $0.date > $1.date }) { entry in
-                SessionLogRow(entry: entry, isExpanded: expandedEntryID == entry.id) {
+                SessionLogRow(entry: entry, load: load, units: units,
+                              isExpanded: expandedEntryID == entry.id) {
                     withAnimation(.snappy) {
                         expandedEntryID = expandedEntryID == entry.id ? nil : entry.id
                     }
@@ -338,8 +344,32 @@ private struct ProgressContent: View {
 /// set count. Tapping expands the set-by-set breakdown — detail on request, never dumped.
 private struct SessionLogRow: View {
     let entry: HistoryEntry
+    let load: LoadResolver
+    let units: Units
     let isExpanded: Bool
     let onTap: () -> Void
+
+    private var e1rm: Int { load.e1rm(entry) }
+
+    /// "60kg × 8 top set · 3 sets", or reps-only for a bodyweight movement — printing
+    /// "0kg × 8" beside a three-digit estimated 1RM read as a contradiction.
+    private var topSetLine: String {
+        let count = "\(entry.sets.count) set\(entry.sets.count == 1 ? "" : "s")"
+        guard entry.topR > 0 else { return count }
+        if entry.topW > 0 {
+            return "\(Formulas.formatWeight(kg: entry.topW, units: units)) × \(entry.topR) top set · \(count)"
+        }
+        return load.isTimedHold(exId: entry.exId)
+            ? "\(entry.topR)s best hold · \(count)"
+            : "\(entry.topR) reps top set · \(count)"
+    }
+
+    private func setLine(_ set: RecordedSet) -> String {
+        if set.w > 0 {
+            return "\(Formulas.formatWeight(kg: set.w, units: units)) × \(set.r)"
+        }
+        return load.isTimedHold(exId: entry.exId) ? "\(set.r)s" : "\(set.r) reps"
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -348,10 +378,10 @@ private struct SessionLogRow: View {
                     Text(entry.date, format: .dateTime.month().day())
                         .font(.rounded(13, .heavy)).foregroundStyle(Color.text2)
                         .frame(width: 60, alignment: .leading)
-                    Text("\(Int(entry.topW))kg × \(entry.topR) top set · \(entry.sets.count) set\(entry.sets.count == 1 ? "" : "s")")
+                    Text(topSetLine)
                         .font(.rounded(13, .semibold)).foregroundStyle(Color.textPrimary)
                     Spacer()
-                    Text("\(entry.e1rm)").font(.rounded(13, .black))
+                    Text("\(e1rm)").font(.rounded(13, .black))
                         .foregroundStyle(Color.accent).tabularNumbers()
                     Image(systemName: "chevron.down")
                         .font(.system(size: 11, weight: .bold)).foregroundStyle(Color.text3)
@@ -369,7 +399,7 @@ private struct SessionLogRow: View {
                             Text("Set \(index + 1)")
                                 .font(.rounded(12, .bold)).foregroundStyle(Color.text3)
                                 .frame(width: 60, alignment: .leading)
-                            Text("\(Int(set.w)) kg × \(set.r)")
+                            Text(setLine(set))
                                 .font(.rounded(12, .semibold)).foregroundStyle(Color.textPrimary)
                                 .tabularNumbers()
                             Spacer()

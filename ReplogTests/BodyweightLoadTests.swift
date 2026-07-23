@@ -67,8 +67,18 @@ struct BodyweightLoadTests {
         #expect(Set(holds.map(\.id)) == [
             "Plank", "Side_Bridge", "Isometric_Chest_Squeezes",
             "Isometric_Neck_Exercise_-_Front_And_Back",
-            "Isometric_Neck_Exercise_-_Sides", "Prone_Manual_Hamstring",
+            "Isometric_Neck_Exercise_-_Sides",
         ])
+    }
+
+    @Test func aPartnerResistedRepExerciseIsNotAHold() throws {
+        // The catalog marks Prone Manual Hamstring `static` (no concentric direction),
+        // but it is performed for reps. Treating it as a hold would label its reps as
+        // seconds in the live log and credit a third of its real tonnage.
+        let prone = try exercise("Prone_Manual_Hamstring")
+        #expect(prone.force == .static)
+        #expect(!BodyweightLoad.isTimedHold(prone))
+        #expect(BodyweightLoad.repEquivalents(reps: 12, exercise: prone) == 12)
     }
 
     @Test func aHoldsSecondsBecomeRepEquivalents() throws {

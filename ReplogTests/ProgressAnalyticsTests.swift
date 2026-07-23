@@ -232,14 +232,21 @@ struct ProgressAnalyticsTests {
     }
 
     @Test func prEventsSkipTheBaselineAndFlagOnlyNewBests() {
+        // Keyed on the top set: PRs are recomputed over effective load so a bodyweight
+        // lift can set one, which means the stored `e1rm` field is no longer read.
+        func session(_ day: Date, topW: Double) -> HistoryEntry {
+            HistoryEntry(exId: "Bench", date: day, topW: topW, topR: 5,
+                         e1rm: Formulas.e1rmRounded(kg: topW, reps: 5), sets: [])
+        }
         let history = [
-            entry(date(2026, 5, 1), sets: [], e1rm: 100),   // baseline, not a PR
-            entry(date(2026, 5, 8), sets: [], e1rm: 110),   // PR
-            entry(date(2026, 5, 15), sets: [], e1rm: 105),  // below best — not a PR
-            entry(date(2026, 5, 22), sets: [], e1rm: 120),  // PR
+            session(date(2026, 5, 1), topW: 100),    // baseline, not a PR
+            session(date(2026, 5, 8), topW: 110),    // PR
+            session(date(2026, 5, 15), topW: 105),   // below best — not a PR
+            session(date(2026, 5, 22), topW: 120),   // PR
         ]
         let events = ProgressAnalytics.prEvents(history: history)
-        #expect(events.map(\.e1rm) == [120, 110])            // newest first
+        #expect(events.map(\.e1rm) == [Formulas.e1rmRounded(kg: 120, reps: 5),
+                                       Formulas.e1rmRounded(kg: 110, reps: 5)])  // newest first
     }
 
     @Test func relativeStrengthNeedsAPositiveBodyweight() {

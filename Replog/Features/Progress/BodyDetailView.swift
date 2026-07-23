@@ -21,6 +21,9 @@ struct BodyDetailView: View {
 
     private var units: Units { settingsRows.first?.units ?? .kg }
     private var snapshot: BodyweightSnapshot? { BodyweightTracker.snapshot(entries: bodyweightEntries) }
+    /// Relative strength is the one reading that is meaningless without bodyweight credit:
+    /// a pull-up would otherwise rank at 0.00x BW.
+    private var load: LoadResolver { .live(catalog: catalog, bodyweightEntries: bodyweightEntries) }
 
     private var windowed: [BodyweightEntry] {
         guard let days = window.days,
@@ -90,7 +93,7 @@ struct BodyDetailView: View {
     private var relativeStrengthSection: some View {
         let bw = snapshot?.currentKg
         let top = Dictionary(grouping: history, by: \.exId)
-            .map { ProgressAggregator.summarize(exId: $0.key, history: $0.value) }
+            .map { ProgressAggregator.summarize(exId: $0.key, history: $0.value, load: load) }
             .sorted { $0.bestE1rm > $1.bestE1rm }
             .prefix(3)
         return Group {

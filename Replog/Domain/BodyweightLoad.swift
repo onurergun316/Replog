@@ -45,8 +45,15 @@ enum BodyweightLoad {
     /// Read from the catalog's own `static` force facet rather than a hand-kept list, so
     /// a re-tuned catalog can't silently drift out of sync.
     static func isTimedHold(_ exercise: Exercise) -> Bool {
-        isBodyweightLoaded(exercise) && exercise.force == .static
+        guard isBodyweightLoaded(exercise), exercise.force == .static else { return false }
+        // The catalog's `static` facet means "no concentric direction", which is not quite
+        // the same as "measured in seconds". Prone Manual Hamstring is a partner-resisted
+        // exercise performed for reps; labelling it a hold would print SECONDS in the live
+        // log and divide its tonnage by three.
+        return !repBasedStaticExIds.contains(exercise.id)
     }
+
+    private static let repBasedStaticExIds: Set<String> = ["Prone_Manual_Hamstring"]
 
     // MARK: - The factor
 

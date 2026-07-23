@@ -221,9 +221,14 @@ struct MuscleDetailView: View {
 
                     SectionHeader(title: "Exercises")
                     // The muscle is fixed by context here, so a name search is enough.
-                    if rankedExercises.count > 6 {
+                    // Kept visible while a query is active even if the list has shrunk
+                    // below the threshold, so the field that filtered it can also clear it.
+                    if rankedExercises.count > 6 || !query.isEmpty {
                         SearchField(placeholder: "Search exercises", text: $query)
                     }
+                    if filteredExercises.isEmpty {
+                        ProgressEmptyCard(text: "No exercises match — clear the search above.")
+                    } else {
                     VStack(spacing: 0) {
                         ForEach(Array(filteredExercises.enumerated()), id: \.element.exId) { index, item in
                             if index > 0 { Divider() }
@@ -249,6 +254,7 @@ struct MuscleDetailView: View {
                     }
                     .padding(.horizontal, 14)
                     .cardSurface()
+                    }
                 }
             }
             .padding(20)

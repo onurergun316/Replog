@@ -38,24 +38,33 @@ enum TemplateWriteBack {
         return result
     }
 
-    /// Copies every completed set's weight/reps/RPE onto the template at the same
+    /// Copies every completed set's weight and reps onto the template at the same
     /// position, clearing the `estimated` flag because these are now real logged values.
     /// Sets logged beyond the prescription (the athlete tapped "Add set") append new
     /// templates; templates beyond the sets logged are left untouched.
+    ///
+    /// **RPE is deliberately not written back.** The template's RPE is the *target*
+    /// effort the program prescribed; the logged RPE is how hard the set actually felt.
+    /// Copying felt over target would silently re-prescribe the workout — and
+    /// `ProgressionEngine` reads that target to calibrate a first-session load estimate
+    /// (`SessionBuilder` passes it as `targetRPE`), so an honest "that was a 10" would
+    /// permanently redefine the program as an RPE-10 program.
+    ///
+    /// Matching is by `LoggedSet.order`, not array position, so a set deleted mid-session
+    /// doesn't slide every later set onto the wrong template.
     ///
     /// Returns the number of template sets written, for tests and telemetry.
     @discardableResult
     static func apply(session: ActiveSession, to workout: Workout, context: ModelContext) -> Int {
         var written = 0
         for (exercise, item) in matches(sessionExercises: session.exercises, items: workout.items) {
-            let templates = item.orderedSets
+            let templatesByOrder = Dictionary(item.orderedSets.map { ($0.order, $0) },
+                                              uniquingKeysWith: { first, _ in first })
             var nextOrder = Reordering.nextOrder(after: item.sets)
-            for (index, logged) in exercise.orderedSets.enumerated() where logged.done {
-                if index < templates.count {
-                    let template = templates[index]
+            for logged in exercise.orderedSets where logged.done {
+                if let template = templatesByOrder[logged.order] {
                     template.weightKg = logged.weightKg
                     template.reps = logged.reps
-                    template.rpe = logged.rpe
                     template.estimated = false
                 } else {
                     let template = SetTemplate(weightKg: logged.weightKg, reps: logged.reps,
