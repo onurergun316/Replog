@@ -103,20 +103,26 @@ struct ConsistencyDetailView: View {
             VStack(spacing: 0) {
                 ForEach(Array(active.reversed().enumerated()), id: \.element.id) { index, week in
                     if index > 0 { Divider() }
-                    HStack {
-                        Text(week.weekStart, format: .dateTime.month(.abbreviated).day())
-                            .font(.rounded(13, .heavy)).foregroundStyle(Color.textPrimary)
-                            .frame(width: 64, alignment: .leading)
-                        Spacer()
-                        Text("\(week.done)/\(week.scheduled) scheduled days")
-                            .font(.rounded(12, .semibold))
-                            .foregroundStyle(week.done >= week.scheduled ? Color.up : Color.text2)
-                        if week.done >= week.scheduled {
-                            Image(systemName: "checkmark.circle.fill")
-                                .font(.system(size: 13)).foregroundStyle(Color.up)
+                    NavigationLink(value: ProgressRoute.week(week.weekStart)) {
+                        HStack {
+                            Text(week.weekStart, format: .dateTime.month(.abbreviated).day())
+                                .font(.rounded(13, .heavy)).foregroundStyle(Color.textPrimary)
+                                .frame(width: 64, alignment: .leading)
+                            Spacer()
+                            Text("\(week.done)/\(week.scheduled) scheduled days")
+                                .font(.rounded(12, .semibold))
+                                .foregroundStyle(week.done >= week.scheduled ? Color.up : Color.text2)
+                            if week.done >= week.scheduled {
+                                Image(systemName: "checkmark.circle.fill")
+                                    .font(.system(size: 13)).foregroundStyle(Color.up)
+                            }
+                            Image(systemName: "chevron.right")
+                                .font(.system(size: 11, weight: .bold)).foregroundStyle(Color.text3)
                         }
+                        .padding(.vertical, 10)
+                        .contentShape(Rectangle())
                     }
-                    .padding(.vertical, 10)
+                    .buttonStyle(.plain)
                 }
             }
             .padding(.horizontal, 14)
