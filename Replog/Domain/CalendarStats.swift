@@ -49,7 +49,10 @@ struct DayTotals: Equatable {
 enum CalendarStats {
 
     /// Per-day totals over the whole history — decode each entry's sets exactly once.
+    /// `load` decides what each set was worth (see `LoadResolver`); the default reads
+    /// the stored weight.
     static func dayTotals(history: [HistoryEntry],
+                          load: LoadResolver = .stored,
                           calendar: Calendar = .current) -> [Date: DayTotals] {
         var totals: [Date: DayTotals] = [:]
         for entry in history {
@@ -58,7 +61,7 @@ enum CalendarStats {
             for set in entry.sets {
                 t.sets += 1
                 t.reps += set.r
-                t.volumeKg += set.w * Double(set.r)
+                t.volumeKg += load.volumeKg(exId: entry.exId, set: set, on: entry.date)
             }
             totals[day] = t
         }
@@ -85,6 +88,7 @@ enum CalendarStats {
     /// Totals + averages across `selection`. Days are binary training days; totals sum
     /// every logged set on the selected days.
     static func summary(selection: Set<Date>, doneDates: [Date], history: [HistoryEntry],
+                        load: LoadResolver = .stored,
                         calendar: Calendar = .current) -> RangeSummary {
         let selectedDays = Set(selection.map { calendar.startOfDay(for: $0) })
         let done = doneDays(doneDates: doneDates, history: history, calendar: calendar)
@@ -102,11 +106,13 @@ enum CalendarStats {
             for set in entry.sets {
                 result.totalSets += 1
                 result.totalReps += set.r
-                result.totalVolumeKg += set.w * Double(set.r)
+                result.totalVolumeKg += load.volumeKg(exId: entry.exId, set: set, on: entry.date)
             }
-            if entry.e1rm > (result.bestLift?.e1rm ?? 0) {
+            // Ranked on effective load, so a bodyweight lift can hold "best" honestly.
+            let e1rm = load.e1rm(entry)
+            if e1rm > (result.bestLift?.e1rm ?? 0) {
                 result.bestLift = BestLift(exId: entry.exId, weightKg: entry.topW,
-                                           reps: entry.topR, e1rm: entry.e1rm)
+                                           reps: entry.topR, e1rm: e1rm)
             }
         }
         result.distinctExercises = exIds.count
@@ -131,10 +137,11 @@ enum CalendarStats {
 
     /// Convenience over raw data (tests, one-shot callers) — derives both caches.
     static func monthTotals(month: Date, doneDates: [Date], history: [HistoryEntry],
+                            load: LoadResolver = .stored,
                             calendar: Calendar = .current) -> (workouts: Int, volumeKg: Double) {
         monthTotals(month: month,
                     doneDays: doneDays(doneDates: doneDates, history: history, calendar: calendar),
-                    dayTotals: dayTotals(history: history, calendar: calendar),
+                    dayTotals: dayTotals(history: history, load: load, calendar: calendar),
                     calendar: calendar)
     }
 }

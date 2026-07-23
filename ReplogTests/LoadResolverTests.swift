@@ -133,4 +133,74 @@ struct LoadResolverTests {
         // Epley over 60 "reps" would triple the load; 20 rep-equivalents is the honest read.
         #expect(r.e1rm(e) == Formulas.e1rmRounded(kg: 48, reps: 20))
     }
+
+    // MARK: - The seam reaches the aggregators
+
+    @Test func weeklyVolumeCreditsBodyweightOnlyWhenAskedTo() {
+        let r = resolver([(day(-1), 80)])
+        let history = [entry("Pushups", [(0, 20), (0, 20)], on: day(0))]
+
+        let raw = ProgressAnalytics.weekBuckets(history: history, weeks: 1)
+        let credited = ProgressAnalytics.weekBuckets(history: history, weeks: 1, load: r)
+
+        // The bug, then the fix: 40 push-ups used to be a week of zero work.
+        #expect(raw.last?.volumeKg == 0)
+        #expect(credited.last?.volumeKg == 0.64 * 80 * 40)
+        #expect(raw.last?.sets == credited.last?.sets)   // set counting is unaffected
+    }
+
+    @Test func aCalisthenicsAthleteGetsAMuscleBreakdownAtAll() {
+        let r = resolver([(day(-1), 80)])
+        let history = [entry("Pushups", [(0, 20)], on: day(0)),
+                       entry("Pullups", [(0, 10)], on: day(0))]
+        let muscles: (String) -> [Muscle] = { catalog.exercise(id: $0)?.primaryMuscles ?? [] }
+
+        // Shares normalise over total volume, so an all-zero history has no shares at all —
+        // the donut was empty for anyone training without equipment.
+        #expect(ProgressAnalytics.muscleShares(history: history, days: 7, muscles: muscles).isEmpty)
+
+        let shares = ProgressAnalytics.muscleShares(history: history, days: 7,
+                                                    muscles: muscles, load: r)
+        #expect(Set(shares.map(\.muscle)) == [.chest, .lats])
+        #expect(abs(shares.reduce(0) { $0 + $1.share } - 1) < 0.0001)
+    }
+
+    @Test func repRangeMixDropsTimedHolds() {
+        let r = resolver([(day(-1), 80)])
+        let history = [entry("Plank", [(0, 45)], on: day(0)),
+                       entry("Barbell_Bench_Press_-_Medium_Grip", [(100, 5)], on: day(0))]
+
+        // Without the resolver a 45-second plank counts as a 45-rep endurance set.
+        #expect(ProgressAnalytics.repRangeMix(history: history, days: 7).endurance == 1)
+
+        let mix = ProgressAnalytics.repRangeMix(history: history, days: 7, load: r)
+        #expect(mix.endurance == 0)
+        #expect(mix.strength == 1)
+        #expect(mix.total == 1)
+    }
+
+    @Test func calendarDayTotalsCreditBodyweight() {
+        let r = resolver([(day(-1), 80)])
+        let history = [entry("Pushups", [(0, 20)], on: day(0))]
+        let totals = CalendarStats.dayTotals(history: history, load: r)
+        let today = Calendar.current.startOfDay(for: day(0))
+
+        #expect(totals[today]?.volumeKg == 0.64 * 80 * 20)
+        #expect(totals[today]?.reps == 20)
+    }
+
+    @Test func rangeSummaryRanksBestLiftOnEffectiveLoad() {
+        let r = resolver([(day(-1), 80)])
+        // A 10-rep pull-up (0.95 x 80 = 76 kg) outranks a 20 kg dumbbell curl.
+        let history = [entry("Pullups", [(0, 10)], on: day(0)),
+                       entry("Dumbbell_Bicep_Curl", [(20, 10)], on: day(0))]
+        let selection: Set<Date> = [Calendar.current.startOfDay(for: day(0))]
+
+        let raw = CalendarStats.summary(selection: selection, doneDates: [], history: history)
+        let credited = CalendarStats.summary(selection: selection, doneDates: [],
+                                             history: history, load: r)
+
+        #expect(raw.bestLift?.exId == "Dumbbell_Bicep_Curl")   // pull-up scored 0
+        #expect(credited.bestLift?.exId == "Pullups")
+    }
 }

@@ -61,6 +61,14 @@ struct LoadResolver {
         self.bodyweight = bodyweight
     }
 
+    /// The production resolver, built from the two things every Progress screen already
+    /// has to hand: the catalog and the bodyweight series.
+    @MainActor
+    static func live(catalog: ExerciseCatalog, bodyweightEntries: [BodyweightEntry]) -> LoadResolver {
+        LoadResolver(exercise: { catalog.exercise(id: $0) },
+                     bodyweight: BodyweightResolver(entries: bodyweightEntries))
+    }
+
     /// Kilograms this set actually moved: the bodyweight share plus whatever was added,
     /// or simply the stored weight for barbell/machine work.
     func kg(exId: String, set: RecordedSet, on date: Date) -> Double {
@@ -74,6 +82,13 @@ struct LoadResolver {
     func repEquivalents(exId: String, set: RecordedSet) -> Double {
         guard let exercise else { return Double(set.r) }
         return BodyweightLoad.repEquivalents(reps: set.r, exercise: exercise(exId))
+    }
+
+    /// Whether this exercise's logged "reps" are really seconds. Rep-range statistics
+    /// have to drop these — a 45-second plank is not a set of 45.
+    func isTimedHold(exId: String) -> Bool {
+        guard let exercise, let match = exercise(exId) else { return false }
+        return BodyweightLoad.isTimedHold(match)
     }
 
     /// One set's contribution to tonnage.

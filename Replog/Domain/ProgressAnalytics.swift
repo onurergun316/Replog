@@ -57,7 +57,11 @@ enum ProgressAnalytics {
 
     /// The last `weeks` Sunday-anchored weeks (oldest → newest, empty weeks included),
     /// with volume, set count, and distinct training days per week.
+    ///
+    /// `load` decides what each set was worth; the default reads the stored weight, so a
+    /// caller that hasn't opted in sees exactly the numbers it always did.
     static func weekBuckets(history: [HistoryEntry], weeks: Int,
+                            load: LoadResolver = .stored,
                             today: Date = Date(),
                             calendar: Calendar = .current) -> [WeekBucket] {
         guard weeks > 0,
@@ -74,7 +78,7 @@ enum ProgressAnalytics {
             guard let week = StreakEngine.startOfWeek(for: entry.date, calendar: calendar),
                   var bucket = buckets[week] else { continue }
             for set in entry.sets {
-                bucket.volumeKg += set.w * Double(set.r)
+                bucket.volumeKg += load.volumeKg(exId: entry.exId, set: set, on: entry.date)
                 bucket.sets += 1
             }
             buckets[week] = bucket
@@ -92,6 +96,7 @@ enum ProgressAnalytics {
     /// normalized over the attributed total so they always sum to 1.
     static func muscleShares(history: [HistoryEntry], days: Int,
                              muscles: (String) -> [Muscle],
+                             load: LoadResolver = .stored,
                              today: Date = Date(),
                              calendar: Calendar = .current) -> [MuscleShare] {
         guard let cutoff = calendar.date(byAdding: .day, value: -days,
@@ -100,7 +105,7 @@ enum ProgressAnalytics {
         for entry in history where entry.date >= cutoff {
             let targets = muscles(entry.exId)
             guard !targets.isEmpty else { continue }
-            let entryVolume = entry.sets.reduce(0.0) { $0 + $1.w * Double($1.r) }
+            let entryVolume = load.volumeKg(entry)
             for muscle in targets { volume[muscle, default: 0] += entryVolume }
         }
         let total = volume.values.reduce(0, +)
@@ -111,13 +116,18 @@ enum ProgressAnalytics {
     }
 
     /// Sets by rep range over the last `days` days.
+    ///
+    /// Timed holds are excluded: their stored "reps" are seconds, so a 45-second plank
+    /// would otherwise land in the endurance bucket as a set of 45.
     static func repRangeMix(history: [HistoryEntry], days: Int,
+                            load: LoadResolver = .stored,
                             today: Date = Date(),
                             calendar: Calendar = .current) -> RepRangeMix {
         var mix = RepRangeMix()
         guard let cutoff = calendar.date(byAdding: .day, value: -days,
                                          to: calendar.startOfDay(for: today)) else { return mix }
         for entry in history where entry.date >= cutoff {
+            guard !load.isTimedHold(exId: entry.exId) else { continue }
             for set in entry.sets {
                 switch set.r {
                 case ..<6: mix.strength += 1
