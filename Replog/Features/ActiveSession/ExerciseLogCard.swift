@@ -15,6 +15,12 @@ struct ExerciseLogCard: View {
     let muscle: String
     let imageName: String?
     let units: Units
+    /// True when the movement is loaded by the athlete's own bodyweight. The weight
+    /// column becomes a "BW" chip and typing a load is optional — the stepper in the
+    /// expanded editor is for *added* weight only (dip belt, vest).
+    var isBodyweight: Bool = false
+    /// True when the logged count is seconds rather than reps (plank and friends).
+    var isTimedHold: Bool = false
     @Binding var expandedSetID: UUID?
     let onCheck: (LoggedSet) -> Void
     let onInfo: () -> Void
@@ -43,6 +49,7 @@ struct ExerciseLogCard: View {
             ForEach(Array(exercise.orderedSets.enumerated()), id: \.element.id) { index, set in
                 SetLogRow(
                     index: index + 1, set: set, units: units,
+                    isBodyweight: isBodyweight, isTimedHold: isTimedHold,
                     isEditing: expandedSetID == set.id,
                     onToggleEdit: { toggleEdit(set) },
                     onCheck: { onCheck(set) },
@@ -82,7 +89,7 @@ struct ExerciseLogCard: View {
     private var columnHeader: some View {
         HStack {
             Text("SET").frame(width: 30, alignment: .leading)
-            Text("WEIGHT & REPS")
+            Text(isBodyweight ? (isTimedHold ? "HOLD" : "REPS") : "WEIGHT & REPS")
             Spacer()
             Text("RPE")
         }
@@ -163,6 +170,8 @@ private struct SetLogRow: View {
     let index: Int
     @Bindable var set: LoggedSet
     let units: Units
+    var isBodyweight: Bool = false
+    var isTimedHold: Bool = false
     let isEditing: Bool
     let onToggleEdit: () -> Void
     let onCheck: () -> Void
@@ -170,6 +179,8 @@ private struct SetLogRow: View {
     let onChange: () -> Void
 
     @State private var dragOffset: CGFloat = 0
+    /// Whether the added-load stepper has been revealed on a bodyweight movement.
+    @State private var showAddedWeight = false
     private let revealWidth: CGFloat = 72
 
     var body: some View {
@@ -205,32 +216,56 @@ private struct SetLogRow: View {
         HStack(spacing: 8) {
             Text("\(index)").font(.rounded(13, .heavy)).foregroundStyle(Color.text3).frame(width: 22)
 
-            // Weight + trend — struck through when the set is done.
-            valueButton {
-                HStack(spacing: 2) {
-                    Text(Formulas.formatWeight(kg: set.weightKg, units: units, includeUnit: false))
-                        .font(.rounded(16, .heavy)).foregroundStyle(Color.textPrimary).tabularNumbers()
-                        .strikethrough(set.done, color: Color.up)
-                    Text(units.label).font(.rounded(9, .bold)).foregroundStyle(Color.text3)
-                    if !set.done { TrendArrow(trend: set.weightTrend) }
-                    // A computed starting estimate — flagged until a finished session
-                    // replaces it with the athlete's own logged numbers.
-                    if !set.done, set.estimated {
-                        Text("est")
-                            .font(.rounded(8, .black)).foregroundStyle(Color.accent)
-                            .padding(.horizontal, 4).padding(.vertical, 1)
+            // Load. A bodyweight movement has no weight to type, so it reads as a "BW"
+            // chip and only mentions kilograms once a belt or vest is actually logged.
+            if isBodyweight {
+                valueButton {
+                    HStack(spacing: 3) {
+                        Text("BW")
+                            .font(.rounded(11, .black)).foregroundStyle(Color.accent)
+                            .padding(.horizontal, 6).padding(.vertical, 2)
                             .background(Capsule().fill(Color.accentSoft))
-                            .accessibilityLabel("suggested starting weight")
+                            .strikethrough(set.done, color: Color.up)
+                        if set.weightKg > 0 {
+                            Text("+\(Formulas.formatWeight(kg: set.weightKg, units: units))")
+                                .font(.rounded(14, .heavy)).foregroundStyle(Color.textPrimary)
+                                .tabularNumbers()
+                                .strikethrough(set.done, color: Color.up)
+                        }
                     }
                 }
+                .accessibilityLabel(set.weightKg > 0
+                                    ? "bodyweight plus \(Formulas.formatWeight(kg: set.weightKg, units: units))"
+                                    : "bodyweight")
+            } else {
+                // Weight + trend — struck through when the set is done.
+                valueButton {
+                    HStack(spacing: 2) {
+                        Text(Formulas.formatWeight(kg: set.weightKg, units: units, includeUnit: false))
+                            .font(.rounded(16, .heavy)).foregroundStyle(Color.textPrimary).tabularNumbers()
+                            .strikethrough(set.done, color: Color.up)
+                        Text(units.label).font(.rounded(9, .bold)).foregroundStyle(Color.text3)
+                        if !set.done { TrendArrow(trend: set.weightTrend) }
+                        // A computed starting estimate — flagged until a finished session
+                        // replaces it with the athlete's own logged numbers.
+                        if !set.done, set.estimated {
+                            Text("est")
+                                .font(.rounded(8, .black)).foregroundStyle(Color.accent)
+                                .padding(.horizontal, 4).padding(.vertical, 1)
+                                .background(Capsule().fill(Color.accentSoft))
+                                .accessibilityLabel("suggested starting weight")
+                        }
+                    }
+                }
+                Text("×").font(.rounded(13, .bold)).foregroundStyle(Color.text3)
             }
-            Text("×").font(.rounded(13, .bold)).foregroundStyle(Color.text3)
-            // Reps + trend
+            // Reps — or seconds, for a hold.
             valueButton {
                 HStack(spacing: 2) {
                     Text("\(set.reps)").font(.rounded(16, .heavy)).foregroundStyle(Color.textPrimary).tabularNumbers()
                         .strikethrough(set.done, color: Color.up)
-                    Text("reps").font(.rounded(9, .bold)).foregroundStyle(Color.text3)
+                    Text(isTimedHold ? "sec" : "reps")
+                        .font(.rounded(9, .bold)).foregroundStyle(Color.text3)
                     if !set.done { TrendArrow(trend: set.repsTrend) }
                 }
             }
@@ -258,21 +293,37 @@ private struct SetLogRow: View {
     private var inlineEditor: some View {
         VStack(spacing: 12) {
             HStack(spacing: 16) {
-                editorColumn(title: "WEIGHT (\(units.label))",
-                             value: Formulas.formatWeight(kg: set.weightKg, units: units, includeUnit: false),
-                             keyboard: .decimalPad,
-                             onMinus: { set.weightKg = max(0, set.weightKg - Formulas.weightStepKg(units: units)); onChange() },
-                             onPlus: { set.weightKg += Formulas.weightStepKg(units: units); onChange() },
-                             onCommit: { raw in
-                                 if let kg = Formulas.parseWeightKg(raw, units: units) { set.weightKg = kg; onChange() }
-                             })
-                editorColumn(title: "REPS", value: "\(set.reps)",
+                // Bodyweight movements keep the load column out of the way until the
+                // athlete asks for it — most sets are just reps.
+                if !isBodyweight || showAddedWeight || set.weightKg > 0 {
+                    editorColumn(title: isBodyweight ? "ADDED (\(units.label))" : "WEIGHT (\(units.label))",
+                                 value: Formulas.formatWeight(kg: set.weightKg, units: units, includeUnit: false),
+                                 keyboard: .decimalPad,
+                                 onMinus: { set.weightKg = max(0, set.weightKg - Formulas.weightStepKg(units: units)); onChange() },
+                                 onPlus: { set.weightKg += Formulas.weightStepKg(units: units); onChange() },
+                                 onCommit: { raw in
+                                     if let kg = Formulas.parseWeightKg(raw, units: units) { set.weightKg = kg; onChange() }
+                                 })
+                }
+                editorColumn(title: isTimedHold ? "SECONDS" : "REPS", value: "\(set.reps)",
                              keyboard: .numberPad,
                              onMinus: { set.reps = max(1, set.reps - 1); onChange() },
                              onPlus: { set.reps += 1; onChange() },
                              onCommit: { raw in
                                  if let reps = Formulas.parseReps(raw) { set.reps = reps; onChange() }
                              })
+            }
+            if isBodyweight, !showAddedWeight, set.weightKg == 0 {
+                Button { withAnimation(.snappy) { showAddedWeight = true } } label: {
+                    HStack(spacing: 5) {
+                        Image(systemName: "plus.circle.fill").font(.system(size: 12, weight: .bold))
+                        Text("Add weight").font(.rounded(13, .heavy))
+                    }
+                    .foregroundStyle(Color.accent)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .buttonStyle(.plain)
+                .accessibilityHint("For a dip belt or weighted vest")
             }
             VStack(spacing: 6) {
                 Text("RPE — how hard did it feel?").font(.rounded(11, .bold)).foregroundStyle(Color.text3)

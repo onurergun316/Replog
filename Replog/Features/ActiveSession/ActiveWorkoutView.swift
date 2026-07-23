@@ -48,12 +48,15 @@ struct ActiveWorkoutView: View {
             ScrollView {
                 LazyVStack(spacing: 12) {
                     ForEach(session.orderedExercises) { exercise in
+                        let entry = catalog.exercise(id: exercise.exId)
                         ExerciseLogCard(
                             exercise: exercise,
-                            name: catalog.exercise(id: exercise.exId)?.name ?? exercise.exId,
-                            muscle: catalog.exercise(id: exercise.exId)?.primaryMuscles.first?.displayName ?? "",
-                            imageName: catalog.exercise(id: exercise.exId)?.imageResourceNames.first,
+                            name: entry?.name ?? exercise.exId,
+                            muscle: entry?.primaryMuscles.first?.displayName ?? "",
+                            imageName: entry?.imageResourceNames.first,
                             units: settings.units,
+                            isBodyweight: entry.map { BodyweightLoad.isBodyweightLoaded($0) } ?? false,
+                            isTimedHold: entry.map { BodyweightLoad.isTimedHold($0) } ?? false,
                             expandedSetID: $expandedSetID,
                             onCheck: { toggle($0, in: exercise) },
                             onInfo: { detailRef = ExerciseRef(id: exercise.exId) },
