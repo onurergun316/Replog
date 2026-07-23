@@ -39,6 +39,8 @@ struct CalendarView: View {
     /// Read-only: the singletons are bootstrapped in `ReplogApp.init`, so a view body
     /// never needs to create one — and must not, mid-render.
     private var doneDates: [Date] { profiles.first?.doneDates ?? [] }
+    /// Credits bodyweight movements at their share of the athlete's weight.
+    private var load: LoadResolver { .live(catalog: catalog, bodyweightEntries: bodyweightEntries) }
     private var units: Units { settingsRows.first?.units ?? .kg }
     private var today: Date { cal.startOfDay(for: Date()) }
     private var scheduledDays: Set<Weekday> { StreakEngine.scheduledDays(in: plans) }
@@ -52,7 +54,7 @@ struct CalendarView: View {
     private func refreshCaches() {
         doneDays = CalendarStats.doneDays(doneDates: doneDates,
                                           history: history, calendar: cal)
-        dayTotals = CalendarStats.dayTotals(history: history, calendar: cal)
+        dayTotals = CalendarStats.dayTotals(history: history, load: load, calendar: cal)
     }
 
     // Live-computed like Today/Profile — the stored profile.streak only refreshes on
@@ -222,7 +224,7 @@ struct CalendarView: View {
             RangeSummaryView(
                 summary: CalendarStats.summary(selection: selection,
                                                doneDates: doneDates,
-                                               history: history, calendar: cal),
+                                               history: history, load: load, calendar: cal),
                 units: units, catalog: catalog,
                 onClear: { withAnimation(.snappy) { selection = [] } }
             )
