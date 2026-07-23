@@ -58,9 +58,12 @@ enum CalendarStats {
         for entry in history {
             let day = calendar.startOfDay(for: entry.date)
             var t = totals[day, default: DayTotals()]
+            // A hold's stored count is seconds, not repetitions — adding it to a rep
+            // total would report "180 reps" for three one-minute planks.
+            let isHold = load.isTimedHold(exId: entry.exId)
             for set in entry.sets {
                 t.sets += 1
-                t.reps += set.r
+                if !isHold { t.reps += set.r }
                 t.volumeKg += load.volumeKg(exId: entry.exId, set: set, on: entry.date)
             }
             totals[day] = t
@@ -79,10 +82,11 @@ enum CalendarStats {
 
     /// One day's history entries, heaviest first (the day-detail list).
     static func entries(on day: Date, history: [HistoryEntry],
+                        load: LoadResolver = .stored,
                         calendar: Calendar = .current) -> [HistoryEntry] {
         history
             .filter { calendar.isDate($0.date, inSameDayAs: day) }
-            .sorted { $0.e1rm > $1.e1rm }
+            .sorted { load.e1rm($0) > load.e1rm($1) }
     }
 
     /// Totals + averages across `selection`. Days are binary training days; totals sum
@@ -103,9 +107,10 @@ enum CalendarStats {
         var exIds = Set<String>()
         for entry in entries {
             exIds.insert(entry.exId)
+            let isHold = load.isTimedHold(exId: entry.exId)
             for set in entry.sets {
                 result.totalSets += 1
-                result.totalReps += set.r
+                if !isHold { result.totalReps += set.r }
                 result.totalVolumeKg += load.volumeKg(exId: entry.exId, set: set, on: entry.date)
             }
             // Ranked on effective load, so a bodyweight lift can hold "best" honestly.

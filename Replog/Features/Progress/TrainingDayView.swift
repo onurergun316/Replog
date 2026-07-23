@@ -28,7 +28,10 @@ struct TrainingDayView: View {
         ProgressAnalytics.sessions(history: onDay)
     }
 
-    private var totalVolume: Double { onDay.reduce(0.0) { $0 + load.volumeKg($1) } }
+    private var totalVolume: Double {
+        let load = self.load
+        return onDay.reduce(0.0) { $0 + load.volumeKg($1) }
+    }
     private var totalSets: Int { onDay.reduce(0) { $0 + $1.sets.count } }
 
     var body: some View {
@@ -56,6 +59,7 @@ struct TrainingDayView: View {
     }
 
     private var summaryRow: some View {
+        let load = self.load
         let split = (external: onDay.reduce(0.0) { $0 + load.externalVolumeKg($1) },
                      bodyweight: onDay.reduce(0.0) { $0 + load.bodyweightVolumeKg($1) })
         return VStack(spacing: 10) {

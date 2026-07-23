@@ -47,7 +47,8 @@ struct WeekDetailView: View {
     }
 
     private var totalVolume: Double {
-        inWeek.reduce(0.0) { $0 + load.volumeKg($1) }
+        let load = self.load
+        return inWeek.reduce(0.0) { $0 + load.volumeKg($1) }
     }
 
     var body: some View {

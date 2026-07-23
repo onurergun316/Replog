@@ -33,6 +33,7 @@ struct BalanceDetailView: View {
             Calendar.current.date(byAdding: .day, value: -$0, to: Date())
         } ?? .distantPast
         var byForce: [Force: Double] = [:]
+        let load = self.load
         for entry in history where entry.date >= cutoff {
             guard let force = catalog.exercise(id: entry.exId)?.force else { continue }
             byForce[force, default: 0] += load.volumeKg(entry)
@@ -185,7 +186,10 @@ struct MuscleDetailView: View {
 
     /// This muscle's exercises ranked by window volume.
     private var rankedExercises: [(exId: String, volume: Double)] {
-        Dictionary(grouping: relevant, by: \.exId)
+        // Hoisted: `load` is a computed property, so reading it inside the reduce would
+        // rebuild the resolver (re-sorting the whole bodyweight series) once per entry.
+        let load = self.load
+        return Dictionary(grouping: relevant, by: \.exId)
             .map { (exId: $0.key,
                     volume: $0.value.reduce(0.0) { sum, e in sum + load.volumeKg(e) })
             }

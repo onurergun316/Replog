@@ -19,6 +19,7 @@ struct DayDetailView: View {
     let bodyweight: Double?
     let units: Units
     let catalog: ExerciseCatalog
+    var load: LoadResolver = .stored
 
     private var isToday: Bool { Calendar.current.isDateInToday(day) }
 
@@ -40,7 +41,7 @@ struct DayDetailView: View {
                     }
                     ForEach(Array(entries.enumerated()), id: \.element.id) { index, entry in
                         if index > 0 { Divider().padding(.vertical, 10) }
-                        EntryRow(entry: entry, units: units, catalog: catalog)
+                        EntryRow(entry: entry, units: units, catalog: catalog, load: load)
                     }
                     if let bodyweight {
                         if !entries.isEmpty { Divider().padding(.vertical, 10) }
@@ -81,6 +82,7 @@ private struct EntryRow: View {
     let entry: HistoryEntry
     let units: Units
     let catalog: ExerciseCatalog
+    let load: LoadResolver
 
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
@@ -94,16 +96,24 @@ private struct EntryRow: View {
             }
             Spacer(minLength: 8)
             VStack(alignment: .trailing, spacing: 2) {
-                Text("\(entry.e1rm)").font(.rounded(15, .black)).foregroundStyle(Color.accent)
+                Text("\(load.e1rm(entry))").font(.rounded(15, .black)).foregroundStyle(Color.accent)
                     .tabularNumbers()
                 Text("est. 1RM").font(.rounded(10, .bold)).foregroundStyle(Color.text3)
             }
         }
     }
 
+    /// "60×8 · 60×8", or reps/seconds alone for a bodyweight movement — "0×8" beside a
+    /// three-digit estimated 1RM read as a contradiction.
     private var setsLine: String {
-        entry.sets
-            .map { "\(Formulas.formatWeight(kg: $0.w, units: units, includeUnit: false))×\($0.r)" }
+        let isHold = load.isTimedHold(exId: entry.exId)
+        return entry.sets
+            .map { set in
+                if set.w > 0 {
+                    return "\(Formulas.formatWeight(kg: set.w, units: units, includeUnit: false))×\(set.r)"
+                }
+                return isHold ? "\(set.r)s" : "\(set.r) reps"
+            }
             .joined(separator: " · ")
     }
 }

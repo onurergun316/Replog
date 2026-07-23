@@ -232,9 +232,9 @@ struct CalendarView: View {
             DayDetailView(
                 day: focusedDay,
                 isDone: doneDays.contains(focusedDay),
-                entries: CalendarStats.entries(on: focusedDay, history: history, calendar: cal),
+                entries: CalendarStats.entries(on: focusedDay, history: history, load: load, calendar: cal),
                 bodyweight: bodyweight(on: focusedDay),
-                units: units, catalog: catalog
+                units: units, catalog: catalog, load: load
             )
         }
     }
