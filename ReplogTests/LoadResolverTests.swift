@@ -189,6 +189,31 @@ struct LoadResolverTests {
         #expect(totals[today]?.reps == 20)
     }
 
+    @Test func loadSplitSeparatesPlatesFromBody() {
+        let r = resolver([(day(-1), 80)])
+        let history = [
+            entry("Barbell_Bench_Press_-_Medium_Grip", [(100, 5)], on: day(0)),  // 500 external
+            entry("Pushups", [(0, 20)], on: day(0)),                             // 0.64*80*20 bodyweight
+            entry("Pullups", [(10, 5)], on: day(0)),                             // 50 external + 76*5 body
+        ]
+        let split = ProgressAnalytics.loadSplit(history: history, days: 7, load: r)
+
+        let expectedBodyweight: Double = (0.64 * 80 * 20) + (76 * 5)
+        #expect(split.externalKg == 550)
+        #expect(split.bodyweightKg == expectedBodyweight)
+        // The split must reconstruct the blended total exactly — no double counting.
+        let blended = history.reduce(0.0) { $0 + r.volumeKg($1) }
+        #expect(abs(split.externalKg + split.bodyweightKg - blended) < 0.0001)
+    }
+
+    @Test func loadSplitIsAllExternalWithoutBodyweightWork() {
+        let r = resolver([(day(-1), 80)])
+        let history = [entry("Barbell_Bench_Press_-_Medium_Grip", [(100, 5)], on: day(0))]
+        let split = ProgressAnalytics.loadSplit(history: history, days: 7, load: r)
+        #expect(split.bodyweightKg == 0)
+        #expect(split.externalKg == 500)
+    }
+
     @Test func rangeSummaryRanksBestLiftOnEffectiveLoad() {
         let r = resolver([(day(-1), 80)])
         // A 10-rep pull-up (0.95 x 80 = 76 kg) outranks a 20 kg dumbbell curl.
