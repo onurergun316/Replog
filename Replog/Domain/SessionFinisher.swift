@@ -25,7 +25,10 @@ enum SessionFinisher {
     /// Persists history for every exercise with at least one completed set. Only a *fully
     /// completed* workout counts toward the streaks and the lifetime total: a partial finish
     /// still saves progress (history) but does not mark the scheduled day done, so the
-    /// schedule-aware streak can break. Always recomputes both streaks, then deletes the session.
+    /// schedule-aware streak can break. A fully completed workout also writes its logged
+    /// weights/reps back onto the plan's templates (`TemplateWriteBack`), so the next
+    /// session starts from what was actually lifted. Always recomputes both streaks, then
+    /// deletes the session.
     @discardableResult
     static func finish(_ session: ActiveSession, profile: UserProfile,
                        context: ModelContext, date: Date = Date()) -> Summary {
@@ -58,6 +61,9 @@ enum SessionFinisher {
         }
 
         if isComplete {
+            // The plan's templates are the athlete's current working numbers, not a frozen
+            // prescription: what was just lifted is what the next session starts from.
+            TemplateWriteBack.applyIfComplete(session: session, context: context)
             profile.totalWorkouts += 1
             profile.doneDates = StreakCalendar.recordingCompletion(date, into: profile.doneDates)
         }

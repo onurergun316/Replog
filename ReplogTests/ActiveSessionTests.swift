@@ -136,6 +136,48 @@ struct ActiveSessionTests {
         #expect(profile.doneDates.isEmpty)               // day not marked complete
     }
 
+    @Test func finishCarriesLoggedValuesOntoThePlan() throws {
+        let ctx = makeContext()
+        let workout = seedWorkout(ctx)
+        let fixedDay = Date()
+        workout.day = Weekday.from(fixedDay)
+        let session = SessionBuilder.start(workout: workout, into: ctx)
+        let profile = ctx.userProfile()
+
+        // The athlete lifted heavier and lower-rep than the plan's 60/70 x 10.
+        let bench = session.orderedExercises.first { $0.exId == "Bench" }!
+        bench.orderedSets[0].weightKg = 80; bench.orderedSets[0].reps = 5
+        bench.orderedSets[1].weightKg = 85; bench.orderedSets[1].reps = 3
+        session.exercises.forEach { $0.sets.forEach { $0.done = true } }
+        try ctx.save()
+
+        SessionFinisher.finish(session, profile: profile, context: ctx, date: fixedDay)
+        try ctx.save()
+
+        let templates = workout.orderedItems.first { $0.exId == "Bench" }!.orderedSets
+        #expect(templates.map(\.weightKg) == [80, 85])
+        #expect(templates.map(\.reps) == [5, 3])
+    }
+
+    @Test func partialFinishLeavesThePlanUnchanged() throws {
+        let ctx = makeContext()
+        let workout = seedWorkout(ctx)
+        let session = SessionBuilder.start(workout: workout, into: ctx)
+        let profile = ctx.userProfile()
+
+        // Only Bench logged; Press untouched → the workout is not complete.
+        let bench = session.orderedExercises.first { $0.exId == "Bench" }!
+        bench.orderedSets.forEach { $0.weightKg = 999; $0.done = true }
+
+        SessionFinisher.finish(session, profile: profile, context: ctx, date: Date())
+        try ctx.save()
+
+        // History is still saved (see partialFinishSavesHistoryButDoesNotCountTheDay),
+        // but a half-done workout is not evidence the prescription changed.
+        let templates = workout.orderedItems.first { $0.exId == "Bench" }!.orderedSets
+        #expect(templates.map(\.weightKg) == [60, 70])
+    }
+
     @Test func sessionInheritsPerExerciseRestFromPlan() throws {
         let ctx = makeContext()
         let workout = seedWorkout(ctx)
