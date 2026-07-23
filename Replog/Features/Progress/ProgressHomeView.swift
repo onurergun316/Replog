@@ -19,13 +19,14 @@ struct ProgressHomeView: View {
     @Query private var profiles: [UserProfile]
     @Query(sort: \BodyweightEntry.date) private var bodyweightEntries: [BodyweightEntry]
     @Query private var settingsRows: [AppSettings]
+    @State private var path = NavigationPath()
 
     private var profile: UserProfile { profiles.first ?? context.userProfile() }
     private var units: Units { settingsRows.first?.units ?? .kg }
     private var scheduledDays: Set<Weekday> { StreakEngine.scheduledDays(in: plans) }
 
     var body: some View {
-        NavigationStack {
+        NavigationStack(path: $path) {
             ScrollView {
                 VStack(alignment: .leading, spacing: 14) {
                     VStack(alignment: .leading, spacing: 2) {
@@ -53,16 +54,14 @@ struct ProgressHomeView: View {
             }
             .background(Color.bg.ignoresSafeArea())
             .toolbar(.hidden, for: .navigationBar)
-            .navigationDestination(for: ExerciseRef.self) { ref in
-                ExerciseDetailView(exId: ref.id, showProgress: true)
-            }
+            .progressNavigationDestinations()
         }
     }
 
     // MARK: Calendar
 
     private var calendarCard: some View {
-        NavigationLink { CalendarView(embedded: true) } label: {
+        NavigationLink(value: ProgressRoute.calendar) {
             HStack(spacing: 12) {
                 Image(systemName: "calendar")
                     .font(.system(size: 16, weight: .bold)).foregroundStyle(Color.accent)
@@ -105,7 +104,8 @@ struct ProgressHomeView: View {
                 eyebrow: "Strength",
                 headline: "\(top.bestE1rm) est. 1RM",
                 caption: "\(catalog.exercise(id: top.exId)?.name ?? top.exId)"
-                    + (recentPRCount > 0 ? " · \(recentPRCount) PR\(recentPRCount == 1 ? "" : "s") this month" : "")
+                    + (recentPRCount > 0 ? " · \(recentPRCount) PR\(recentPRCount == 1 ? "" : "s") this month" : ""),
+                route: .strength
             ) {
                 Chart(Array(top.series.suffix(20).enumerated()), id: \.offset) { index, value in
                     LineMark(x: .value("Session", index), y: .value("1RM", value))
@@ -118,7 +118,7 @@ struct ProgressHomeView: View {
                 }
                 .chartXAxis(.hidden).chartYAxis(.hidden)
                 .frame(height: 72)
-            } destination: { StrengthDetailView() }
+            }
         }
     }
 
@@ -134,7 +134,8 @@ struct ProgressHomeView: View {
         return DashboardCard(
             eyebrow: "Volume",
             headline: Formulas.formatWeight(kg: thisWeek, units: units, includeUnit: false),
-            caption: "\(units.label) this week"
+            caption: "\(units.label) this week",
+            route: .volume
         ) {
             Chart(buckets) { bucket in
                 BarMark(x: .value("Week", bucket.weekStart, unit: .weekOfYear),
@@ -144,7 +145,7 @@ struct ProgressHomeView: View {
             }
             .chartXAxis(.hidden).chartYAxis(.hidden)
             .frame(height: 56)
-        } destination: { VolumeDetailView() }
+        }
     }
 
     // MARK: Muscle balance
@@ -159,7 +160,8 @@ struct ProgressHomeView: View {
         return DashboardCard(
             eyebrow: "Muscles",
             headline: shares.first.map { $0.muscle.displayName } ?? "—",
-            caption: shares.first.map { "\(Int(($0.share * 100).rounded()))% of 4-week volume" }
+            caption: shares.first.map { "\(Int(($0.share * 100).rounded()))% of 4-week volume" },
+            route: .balance
         ) {
             Chart(Array(shares.enumerated()), id: \.element.id) { index, share in
                 SectorMark(angle: .value("Volume", share.volumeKg),
@@ -168,7 +170,7 @@ struct ProgressHomeView: View {
                     .cornerRadius(2)
             }
             .frame(height: 56)
-        } destination: { BalanceDetailView() }
+        }
     }
 
     // MARK: Consistency
@@ -182,7 +184,8 @@ struct ProgressHomeView: View {
         return DashboardCard(
             eyebrow: "Consistency",
             headline: scheduled == 0 ? "—" : "\(percent)%",
-            caption: "of scheduled days, 4 weeks"
+            caption: "of scheduled days, 4 weeks",
+            route: .consistency
         ) {
             Chart(weeks) { week in
                 BarMark(x: .value("Week", week.weekStart, unit: .weekOfYear),
@@ -196,7 +199,7 @@ struct ProgressHomeView: View {
             }
             .chartXAxis(.hidden).chartYAxis(.hidden)
             .frame(height: 56)
-        } destination: { ConsistencyDetailView() }
+        }
     }
 
     // MARK: Body
@@ -208,7 +211,8 @@ struct ProgressHomeView: View {
             eyebrow: "Body",
             headline: snapshot.map { Formulas.formatBodyweight(kg: $0.currentKg, units: units,
                                                               includeUnit: false) } ?? "—",
-            caption: snapshot == nil ? "log your bodyweight" : units.label + " bodyweight"
+            caption: snapshot == nil ? "log your bodyweight" : units.label + " bodyweight",
+            route: .body
         ) {
             Chart(Array(series), id: \.id) { entry in
                 LineMark(x: .value("Date", entry.date), y: .value("Weight", entry.weightKg))
@@ -218,7 +222,7 @@ struct ProgressHomeView: View {
             .chartYScale(domain: .automatic(includesZero: false))
             .chartXAxis(.hidden).chartYAxis(.hidden)
             .frame(height: 56)
-        } destination: { BodyDetailView() }
+        }
     }
 
     private var emptyState: some View {

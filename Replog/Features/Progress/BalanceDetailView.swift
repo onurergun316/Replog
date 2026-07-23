@@ -128,7 +128,7 @@ struct BalanceDetailView: View {
             VStack(spacing: 0) {
                 ForEach(Array(shares.enumerated()), id: \.element.id) { index, share in
                     if index > 0 { Divider() }
-                    NavigationLink { MuscleDetailView(muscle: share.muscle) } label: {
+                    NavigationLink(value: ProgressRoute.muscle(share.muscle)) {
                         HStack(spacing: 10) {
                             Text(share.muscle.displayName)
                                 .font(.rounded(14, .heavy)).foregroundStyle(Color.textPrimary)

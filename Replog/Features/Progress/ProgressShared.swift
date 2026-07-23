@@ -70,15 +70,19 @@ enum ProgressPalette {
 }
 
 /// L1 dashboard card chrome: eyebrow + headline row + a mini chart, all tappable.
-struct DashboardCard<Chart: View, Destination: View>: View {
+///
+/// Takes a `ProgressRoute` rather than a destination closure: a destination-based push
+/// isn't represented in the stack's path, and mixing the two styles in one stack is
+/// what made deeper exercise rows push-then-pop and pile up (see `ProgressNavigation`).
+struct DashboardCard<Chart: View>: View {
     let eyebrow: String
     let headline: String
     var caption: String? = nil
+    let route: ProgressRoute
     @ViewBuilder var chart: () -> Chart
-    @ViewBuilder var destination: () -> Destination
 
     var body: some View {
-        NavigationLink { destination() } label: {
+        NavigationLink(value: route) {
             VStack(alignment: .leading, spacing: 8) {
                 HStack {
                     Text(eyebrow).font(.rounded(11, .heavy)).foregroundStyle(Color.text3)
