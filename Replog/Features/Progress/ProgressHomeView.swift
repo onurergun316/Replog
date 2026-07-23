@@ -91,13 +91,13 @@ struct ProgressHomeView: View {
     /// The top lift by best e1RM carries the hero card.
     private var topLift: ExerciseProgress? {
         Dictionary(grouping: history, by: \.exId)
-            .map { ProgressAggregator.summarize(exId: $0.key, history: $0.value) }
+            .map { ProgressAggregator.summarize(exId: $0.key, history: $0.value, load: load) }
             .max { $0.bestE1rm < $1.bestE1rm }
     }
 
     private var recentPRCount: Int {
         let cutoff = Calendar.current.date(byAdding: .day, value: -28, to: Date()) ?? Date()
-        return ProgressAnalytics.prEvents(history: history).filter { $0.date >= cutoff }.count
+        return ProgressAnalytics.prEvents(history: history, load: load).filter { $0.date >= cutoff }.count
     }
 
     @ViewBuilder

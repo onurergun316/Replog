@@ -15,6 +15,7 @@ struct ExerciseDetailView: View {
     @Environment(\.exerciseCatalog) private var catalog
     @Environment(\.modelContext) private var context
     @Query(sort: \Plan.order) private var plans: [Plan]
+    @Query(sort: \BodyweightEntry.date) private var bodyweightEntries: [BodyweightEntry]
     let exId: String
     var showProgress: Bool = false
 
@@ -42,7 +43,9 @@ struct ExerciseDetailView: View {
                         GuideContent(exercise: exercise)
                         addToWorkoutSection
                     } else {
-                        ProgressContent(exId: exId, history: context.history(forExercise: exId))
+                        ProgressContent(exId: exId, history: context.history(forExercise: exId),
+                                        load: .live(catalog: catalog,
+                                                    bodyweightEntries: bodyweightEntries))
                     }
                 } else {
                     Text("Exercise not found").foregroundStyle(Color.text2)
@@ -229,9 +232,10 @@ private struct ProgressContent: View {
     @State private var expandedEntryID: UUID?
     let exId: String
     let history: [HistoryEntry]
+    let load: LoadResolver
 
     private var progress: ExerciseProgress {
-        ProgressAggregator.summarize(exId: exId, history: history)
+        ProgressAggregator.summarize(exId: exId, history: history, load: load)
     }
 
     var body: some View {
@@ -274,14 +278,14 @@ private struct ProgressContent: View {
     /// identical to two sessions three months apart.
     private var trendChart: some View {
         Chart(sorted, id: \.id) { entry in
-            LineMark(x: .value("Date", entry.date), y: .value("1RM", entry.e1rm))
+            LineMark(x: .value("Date", entry.date), y: .value("1RM", load.e1rm(entry)))
                 .foregroundStyle(Color.accent)
                 .interpolationMethod(.monotone)
-            AreaMark(x: .value("Date", entry.date), y: .value("1RM", entry.e1rm))
+            AreaMark(x: .value("Date", entry.date), y: .value("1RM", load.e1rm(entry)))
                 .foregroundStyle(LinearGradient(colors: [Color.accent.opacity(0.25), .clear],
                                                 startPoint: .top, endPoint: .bottom))
                 .interpolationMethod(.monotone)
-            PointMark(x: .value("Date", entry.date), y: .value("1RM", entry.e1rm))
+            PointMark(x: .value("Date", entry.date), y: .value("1RM", load.e1rm(entry)))
                 .foregroundStyle(Color.accent)
                 .symbolSize(40)
         }

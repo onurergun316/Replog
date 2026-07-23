@@ -324,7 +324,8 @@ struct TodayView: View {
     }
 
     private var recentHighlight: (some View)? {
-        guard let best = history.max(by: { $0.e1rm < $1.e1rm }),
+        let load = LoadResolver.live(catalog: catalog, bodyweightEntries: bodyweightEntries)
+        guard let best = history.max(by: { load.e1rm($0) < load.e1rm($1) }),
               let ex = catalog.exercise(id: best.exId) else { return Optional<AnyView>.none }
         return AnyView(
             VStack(alignment: .leading, spacing: 8) {
@@ -333,7 +334,7 @@ struct TodayView: View {
                     ExerciseThumbnail(exercise: ex, size: 48, cornerRadius: 12)
                     VStack(alignment: .leading, spacing: 2) {
                         Text(ex.name).font(.cardTitle).foregroundStyle(Color.textPrimary)
-                        Text("\(best.e1rm) est. 1RM").font(.rounded(13, .bold)).foregroundStyle(Color.accent)
+                        Text("\(load.e1rm(best)) est. 1RM").font(.rounded(13, .bold)).foregroundStyle(Color.accent)
                     }
                     Spacer()
                     Image(systemName: "trophy.fill").foregroundStyle(Color.accent)

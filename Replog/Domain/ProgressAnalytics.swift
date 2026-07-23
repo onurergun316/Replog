@@ -190,16 +190,21 @@ enum ProgressAnalytics {
 
     /// Every session that beat its exercise's previous all-time best e1RM, newest first.
     /// The first-ever session of an exercise is a baseline, not a PR.
-    static func prEvents(history: [HistoryEntry]) -> [PREvent] {
+    ///
+    /// Scored over *effective* load, so a rep gained on a bodyweight movement can be a
+    /// personal record — under the stored e1RM every such session scored zero and no
+    /// calisthenics PR could ever be detected.
+    static func prEvents(history: [HistoryEntry], load: LoadResolver = .stored) -> [PREvent] {
         var events: [PREvent] = []
         let byExercise = Dictionary(grouping: history, by: \.exId)
         for (exId, entries) in byExercise {
             var best = Int.min
             for entry in entries.sorted(by: { $0.date < $1.date }) {
-                if best != Int.min, entry.e1rm > best {
-                    events.append(PREvent(exId: exId, date: entry.date, e1rm: entry.e1rm))
+                let e1rm = load.e1rm(entry)
+                if best != Int.min, e1rm > best {
+                    events.append(PREvent(exId: exId, date: entry.date, e1rm: e1rm))
                 }
-                best = max(best, entry.e1rm)
+                best = max(best, e1rm)
             }
         }
         return events.sorted { $0.date > $1.date }

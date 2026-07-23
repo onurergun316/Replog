@@ -14,7 +14,10 @@ import Charts
 struct StrengthDetailView: View {
     @Environment(\.exerciseCatalog) private var catalog
     @Query private var history: [HistoryEntry]
+    @Query(sort: \BodyweightEntry.date) private var bodyweightEntries: [BodyweightEntry]
     @State private var window: RangeWindow = .twelveWeeks
+
+    private var load: LoadResolver { .live(catalog: catalog, bodyweightEntries: bodyweightEntries) }
 
     private var cutoff: Date? {
         window.days.flatMap { Calendar.current.date(byAdding: .day, value: -$0, to: Date()) }
@@ -28,12 +31,12 @@ struct StrengthDetailView: View {
     /// Every trained exercise summarized, best lift first.
     private var ranked: [ExerciseProgress] {
         Dictionary(grouping: windowed, by: \.exId)
-            .map { ProgressAggregator.summarize(exId: $0.key, history: $0.value) }
+            .map { ProgressAggregator.summarize(exId: $0.key, history: $0.value, load: load) }
             .sorted { $0.bestE1rm > $1.bestE1rm }
     }
 
     private var prs: [PREvent] {
-        let events = ProgressAnalytics.prEvents(history: history)
+        let events = ProgressAnalytics.prEvents(history: history, load: load)
         guard let cutoff else { return events }
         return events.filter { $0.date >= cutoff }
     }
@@ -121,7 +124,7 @@ struct StrengthDetailView: View {
                 .filter { $0.exId == progress.exId }
                 .sorted { $0.date < $1.date }
                 .map { (name: catalog.exercise(id: progress.exId)?.name ?? progress.exId,
-                        date: $0.date, e1rm: $0.e1rm) }
+                        date: $0.date, e1rm: load.e1rm($0)) }
         }
         return VStack(alignment: .leading, spacing: 8) {
             Chart(Array(series.enumerated()), id: \.offset) { _, point in

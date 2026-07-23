@@ -29,9 +29,14 @@ struct ExerciseProgress: Equatable, Sendable {
 
 enum ProgressAggregator {
     /// Summarizes a single exercise's history (any order; sorted internally by date).
-    static func summarize(exId: String, history: [HistoryEntry]) -> ExerciseProgress {
+    ///
+    /// `load` recomputes each session's estimated 1RM over *effective* load. The stored
+    /// `e1rm` was written from the logged weight alone, which is zero for a bodyweight
+    /// movement — so pull-ups and dips ranked at zero and never surfaced in Strength.
+    static func summarize(exId: String, history: [HistoryEntry],
+                          load: LoadResolver = .stored) -> ExerciseProgress {
         let sorted = history.sorted { $0.date < $1.date }
-        let series = sorted.map(\.e1rm)
+        let series = sorted.map { load.e1rm($0) }
         let best = series.max() ?? 0
         let current = series.last ?? 0
         let previous = series.count >= 2 ? series[series.count - 2] : nil
