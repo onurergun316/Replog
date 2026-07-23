@@ -49,6 +49,7 @@ enum SessionBuilder {
                     rpe: template.rpe,
                     prevWeight: prev?.w,
                     prevReps: prev?.r,
+                    estimated: template.estimated,
                     order: setIndex
                 )
                 logged.exercise = sessionExercise

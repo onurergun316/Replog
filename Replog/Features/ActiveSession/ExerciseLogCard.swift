@@ -213,9 +213,9 @@ private struct SetLogRow: View {
                         .strikethrough(set.done, color: Color.up)
                     Text(units.label).font(.rounded(9, .bold)).foregroundStyle(Color.text3)
                     if !set.done { TrendArrow(trend: set.weightTrend) }
-                    // A never-logged weight is a computed starting estimate — flag it subtly
-                    // until the athlete's real sets calibrate it.
-                    if !set.done, set.prevWeight == nil {
+                    // A computed starting estimate — flagged until a finished session
+                    // replaces it with the athlete's own logged numbers.
+                    if !set.done, set.estimated {
                         Text("est")
                             .font(.rounded(8, .black)).foregroundStyle(Color.accent)
                             .padding(.horizontal, 4).padding(.vertical, 1)

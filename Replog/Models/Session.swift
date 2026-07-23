@@ -130,15 +130,21 @@ final class LoggedSet {
     /// Same set index's weight/reps from the previous session (drives trend arrows).
     var prevWeight: Double?
     var prevReps: Int?
+    /// True while `weightKg` is still the computed starting estimate copied from
+    /// `SetTemplate.estimated` — drives the "est" badge. Cleared for good once a finished
+    /// session writes real logged numbers back onto the template (`TemplateWriteBack`).
+    var estimated: Bool = false
     var order: Int = 0
     var exercise: SessionExercise?
 
-    init(weightKg: Double, reps: Int, rpe: Int, prevWeight: Double? = nil, prevReps: Int? = nil, order: Int = 0) {
+    init(weightKg: Double, reps: Int, rpe: Int, prevWeight: Double? = nil, prevReps: Int? = nil,
+         estimated: Bool = false, order: Int = 0) {
         self.weightKg = weightKg
         self.reps = reps
         self.rpe = rpe
         self.prevWeight = prevWeight
         self.prevReps = prevReps
+        self.estimated = estimated
         self.order = order
     }
 

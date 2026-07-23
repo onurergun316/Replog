@@ -159,6 +159,27 @@ struct ActiveSessionTests {
         #expect(templates.map(\.reps) == [5, 3])
     }
 
+    @Test func estimatedSeedFlagPropagatesThenClearsOnceLogged() throws {
+        let ctx = makeContext()
+        let workout = seedWorkout(ctx)
+        workout.day = Weekday.from(Date())
+        for item in workout.orderedItems { for set in item.sets { set.estimated = true } }
+        try ctx.save()
+
+        let first = SessionBuilder.start(workout: workout, into: ctx)
+        // The live log inherits the seed flag, so the "est" badge shows.
+        #expect(first.exercises.allSatisfy { $0.orderedSets.allSatisfy { $0.estimated } })
+
+        first.exercises.forEach { $0.sets.forEach { $0.done = true } }
+        try ctx.save()
+        SessionFinisher.finish(first, profile: ctx.userProfile(), context: ctx)
+        try ctx.save()
+
+        // Real numbers replaced the seed, so the badge is gone the next time round.
+        let second = SessionBuilder.start(workout: workout, into: ctx)
+        #expect(second.exercises.allSatisfy { $0.orderedSets.allSatisfy { !$0.estimated } })
+    }
+
     @Test func partialFinishLeavesThePlanUnchanged() throws {
         let ctx = makeContext()
         let workout = seedWorkout(ctx)
