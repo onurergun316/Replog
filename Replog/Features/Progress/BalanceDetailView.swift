@@ -16,10 +16,19 @@ struct BalanceDetailView: View {
     @Query private var history: [HistoryEntry]
     @Query private var settingsRows: [AppSettings]
     @Query(sort: \BodyweightEntry.date) private var bodyweightEntries: [BodyweightEntry]
-    @State private var window: RangeWindow = .fourWeeks
+    @State private var window = RangeSelection()
 
     private var units: Units { settingsRows.first?.units ?? .kg }
     private var load: LoadResolver { .live(catalog: catalog, bodyweightEntries: bodyweightEntries) }
+
+
+    /// Days from the athlete's first activity to today — the range control offers only
+    /// windows that actually contain something.
+    private var historySpanDays: Int? {
+        guard let first = ProgressAnalytics.firstActivity(history: history, doneDates: [])
+        else { return nil }
+        return max(1, Calendar.current.dateComponents([.day], from: first, to: Date()).day ?? 1)
+    }
 
     private var shares: [MuscleShare] {
         ProgressAnalytics.muscleShares(history: history, days: window.days ?? 730,
@@ -46,7 +55,7 @@ struct BalanceDetailView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
                 Text("Muscle Balance").font(.screenTitle).foregroundStyle(Color.textPrimary)
-                RangePicker(selection: $window)
+                RangePicker(selection: $window, historySpanDays: historySpanDays)
 
                 if shares.isEmpty {
                     ProgressEmptyCard(text: "No attributed volume in this window yet.")
@@ -162,12 +171,21 @@ struct MuscleDetailView: View {
     @Query private var history: [HistoryEntry]
     @Query private var settingsRows: [AppSettings]
     @Query(sort: \BodyweightEntry.date) private var bodyweightEntries: [BodyweightEntry]
-    @State private var window: RangeWindow = .twelveWeeks
+    @State private var window = RangeSelection()
 
     private var units: Units { settingsRows.first?.units ?? .kg }
     private var load: LoadResolver { .live(catalog: catalog, bodyweightEntries: bodyweightEntries) }
 
     @State private var query = ""
+
+
+    /// Days from the athlete's first activity to today — the range control offers only
+    /// windows that actually contain something.
+    private var historySpanDays: Int? {
+        guard let first = ProgressAnalytics.firstActivity(history: history, doneDates: [])
+        else { return nil }
+        return max(1, Calendar.current.dateComponents([.day], from: first, to: Date()).day ?? 1)
+    }
 
     /// History entries whose exercise trains this muscle as a primary, within the window.
     private var relevant: [HistoryEntry] {
@@ -207,7 +225,7 @@ struct MuscleDetailView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
                 Text(muscle.displayName).font(.screenTitle).foregroundStyle(Color.textPrimary)
-                RangePicker(selection: $window)
+                RangePicker(selection: $window, historySpanDays: historySpanDays)
 
                 if relevant.isEmpty {
                     ProgressEmptyCard(text: "Nothing logged for this muscle yet.")

@@ -15,12 +15,21 @@ struct ConsistencyDetailView: View {
     @Query private var profiles: [UserProfile]
     /// Only for the first-activity clamp: adherence itself is computed from doneDates.
     @Query private var history: [HistoryEntry]
-    @State private var window: RangeWindow = .twelveWeeks
+    @State private var window = RangeSelection()
 
     /// Read-only: the singletons are bootstrapped in `ReplogApp.init`, so a view body
     /// never needs to create one — and must not, mid-render.
     private var doneDates: [Date] { profiles.first?.doneDates ?? [] }
     private var scheduledDays: Set<Weekday> { StreakEngine.scheduledDays(in: plans) }
+
+
+    /// Days from the athlete's first activity to today — the range control offers only
+    /// windows that actually contain something.
+    private var historySpanDays: Int? {
+        guard let first = ProgressAnalytics.firstActivity(history: history, doneDates: doneDates)
+        else { return nil }
+        return max(1, Calendar.current.dateComponents([.day], from: first, to: Date()).day ?? 1)
+    }
 
     private var weeks: [AdherenceWeek] {
         ProgressAnalytics.adherence(
@@ -40,7 +49,7 @@ struct ConsistencyDetailView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
                 Text("Consistency").font(.screenTitle).foregroundStyle(Color.textPrimary)
-                RangePicker(selection: $window)
+                RangePicker(selection: $window, historySpanDays: historySpanDays)
 
                 let active = weeks.filter { $0.scheduled > 0 }
                 if active.isEmpty {

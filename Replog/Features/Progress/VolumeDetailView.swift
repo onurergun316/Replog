@@ -16,10 +16,19 @@ struct VolumeDetailView: View {
     @Query private var history: [HistoryEntry]
     @Query private var settingsRows: [AppSettings]
     @Query(sort: \BodyweightEntry.date) private var bodyweightEntries: [BodyweightEntry]
-    @State private var window: RangeWindow = .twelveWeeks
+    @State private var window = RangeSelection()
 
     private var units: Units { settingsRows.first?.units ?? .kg }
     private var load: LoadResolver { .live(catalog: catalog, bodyweightEntries: bodyweightEntries) }
+
+
+    /// Days from the athlete's first activity to today — the range control offers only
+    /// windows that actually contain something.
+    private var historySpanDays: Int? {
+        guard let first = ProgressAnalytics.firstActivity(history: history, doneDates: [])
+        else { return nil }
+        return max(1, Calendar.current.dateComponents([.day], from: first, to: Date()).day ?? 1)
+    }
 
     private var buckets: [WeekBucket] {
         ProgressAnalytics.trimmingLeadingEmptyWeeks(
@@ -34,7 +43,7 @@ struct VolumeDetailView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
                 Text("Volume").font(.screenTitle).foregroundStyle(Color.textPrimary)
-                RangePicker(selection: $window)
+                RangePicker(selection: $window, historySpanDays: historySpanDays)
 
                 let trained = buckets.filter { $0.volumeKg > 0 }
                 if trained.isEmpty {
@@ -56,12 +65,24 @@ struct VolumeDetailView: View {
 
     private func summaryRow(trained: [WeekBucket]) -> some View {
         let total = trained.reduce(0.0) { $0 + $1.volumeKg }
-        let avg = total / Double(trained.count)
+        let groups = sessions
         return HStack(spacing: 12) {
             summaryTile(Formulas.formatWeight(kg: total, units: units, includeUnit: false),
                         "total \(units.label)")
-            summaryTile(Formulas.formatWeight(kg: avg, units: units, includeUnit: false),
-                        "avg / trained week")
+            // An average over one week is just the total again — two tiles showing the
+            // identical number reads as a bug. Below two trained weeks, report the
+            // per-session average instead, which is a real second reading.
+            if trained.count > 1 {
+                summaryTile(Formulas.formatWeight(kg: total / Double(trained.count),
+                                                  units: units, includeUnit: false),
+                            "avg / week")
+            } else if groups.count > 1 {
+                summaryTile(Formulas.formatWeight(kg: total / Double(groups.count),
+                                                  units: units, includeUnit: false),
+                            "avg / session")
+            } else {
+                summaryTile("\(groups.count)", groups.count == 1 ? "session" : "sessions")
+            }
             summaryTile("\(trained.reduce(0) { $0 + $1.sets })", "sets")
         }
     }

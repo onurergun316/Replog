@@ -15,7 +15,7 @@ struct StrengthDetailView: View {
     @Environment(\.exerciseCatalog) private var catalog
     @Query private var history: [HistoryEntry]
     @Query(sort: \BodyweightEntry.date) private var bodyweightEntries: [BodyweightEntry]
-    @State private var window: RangeWindow = .twelveWeeks
+    @State private var window = RangeSelection()
 
     private var load: LoadResolver { .live(catalog: catalog, bodyweightEntries: bodyweightEntries) }
 
@@ -31,6 +31,15 @@ struct StrengthDetailView: View {
     private var muscleOptions: [Muscle] {
         ProgressListFilter.availableMuscles(in: ranked.map(\.exId),
                                             catalog: { catalog.exercise(id: $0) })
+    }
+
+
+    /// Days from the athlete's first activity to today — the range control offers only
+    /// windows that actually contain something.
+    private var historySpanDays: Int? {
+        guard let first = ProgressAnalytics.firstActivity(history: history, doneDates: [])
+        else { return nil }
+        return max(1, Calendar.current.dateComponents([.day], from: first, to: Date()).day ?? 1)
     }
 
     private var cutoff: Date? {
@@ -59,7 +68,7 @@ struct StrengthDetailView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
                 Text("Strength").font(.screenTitle).foregroundStyle(Color.textPrimary)
-                RangePicker(selection: $window)
+                RangePicker(selection: $window, historySpanDays: historySpanDays)
 
                 if ranked.isEmpty {
                     ProgressEmptyCard(text: "No lifts in this window yet.")

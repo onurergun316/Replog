@@ -17,13 +17,22 @@ struct BodyDetailView: View {
     @Query private var history: [HistoryEntry]
     @Query private var readinessEntries: [ReadinessEntry]
     @Query private var settingsRows: [AppSettings]
-    @State private var window: RangeWindow = .sixMonths
+    @State private var window = RangeSelection()
 
     private var units: Units { settingsRows.first?.units ?? .kg }
     private var snapshot: BodyweightSnapshot? { BodyweightTracker.snapshot(entries: bodyweightEntries) }
     /// Relative strength is the one reading that is meaningless without bodyweight credit:
     /// a pull-up would otherwise rank at 0.00x BW.
     private var load: LoadResolver { .live(catalog: catalog, bodyweightEntries: bodyweightEntries) }
+
+
+    /// Days from the athlete's first activity to today — the range control offers only
+    /// windows that actually contain something.
+    private var historySpanDays: Int? {
+        guard let first = ProgressAnalytics.firstActivity(history: history, doneDates: [])
+        else { return nil }
+        return max(1, Calendar.current.dateComponents([.day], from: first, to: Date()).day ?? 1)
+    }
 
     private var windowed: [BodyweightEntry] {
         guard let days = window.days,
@@ -36,7 +45,7 @@ struct BodyDetailView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
                 Text("Body").font(.screenTitle).foregroundStyle(Color.textPrimary)
-                RangePicker(selection: $window)
+                RangePicker(selection: $window, historySpanDays: historySpanDays)
 
                 if windowed.isEmpty {
                     ProgressEmptyCard(text: "No bodyweight check-ins in this window — log one from Today.")
@@ -53,13 +62,30 @@ struct BodyDetailView: View {
         .navigationBarTitleDisplayMode(.inline)
     }
 
+    /// Tiles earn their place: a delta and a trend need a second and a third check-in to
+    /// exist at all, and three tiles reading "—" tell a new athlete the screen is broken
+    /// rather than that they have one weigh-in. Below that, say what is missing instead.
+    @ViewBuilder
     private var summaryRow: some View {
+        let current = snapshot.map {
+            Formulas.formatBodyweight(kg: $0.currentKg, units: units, includeUnit: false)
+        } ?? "—"
         HStack(spacing: 12) {
-            tile(snapshot.map { Formulas.formatBodyweight(kg: $0.currentKg, units: units,
-                                                          includeUnit: false) } ?? "—",
-                 "current \(units.label)")
-            tile(snapshot?.deltaKg.map { String(format: "%+.1f", $0) } ?? "—", "vs last check-in")
-            tile(snapshot?.weeklyRateKg.map { String(format: "%+.2f/wk", $0) } ?? "—", "trend")
+            tile(current, "current \(units.label)")
+            if let delta = snapshot?.deltaKg {
+                tile(String(format: "%+.1f", delta), "vs last check-in")
+            }
+            if let rate = snapshot?.weeklyRateKg {
+                tile(String(format: "%+.2f", rate), "\(units.label) / week")
+            }
+            if snapshot?.deltaKg == nil {
+                tile("\(bodyweightEntries.count)",
+                     bodyweightEntries.count == 1 ? "check-in" : "check-ins")
+            }
+        }
+        if snapshot?.deltaKg == nil, snapshot != nil {
+            Text("Log another check-in and this becomes a trend.")
+                .font(.rounded(12, .semibold)).foregroundStyle(Color.text3)
         }
     }
 
@@ -73,20 +99,38 @@ struct BodyDetailView: View {
         .cardSurface()
     }
 
+    /// A single check-in is one dot floating in a 200pt card, which looks like a
+    /// rendering failure. Below two points the card states the reading in words instead.
+    @ViewBuilder
     private var weightChart: some View {
-        Chart(windowed, id: \.id) { entry in
-            LineMark(x: .value("Date", entry.date), y: .value("Weight", entry.weightKg))
-                .foregroundStyle(Color.accent)
-                .interpolationMethod(.monotone)
-            PointMark(x: .value("Date", entry.date), y: .value("Weight", entry.weightKg))
-                .foregroundStyle(Color.accent)
-                .symbolSize(20)
+        if windowed.count < 2 {
+            if let only = windowed.last {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(Formulas.formatBodyweight(kg: only.weightKg, units: units))
+                        .font(.rounded(28, .black)).foregroundStyle(Color.textPrimary)
+                        .tabularNumbers()
+                    Text("Recorded \(only.date.formatted(.relative(presentation: .named))) — your starting point.")
+                        .font(.rounded(12, .semibold)).foregroundStyle(Color.text3)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(18)
+                .cardSurface()
+            }
+        } else {
+            Chart(windowed, id: \.id) { entry in
+                LineMark(x: .value("Date", entry.date), y: .value("Weight", entry.weightKg))
+                    .foregroundStyle(Color.accent)
+                    .interpolationMethod(.monotone)
+                PointMark(x: .value("Date", entry.date), y: .value("Weight", entry.weightKg))
+                    .foregroundStyle(Color.accent)
+                    .symbolSize(40)
+            }
+            .chartYScale(domain: .automatic(includesZero: false))
+            .chartYAxis { AxisMarks(position: .leading) }
+            .frame(height: 200)
+            .padding(14)
+            .cardSurface()
         }
-        .chartYScale(domain: .automatic(includesZero: false))
-        .chartYAxis { AxisMarks(position: .leading) }
-        .frame(height: 200)
-        .padding(14)
-        .cardSurface()
     }
 
     /// Top lifts as bodyweight multiples — the classic strength-standards read.
