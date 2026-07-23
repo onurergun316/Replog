@@ -7,6 +7,7 @@ import Testing
 import Foundation
 @testable import Replog
 
+@MainActor
 struct ProgressAggregatorTests {
 
     private func entry(_ e1rm: Int, daysAgo: Int) -> HistoryEntry {

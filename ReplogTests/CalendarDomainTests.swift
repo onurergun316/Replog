@@ -10,6 +10,7 @@ import Testing
 import Foundation
 @testable import Replog
 
+@MainActor
 struct CalendarDomainTests {
 
     // A fixed UTC Gregorian, Sunday-first — deterministic regardless of machine locale.

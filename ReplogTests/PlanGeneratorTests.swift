@@ -9,6 +9,7 @@ import Testing
 import Foundation
 @testable import Replog
 
+@MainActor
 struct PlanGeneratorTests {
 
     private let catalog = ExerciseCatalog(bundle: .main)

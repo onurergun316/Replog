@@ -10,6 +10,7 @@ import Testing
 import Foundation
 @testable import Replog
 
+@MainActor
 struct ProgressAnalyticsTests {
 
     private var cal: Calendar {

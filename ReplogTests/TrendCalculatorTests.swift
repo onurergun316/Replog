@@ -6,6 +6,7 @@
 import Testing
 @testable import Replog
 
+@MainActor
 struct TrendCalculatorTests {
 
     @Test func trendDirections() {
