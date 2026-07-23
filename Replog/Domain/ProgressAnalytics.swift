@@ -210,6 +210,82 @@ enum ProgressAnalytics {
         return events.sorted { $0.date > $1.date }
     }
 
+    /// One finished workout: every exercise written by a single Finish.
+    ///
+    /// `SessionFinisher` stamps one `sessionId` and one exact timestamp across the whole
+    /// batch, so a session is recoverable even for history written before the id existed
+    /// (those group by timestamp alone). This is what makes "total weight lifted per
+    /// session" answerable at all — history is otherwise per-exercise-per-day, and two
+    /// workouts in one day used to merge into one.
+    struct SessionGroup: Identifiable {
+        var date: Date
+        var entries: [HistoryEntry]
+        /// Captured at finish; nil for history written before attribution existed.
+        var workoutName: String?
+        var planName: String?
+        var durationSeconds: Int?
+        var id: Date { date }
+
+        var setCount: Int { entries.reduce(0) { $0 + $1.sets.count } }
+    }
+
+    /// Every finished session, oldest → newest.
+    static func sessions(history: [HistoryEntry]) -> [SessionGroup] {
+        let grouped = Dictionary(grouping: history) { entry in
+            entry.sessionId.map { AnyHashable($0) } ?? AnyHashable(entry.date)
+        }
+        return grouped.values.compactMap { entries -> SessionGroup? in
+            guard let first = entries.min(by: { $0.date < $1.date }) else { return nil }
+            return SessionGroup(date: first.date, entries: entries,
+                                workoutName: first.workoutName, planName: first.planName,
+                                durationSeconds: first.durationSeconds)
+        }
+        .sorted { $0.date < $1.date }
+    }
+
+    /// A session's total tonnage.
+    static func tonnage(of session: SessionGroup, load: LoadResolver = .stored) -> Double {
+        session.entries.reduce(0.0) { $0 + load.volumeKg($1) }
+    }
+
+    /// Tonnage grouped by the plan each session belonged to, largest first. Sessions
+    /// finished before attribution existed group under `nil`.
+    static func tonnageByPlan(history: [HistoryEntry],
+                              load: LoadResolver = .stored) -> [(plan: String?, volumeKg: Double)] {
+        var totals: [String?: Double] = [:]
+        for session in sessions(history: history) {
+            totals[session.planName, default: 0] += tonnage(of: session, load: load)
+        }
+        return totals.map { (plan: $0.key, volumeKg: $0.value) }
+            .sorted { $0.volumeKg > $1.volumeKg }
+    }
+
+    /// Tonnage grouped by workout template, largest first.
+    static func tonnageByWorkout(history: [HistoryEntry],
+                                 load: LoadResolver = .stored) -> [(workout: String?, volumeKg: Double)] {
+        var totals: [String?: Double] = [:]
+        for session in sessions(history: history) {
+            totals[session.workoutName, default: 0] += tonnage(of: session, load: load)
+        }
+        return totals.map { (workout: $0.key, volumeKg: $0.value) }
+            .sorted { $0.volumeKg > $1.volumeKg }
+    }
+
+    /// How the window's tonnage splits between external load and the athlete's own body.
+    static func loadSplit(history: [HistoryEntry], days: Int,
+                          load: LoadResolver = .stored,
+                          today: Date = Date(),
+                          calendar: Calendar = .current) -> (externalKg: Double, bodyweightKg: Double) {
+        guard let cutoff = calendar.date(byAdding: .day, value: -days,
+                                         to: calendar.startOfDay(for: today)) else { return (0, 0) }
+        var external = 0.0, bodyweight = 0.0
+        for entry in history where entry.date >= cutoff {
+            external += load.externalVolumeKg(entry)
+            bodyweight += load.bodyweightVolumeKg(entry)
+        }
+        return (external, bodyweight)
+    }
+
     /// The athlete's first day of training: the earlier of their first logged set and
     /// their first completed day. `nil` before they have trained at all. Charts clamp
     /// their x-domain to this so nothing is drawn from before they started.

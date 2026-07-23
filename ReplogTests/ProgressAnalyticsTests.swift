@@ -26,8 +26,11 @@ struct ProgressAnalyticsTests {
     private var today: Date { date(2026, 6, 10) }
 
     private func entry(_ day: Date, exId: String = "Bench",
-                       sets: [RecordedSet], e1rm: Int = 100) -> HistoryEntry {
-        HistoryEntry(exId: exId, date: day, topW: 100, topR: 5, e1rm: e1rm, sets: sets)
+                       sets: [RecordedSet], e1rm: Int = 100,
+                       sessionId: UUID? = nil, workoutName: String? = nil,
+                       planName: String? = nil) -> HistoryEntry {
+        HistoryEntry(exId: exId, date: day, topW: 100, topR: 5, e1rm: e1rm, sets: sets,
+                     sessionId: sessionId, workoutName: workoutName, planName: planName)
     }
 
     @Test func weekBucketsFillEmptyWeeksAndCountDistinctDays() {
@@ -114,6 +117,68 @@ struct ProgressAnalyticsTests {
                                                 doneDates: [date(2026, 6, 1)]) == date(2026, 6, 1))
         #expect(ProgressAnalytics.firstActivity(history: history, doneDates: []) == date(2026, 6, 8))
         #expect(ProgressAnalytics.firstActivity(history: [], doneDates: []) == nil)
+    }
+
+    // MARK: - Sessions
+
+    @Test func twoWorkoutsInOneDayStayTwoSessions() {
+        // History is per-exercise-per-day, so a morning and an evening session used to
+        // merge. SessionFinisher stamps one id per finish, which keeps them apart.
+        let morning = UUID(), evening = UUID()
+        let day = date(2026, 6, 8)
+        let history = [
+            entry(day, exId: "Bench", sets: [RecordedSet(w: 100, r: 5)], sessionId: morning),
+            entry(day, exId: "Row", sets: [RecordedSet(w: 60, r: 10)], sessionId: morning),
+            entry(day.addingTimeInterval(36_000), exId: "Squat",
+                  sets: [RecordedSet(w: 120, r: 5)], sessionId: evening),
+        ]
+
+        let sessions = ProgressAnalytics.sessions(history: history)
+        #expect(sessions.count == 2)
+        #expect(sessions[0].entries.count == 2)     // oldest first
+        #expect(sessions[1].entries.count == 1)
+    }
+
+    @Test func sessionsWrittenBeforeAttributionGroupByTimestamp() {
+        // Legacy rows have no sessionId; one finish still shares one exact timestamp.
+        let stamp = date(2026, 6, 8)
+        let history = [
+            entry(stamp, exId: "Bench", sets: [RecordedSet(w: 100, r: 5)]),
+            entry(stamp, exId: "Row", sets: [RecordedSet(w: 60, r: 10)]),
+        ]
+        let sessions = ProgressAnalytics.sessions(history: history)
+        #expect(sessions.count == 1)
+        #expect(sessions[0].entries.count == 2)
+        #expect(sessions[0].workoutName == nil)
+    }
+
+    @Test func sessionTonnageSumsItsExercises() {
+        let day = date(2026, 6, 8)
+        let history = [
+            entry(day, exId: "Bench", sets: [RecordedSet(w: 100, r: 5)], sessionId: UUID()),
+        ]
+        let session = ProgressAnalytics.sessions(history: history)[0]
+        #expect(ProgressAnalytics.tonnage(of: session) == 500)
+    }
+
+    @Test func tonnageGroupsByPlanAndWorkout() {
+        let day = date(2026, 6, 8)
+        let history = [
+            entry(day, exId: "Bench", sets: [RecordedSet(w: 100, r: 5)],
+                  sessionId: UUID(), workoutName: "Push", planName: "PPL"),
+            entry(day.addingTimeInterval(3600), exId: "Squat", sets: [RecordedSet(w: 100, r: 10)],
+                  sessionId: UUID(), workoutName: "Legs", planName: "PPL"),
+            entry(day.addingTimeInterval(7200), exId: "Row", sets: [RecordedSet(w: 50, r: 4)],
+                  sessionId: UUID()),                       // unattributed legacy row
+        ]
+
+        let byPlan = ProgressAnalytics.tonnageByPlan(history: history)
+        #expect(byPlan.first?.plan == "PPL")
+        #expect(byPlan.first?.volumeKg == 1500)             // 500 + 1000, largest first
+        #expect(byPlan.contains { $0.plan == nil && $0.volumeKg == 200 })
+
+        let byWorkout = ProgressAnalytics.tonnageByWorkout(history: history)
+        #expect(byWorkout.first?.workout == "Legs")          // 1000 outranks Push's 500
     }
 
     @Test func muscleSharesNormalizeAndSortLargestFirst() {

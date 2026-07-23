@@ -26,6 +26,10 @@ enum ProgressRoute: Hashable {
     case consistency
     case body
     case muscle(Muscle)
+    /// A Sunday-anchored week start.
+    case week(Date)
+    /// A start-of-day.
+    case day(Date)
 }
 
 extension View {
@@ -41,6 +45,8 @@ extension View {
                 case .consistency:     ConsistencyDetailView()
                 case .body:            BodyDetailView()
                 case .muscle(let m):   MuscleDetailView(muscle: m)
+                case .week(let start): WeekDetailView(weekStart: start)
+                case .day(let day):    TrainingDayView(day: day)
                 }
             }
             .navigationDestination(for: ExerciseRef.self) { ref in
