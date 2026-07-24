@@ -271,6 +271,35 @@ xcodebuild test -project Replog.xcodeproj -scheme Replog \
 ```
 There is no "iPhone 16" simulator installed here; use **iPhone 17**.
 
+### Verifying without a build (when disk is tight)
+`xcodebuild` writes DerivedData; `swiftc -typecheck` writes **nothing** and still catches every
+type error and warning the compiler would. Match the project's real settings or you'll chase
+phantom actor-isolation errors (`SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor`, `SWIFT_VERSION = 5.0`,
+`SWIFT_APPROACHABLE_CONCURRENCY`, `MemberImportVisibility` — all in `project.pbxproj`):
+```bash
+SDK=$(xcrun --sdk iphonesimulator --show-sdk-path)
+FLAGS=(-target arm64-apple-ios26.5-simulator -sdk "$SDK" -swift-version 5
+       -default-isolation MainActor -D DEBUG
+       -enable-upcoming-feature MemberImportVisibility
+       -enable-upcoming-feature InferSendableFromCaptures
+       -enable-upcoming-feature GlobalActorIsolatedTypesUsability
+       -enable-upcoming-feature NonisolatedNonsendingByDefault
+       -enable-upcoming-feature InferIsolatedConformances)
+swiftc -typecheck -module-name Replog "${FLAGS[@]}" $(find Replog -name '*.swift')
+```
+The test target needs the app module on disk first (~1.6 MB, delete it after) plus the Testing
+framework and its macro plugin:
+```bash
+swiftc -emit-module -module-name Replog -emit-module-path /tmp/Replog.swiftmodule \
+  -enable-testing "${FLAGS[@]}" $(find Replog -name '*.swift')
+swiftc -typecheck -module-name ReplogTests "${FLAGS[@]}" -I /tmp \
+  -F "$(xcode-select -p)/Platforms/iPhoneSimulator.platform/Developer/Library/Frameworks" \
+  -plugin-path "$(xcode-select -p)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/host/plugins/testing" \
+  $(find ReplogTests -name '*.swift')
+```
+This is a substitute for "builds clean", not for running the suite — it type-checks, it doesn't
+execute. Note `zsh` doesn't word-split a plain `$FLAGS`; use an array or inline the flags.
+
 ### DEBUG visual checks (no UI automation available)
 Launch envs (DEBUG only, via `SIMCTL_CHILD_*`): `REPLOG_SEED=1` seeds a demo PPL plan + history +
 marks onboarding done; `REPLOG_TAB=today|plans|library|progress|profile` picks the initial tab ("calendar" → progress);
