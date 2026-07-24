@@ -240,6 +240,117 @@ struct MiniRankedBars: View {
     }
 }
 
+/// One number in a summary row. Hand it a `route` and the whole tile becomes the way
+/// into where the number came from — a headline you can't open is a dead end.
+///
+/// The affordance is a corner chevron rather than one beside the label: the tiles are
+/// ~110pt wide on a 393pt screen, and anything inline pushes the label into truncation.
+struct StatTile: View {
+    let value: String
+    let label: String
+    var route: ProgressRoute?
+
+    var body: some View {
+        if let route {
+            NavigationLink(value: route) { tile }
+                .buttonStyle(.plain)
+                .accessibilityHint("Shows where this number came from")
+        } else {
+            tile
+        }
+    }
+
+    private var tile: some View {
+        VStack(spacing: 2) {
+            Text(value).font(.rounded(18, .black)).foregroundStyle(Color.textPrimary)
+                .tabularNumbers().lineLimit(1).minimumScaleFactor(0.6)
+            Text(label).font(.rounded(11, .bold)).foregroundStyle(Color.text2)
+                .lineLimit(1).minimumScaleFactor(0.7)
+        }
+        .frame(maxWidth: .infinity).padding(.vertical, 12).padding(.horizontal, 8)
+        .overlay(alignment: .topTrailing) {
+            if route != nil {
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 9, weight: .bold)).foregroundStyle(Color.text3)
+                    .padding(7)
+            }
+        }
+        .cardSurface()
+        .contentShape(RoundedRectangle(cornerRadius: Radius.card, style: .continuous))
+    }
+}
+
+/// A card-wide header that is itself the way into the section's detail. Used where a
+/// whole card — the load split, the rep-range mix — opens rather than a single number.
+struct SectionLink<Content: View>: View {
+    let title: String
+    let route: ProgressRoute
+    @ViewBuilder var content: () -> Content
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 6) {
+                Text(title).eyebrow()
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 10, weight: .bold)).foregroundStyle(Color.text3)
+                Spacer(minLength: 0)
+            }
+            content()
+        }
+    }
+}
+
+/// One exercise's row inside a breakdown: thumbnail, name, a line of context, a value.
+/// Pushes the exercise's own history, which is the layer below every breakdown screen.
+struct ContributionRow: View {
+    @Environment(\.exerciseCatalog) private var catalog
+    let exId: String
+    let name: String
+    let detail: String
+    let value: String
+
+    private var thumbnail: String? { catalog.exercise(id: exId)?.imageResourceNames.first }
+
+    var body: some View {
+        NavigationLink(value: ExerciseRef(id: exId)) {
+            HStack(spacing: 10) {
+                ExerciseThumbnail(resourceName: thumbnail, size: 40, cornerRadius: 9)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(name).font(.rounded(14, .heavy)).foregroundStyle(Color.textPrimary)
+                        .lineLimit(1)
+                    Text(detail).font(.rounded(12, .semibold)).foregroundStyle(Color.text3)
+                        .lineLimit(1)
+                }
+                Spacer(minLength: 6)
+                Text(value).font(.rounded(13, .heavy)).foregroundStyle(Color.text2)
+                    .tabularNumbers().lineLimit(1)
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 11, weight: .bold)).foregroundStyle(Color.text3)
+            }
+            .padding(.vertical, 10)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+/// The list chrome every breakdown uses: hairline-separated rows on one card.
+struct ProgressCardList<Item: Identifiable, Row: View>: View {
+    let items: [Item]
+    @ViewBuilder var row: (Item) -> Row
+
+    var body: some View {
+        VStack(spacing: 0) {
+            ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
+                if index > 0 { Divider() }
+                row(item)
+            }
+        }
+        .padding(.horizontal, 14)
+        .cardSurface()
+    }
+}
+
 enum ProgressPalette {
     /// Monochrome accent ramp for categorical marks (donut slices, stacked bars).
     static func ramp(_ index: Int) -> Color {
