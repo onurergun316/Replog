@@ -45,6 +45,36 @@ struct AdherenceWeek: Equatable, Identifiable {
     var id: Date { weekStart }
 }
 
+/// Everything one exercise contributed inside a window.
+///
+/// The Volume screen's headline numbers are all sums over this: total tonnage, sets, the
+/// external/bodyweight split, the rep-range mix. Deriving them once, per exercise, is
+/// what lets every one of those figures open into "and here is what it was made of"
+/// without four more passes over history.
+struct ExerciseContribution: Equatable, Identifiable {
+    var exId: String
+    var volumeKg: Double = 0
+    /// Plates, dumbbells, a dip belt.
+    var externalKg: Double = 0
+    /// The part that was the athlete's own body.
+    var bodyweightKg: Double = 0
+    var sets: Int = 0
+    /// Total reps logged (seconds, for a timed hold).
+    var reps: Int = 0
+    /// The heaviest single set's estimated 1RM over effective load.
+    var bestE1rm: Int = 0
+    /// Sets by rep range. Timed holds are excluded, exactly as in `repRangeMix`.
+    var mix = RepRangeMix()
+    /// Start-of-day for every day this exercise was trained, newest first.
+    var days: [Date] = []
+
+    var id: String { exId }
+    var sessionCount: Int { days.count }
+    var lastTrained: Date? { days.first }
+    /// True when any of the load came from moving the athlete's own body.
+    var isBodyweight: Bool { bodyweightKg > 0 }
+}
+
 /// A session that beat the exercise's previous all-time best e1RM.
 struct PREvent: Equatable, Identifiable {
     var exId: String
@@ -306,6 +336,74 @@ enum ProgressAnalytics {
         }
         return totals.map { (workout: $0.key, volumeKg: $0.value) }
             .sorted { $0.volumeKg > $1.volumeKg }
+    }
+
+    /// What every exercise contributed over the last `days` days, heaviest first.
+    ///
+    /// One pass, so the Volume screen's four summaries all break down into the same
+    /// rows and can never disagree with each other about a total.
+    static func exerciseContributions(history: [HistoryEntry], days: Int,
+                                      load: LoadResolver = .stored,
+                                      today: Date = Date(),
+                                      calendar: Calendar = .current) -> [ExerciseContribution] {
+        guard let cutoff = calendar.date(byAdding: .day, value: -days,
+                                         to: calendar.startOfDay(for: today)) else { return [] }
+        var byExercise: [String: ExerciseContribution] = [:]
+        var daysSeen: [String: Set<Date>] = [:]
+        for entry in history.sorted(by: { $0.date < $1.date }) where entry.date >= cutoff {
+            var row = byExercise[entry.exId] ?? ExerciseContribution(exId: entry.exId)
+            let isHold = load.isTimedHold(exId: entry.exId)
+            for set in entry.sets {
+                let reps = load.repEquivalents(exId: entry.exId, set: set)
+                row.volumeKg += load.volumeKg(exId: entry.exId, set: set, on: entry.date)
+                row.externalKg += set.w * reps
+                row.sets += 1
+                row.reps += set.r
+                // Timed holds store seconds in `r`, so a 45-second plank would otherwise
+                // land in the endurance bucket as a set of 45 (see `repRangeMix`).
+                if !isHold {
+                    switch set.r {
+                    case ..<6: row.mix.strength += 1
+                    case 6...12: row.mix.hypertrophy += 1
+                    default: row.mix.endurance += 1
+                    }
+                }
+            }
+            row.bestE1rm = Swift.max(row.bestE1rm, load.e1rm(entry))
+            byExercise[entry.exId] = row
+            daysSeen[entry.exId, default: []].insert(calendar.startOfDay(for: entry.date))
+        }
+        return byExercise.values.map { row in
+            var row = row
+            row.bodyweightKg = Swift.max(0, row.volumeKg - row.externalKg)
+            row.days = (daysSeen[row.exId] ?? []).sorted(by: >)
+            return row
+        }
+        .sorted { $0.volumeKg == $1.volumeKg ? $0.exId < $1.exId : $0.volumeKg > $1.volumeKg }
+    }
+
+    /// Contributions folded into groups — by muscle, by force, by whatever the caller
+    /// can name — largest first. Rows whose key is `nil` are dropped, since an
+    /// uncategorised slice of a part-to-whole chart is noise.
+    static func grouped<Key: Hashable>(
+        _ contributions: [ExerciseContribution],
+        by key: (ExerciseContribution) -> Key?
+    ) -> [(key: Key, volumeKg: Double, sets: Int, exercises: [ExerciseContribution])] {
+        var groups: [Key: [ExerciseContribution]] = [:]
+        var order: [Key] = []
+        for row in contributions {
+            guard let key = key(row) else { continue }
+            if groups[key] == nil { order.append(key) }
+            groups[key, default: []].append(row)
+        }
+        return order.map { key in
+            let rows = groups[key] ?? []
+            return (key: key,
+                    volumeKg: rows.reduce(0) { $0 + $1.volumeKg },
+                    sets: rows.reduce(0) { $0 + $1.sets },
+                    exercises: rows)
+        }
+        .sorted { $0.volumeKg > $1.volumeKg }
     }
 
     /// How the window's tonnage splits between external load and the athlete's own body.

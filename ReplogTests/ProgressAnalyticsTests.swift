@@ -283,4 +283,84 @@ struct ProgressAnalyticsTests {
         #expect(ProgressAnalytics.relativeStrength(e1rm: 150, bodyweightKg: nil) == nil)
         #expect(ProgressAnalytics.relativeStrength(e1rm: 150, bodyweightKg: 0) == nil)
     }
+
+    // MARK: - Per-exercise contributions (what every Volume figure breaks down into)
+
+    @Test func exerciseContributionsRankByTonnageAndCountDistinctDays() {
+        let history = [
+            entry(date(2026, 6, 8), sets: [RecordedSet(w: 100, r: 10)]),            // 1000
+            entry(date(2026, 6, 9), sets: [RecordedSet(w: 100, r: 5)]),             // 500
+            entry(date(2026, 6, 9), exId: "Row", sets: [RecordedSet(w: 50, r: 10)]), // 500
+        ]
+        let rows = ProgressAnalytics.exerciseContributions(history: history, days: 30,
+                                                           today: today, calendar: cal)
+        #expect(rows.map(\.exId) == ["Bench", "Row"])
+        #expect(rows[0].volumeKg == 1500)
+        #expect(rows[0].sets == 2)
+        #expect(rows[0].reps == 15)
+        #expect(rows[0].sessionCount == 2)                    // two distinct days
+        #expect(rows[0].lastTrained == cal.startOfDay(for: date(2026, 6, 9)))  // newest first
+        #expect(rows[1].volumeKg == 500)
+    }
+
+    @Test func exerciseContributionsHonourTheWindow() {
+        let history = [
+            entry(date(2026, 6, 8), sets: [RecordedSet(w: 100, r: 10)]),
+            entry(date(2026, 4, 1), sets: [RecordedSet(w: 100, r: 10)]),   // outside 30 days
+        ]
+        let rows = ProgressAnalytics.exerciseContributions(history: history, days: 30,
+                                                           today: today, calendar: cal)
+        #expect(rows.count == 1)
+        #expect(rows[0].volumeKg == 1000)
+    }
+
+    @Test func exerciseContributionsSplitTheRepRangesLikeTheMix() {
+        let history = [entry(date(2026, 6, 8), sets: [
+            RecordedSet(w: 100, r: 3),    // strength
+            RecordedSet(w: 80, r: 8),     // hypertrophy
+            RecordedSet(w: 60, r: 15),    // endurance
+        ])]
+        let rows = ProgressAnalytics.exerciseContributions(history: history, days: 30,
+                                                           today: today, calendar: cal)
+        let mix = ProgressAnalytics.repRangeMix(history: history, days: 30,
+                                                today: today, calendar: cal)
+        #expect(rows[0].mix == mix)                 // one derivation, two call sites
+        #expect(rows[0].mix.strength == 1)
+        #expect(rows[0].mix.endurance == 1)
+    }
+
+    @Test func exerciseContributionsSumToTheSameTotalsAsTheHeadlines() {
+        // The invariant that matters: a tile you can tap must break down into itself.
+        let history = [
+            entry(date(2026, 6, 8), sets: [RecordedSet(w: 100, r: 10)]),
+            entry(date(2026, 6, 9), exId: "Row", sets: [RecordedSet(w: 50, r: 10),
+                                                        RecordedSet(w: 50, r: 8)]),
+        ]
+        let rows = ProgressAnalytics.exerciseContributions(history: history, days: 30,
+                                                           today: today, calendar: cal)
+        let buckets = ProgressAnalytics.weekBuckets(history: history, weeks: 4,
+                                                    today: today, calendar: cal)
+        #expect(rows.reduce(0) { $0 + $1.volumeKg } == buckets.reduce(0) { $0 + $1.volumeKg })
+        #expect(rows.reduce(0) { $0 + $1.sets } == buckets.reduce(0) { $0 + $1.sets })
+    }
+
+    @Test func groupedFoldsContributionsAndDropsUnkeyedRows() {
+        let history = [
+            entry(date(2026, 6, 8), sets: [RecordedSet(w: 100, r: 10)]),             // 1000
+            entry(date(2026, 6, 8), exId: "Row", sets: [RecordedSet(w: 50, r: 10)]), // 500
+            entry(date(2026, 6, 8), exId: "Mystery", sets: [RecordedSet(w: 10, r: 1)]),
+        ]
+        let rows = ProgressAnalytics.exerciseContributions(history: history, days: 30,
+                                                           today: today, calendar: cal)
+        let groups = ProgressAnalytics.grouped(rows) { row -> String? in
+            switch row.exId {
+            case "Bench": return "Push"
+            case "Row": return "Pull"
+            default: return nil          // uncategorised — must not become a slice
+            }
+        }
+        #expect(groups.map(\.key) == ["Push", "Pull"])       // largest first
+        #expect(groups[0].volumeKg == 1000)
+        #expect(groups[1].exercises.map(\.exId) == ["Row"])
+    }
 }
