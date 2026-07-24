@@ -135,6 +135,15 @@ struct ProgressHomeView: View {
             ProgressAnalytics.weekBuckets(history: history, weeks: 8, load: load))
     }
 
+    /// The last few finished sessions' tonnage — the bucket that still has shape when
+    /// the whole training history fits inside one week.
+    private var recentSessionVolumes: [Double] {
+        let load = self.load
+        return ProgressAnalytics.sessions(history: history)
+            .suffix(8)
+            .map { ProgressAnalytics.tonnage(of: $0, load: load) }
+    }
+
     private var volumeCard: some View {
         let buckets = weekBuckets
         let thisWeek = buckets.last?.volumeKg ?? 0
@@ -142,17 +151,13 @@ struct ProgressHomeView: View {
             eyebrow: "Volume",
             headline: Formulas.formatWeight(kg: thisWeek, units: units, includeUnit: false),
             caption: "\(units.label) this week",
-            route: .volume,
-            showsChart: buckets.count >= 2
+            route: .volume
         ) {
-            Chart(buckets) { bucket in
-                BarMark(x: .value("Week", bucket.weekStart, unit: .weekOfYear),
-                        y: .value("Volume", bucket.volumeKg))
-                    .foregroundStyle(Color.accent.opacity(bucket.id == buckets.last?.id ? 1 : 0.45))
-                    .cornerRadius(3)
-            }
-            .chartXAxis(.hidden).chartYAxis(.hidden)
-            .frame(height: Self.miniChartHeight)
+            // The bucket follows the data. Two sessions inside one calendar week is a
+            // single weekly bar — technically correct and completely shapeless — while
+            // the same tonnage per session is a preview you can actually read.
+            MiniBars(values: buckets.count >= 2 ? buckets.map(\.volumeKg) : recentSessionVolumes,
+                     height: Self.miniChartHeight)
         }
     }
 

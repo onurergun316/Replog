@@ -8,6 +8,7 @@
 //
 
 import SwiftUI
+import Charts
 
 /// The L2 screens' time windows.
 enum RangeWindow: String, CaseIterable, Identifiable, Hashable {
@@ -180,6 +181,59 @@ private struct CustomRangeSheet: View {
         }
         .padding(20)
         .background(Color.bg.ignoresSafeArea())
+    }
+}
+
+/// The L1 preview form: one axis-free bar per data point, newest at full accent.
+///
+/// The x scale is **categorical over the position**, not the date. Two sessions a day
+/// apart on a time scale render as two hairlines pinned to the edges of the card; as
+/// bands they read as two bars, which is the whole point of a preview. Apple's guidance
+/// for a chart this small is no gridlines, no labels, no interaction — the number above
+/// it carries the value, the bars carry the shape.
+struct MiniBars: View {
+    let values: [Double]
+    /// Dims everything but the newest bar — off for a ranked cross-section, where every
+    /// bar is a different subject rather than a step through time.
+    var highlightsLast: Bool = true
+    var height: CGFloat = 56
+
+    var body: some View {
+        Chart(Array(values.enumerated()), id: \.offset) { index, value in
+            BarMark(x: .value("Position", "\(index)"),
+                    y: .value("Value", value),
+                    width: .ratio(0.62))
+                .foregroundStyle(Color.accent.opacity(isDimmed(index) ? 0.45 : 1))
+                .cornerRadius(3)
+        }
+        .chartXAxis(.hidden).chartYAxis(.hidden)
+        // Bars are always zero-based; the headroom keeps the tallest bar off the ceiling.
+        .chartYScale(domain: 0...max(0.0001, (values.max() ?? 0) * 1.15))
+        .frame(height: height)
+    }
+
+    private func isDimmed(_ index: Int) -> Bool {
+        highlightsLast && index != values.count - 1
+    }
+}
+
+/// Ranked horizontal bars, one hue — the cross-section preview (muscles by sets, lifts
+/// by e1RM). Valid from a single data point, which is what makes it the right form when
+/// there is no time series yet.
+struct MiniRankedBars: View {
+    /// Largest first; the label only has to be unique.
+    let rows: [(label: String, value: Double)]
+    var height: CGFloat = 56
+
+    var body: some View {
+        Chart(Array(rows.enumerated()), id: \.offset) { _, row in
+            BarMark(x: .value("Value", row.value),
+                    y: .value("Row", row.label))
+                .foregroundStyle(Color.accent)
+                .cornerRadius(2)
+        }
+        .chartXAxis(.hidden).chartYAxis(.hidden)
+        .frame(height: height)
     }
 }
 
