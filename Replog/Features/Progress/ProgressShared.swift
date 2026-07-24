@@ -217,18 +217,21 @@ struct MiniBars: View {
     }
 }
 
-/// Ranked horizontal bars, one hue — the cross-section preview (muscles by sets, lifts
-/// by e1RM). Valid from a single data point, which is what makes it the right form when
-/// there is no time series yet.
+/// Ranked horizontal bars, one hue — the cross-section preview (lifts by e1RM, muscles
+/// by sets). Valid from a single data point, which is what makes it the right form when
+/// there is no time series to draw yet.
+///
+/// Banded on the row's position rather than its name, so two exercises that happen to
+/// share a name can't collapse into one bar.
 struct MiniRankedBars: View {
-    /// Largest first; the label only has to be unique.
-    let rows: [(label: String, value: Double)]
+    /// Largest first.
+    let values: [Double]
     var height: CGFloat = 56
 
     var body: some View {
-        Chart(Array(rows.enumerated()), id: \.offset) { _, row in
-            BarMark(x: .value("Value", row.value),
-                    y: .value("Row", row.label))
+        Chart(Array(values.enumerated()), id: \.offset) { index, value in
+            BarMark(x: .value("Value", value),
+                    y: .value("Rank", "\(index)"))
                 .foregroundStyle(Color.accent)
                 .cornerRadius(2)
         }

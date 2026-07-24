@@ -92,12 +92,16 @@ struct ProgressHomeView: View {
 
     // MARK: Strength (hero)
 
-    /// The top lift by best e1RM carries the hero card.
-    private var topLift: ExerciseProgress? {
-        Dictionary(grouping: history, by: \.exId)
+    /// Every trained exercise summarised, strongest first.
+    private var rankedLifts: [ExerciseProgress] {
+        let load = self.load
+        return Dictionary(grouping: history, by: \.exId)
             .map { ProgressAggregator.summarize(exId: $0.key, history: $0.value, load: load) }
-            .max { $0.bestE1rm < $1.bestE1rm }
+            .sorted { $0.bestE1rm > $1.bestE1rm }
     }
+
+    /// The top lift by best e1RM carries the hero card.
+    private var topLift: ExerciseProgress? { rankedLifts.first }
 
     private var recentPRCount: Int {
         let cutoff = Calendar.current.date(byAdding: .day, value: -28, to: Date()) ?? Date()
@@ -112,18 +116,20 @@ struct ProgressHomeView: View {
                 headline: "\(top.bestE1rm) est. 1RM",
                 caption: "\(catalog.exercise(id: top.exId)?.name ?? top.exId)"
                     + (recentPRCount > 0 ? " · \(recentPRCount) PR\(recentPRCount == 1 ? "" : "s") this month" : ""),
-                route: .strength,
-                showsChart: ChartDensity.of(top.series.count).count >= 3
+                route: .strength
             ) {
-                // Bars, not a dotted line: at 72pt a scatter of points reads as noise,
-                // while a bar per session shows the shape at a glance.
-                Chart(Array(top.series.suffix(20).enumerated()), id: \.offset) { index, value in
-                    BarMark(x: .value("Session", index), y: .value("1RM", value))
-                        .foregroundStyle(Color.accent.opacity(index == top.series.count - 1 ? 1 : 0.45))
-                        .cornerRadius(2)
+                // Two forms, picked by what the data can support. With three or more
+                // sessions of the headline lift, its own progression is the story —
+                // bars, not a dotted line, because at 72pt a scatter reads as noise.
+                // Below that there is no time series to draw, so the preview switches to
+                // the cross-section: how the trained lifts rank against each other,
+                // which is valid from the very first session.
+                if top.series.count >= 3 {
+                    MiniBars(values: top.series.suffix(20).map(Double.init), height: 72)
+                } else {
+                    MiniRankedBars(values: rankedLifts.prefix(5).map { Double($0.bestE1rm) },
+                                   height: 72)
                 }
-                .chartXAxis(.hidden).chartYAxis(.hidden)
-                .frame(height: 72)
             }
         }
     }
