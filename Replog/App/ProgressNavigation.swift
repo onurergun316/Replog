@@ -38,6 +38,8 @@ enum ProgressRoute: Hashable {
     case loadSplit(days: Int?)
     /// The strength / hypertrophy / endurance mix, opened from the Volume screen.
     case repRanges(days: Int?)
+    /// Push vs pull vs static, opened from the Muscle Balance screen.
+    case forceSplit(days: Int?)
 }
 
 extension View {
@@ -61,6 +63,8 @@ extension View {
                     LoadSplitDetailView(days: days)
                 case .repRanges(let days):
                     RepRangeDetailView(days: days)
+                case .forceSplit(let days):
+                    ForceSplitDetailView(days: days)
                 }
             }
             .navigationDestination(for: ExerciseRef.self) { ref in

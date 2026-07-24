@@ -116,10 +116,11 @@ struct BalanceDetailView: View {
         .cardSurface()
     }
 
+    /// The whole card opens. Three percentages state an imbalance without ever naming
+    /// the ratio behind it, or which movements produced it.
     private var pushPull: some View {
         let total = forceSplit.reduce(0.0) { $0 + $1.volume }
-        return VStack(alignment: .leading, spacing: 10) {
-            SectionHeader(title: "Push · Pull")
+        return SectionLink(title: "Push · Pull", route: .forceSplit(days: window.days)) {
             VStack(alignment: .leading, spacing: 8) {
                 Chart(forceSplit, id: \.label) { item in
                     BarMark(x: .value("Volume", item.volume))
@@ -135,12 +136,13 @@ struct BalanceDetailView: View {
                     ForEach(Array(forceSplit.enumerated()), id: \.element.label) { index, item in
                         HStack(spacing: 5) {
                             Circle().fill(ProgressPalette.ramp(index * 2)).frame(width: 7, height: 7)
-                            Text("\(item.label) \(Int((item.volume / total * 100).rounded()))%")
+                            Text("\(item.label) \(total > 0 ? Int((item.volume / total * 100).rounded()) : 0)%")
                                 .font(.rounded(11, .bold)).foregroundStyle(Color.text2)
                         }
                     }
                 }
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
             .padding(14)
             .cardSurface()
         }
