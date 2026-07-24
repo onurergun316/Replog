@@ -203,23 +203,33 @@ struct ProgressHomeView: View {
             eyebrow: "Consistency",
             headline: scheduled == 0 ? "—" : "\(percent)%",
             caption: "of scheduled days, 4 weeks",
-            route: .consistency,
-            showsChart: weeks.count >= 2
+            route: .consistency
         ) {
-            // Spans from zero so the done bar overlays the scheduled track rather than
-            // stacking on top of it (see ConsistencyDetailView).
-            Chart(weeks) { week in
-                BarMark(x: .value("Week", week.weekStart, unit: .weekOfYear),
-                        yStart: .value("From", 0), yEnd: .value("Scheduled", week.scheduled))
-                    .foregroundStyle(Color.track)
-                    .cornerRadius(3)
-                BarMark(x: .value("Week", week.weekStart, unit: .weekOfYear),
-                        yStart: .value("From", 0), yEnd: .value("Done", week.done))
-                    .foregroundStyle(Color.accent)
-                    .cornerRadius(3)
+            if weeks.isEmpty {
+                // No plan, so no denominator — the headline already says so. A flat
+                // track keeps the card's geometry without pretending to be a reading.
+                Capsule().fill(Color.track).frame(height: 8)
+                    .frame(height: Self.miniChartHeight)
+            } else {
+                // Spans from zero so the done bar overlays the scheduled track rather
+                // than stacking on top of it (see ConsistencyDetailView). Banded on the
+                // week's position, not its date: one week of history on a time scale is
+                // a bar with no width.
+                Chart(Array(weeks.enumerated()), id: \.offset) { index, week in
+                    BarMark(x: .value("Week", "\(index)"),
+                            yStart: .value("From", 0), yEnd: .value("Scheduled", week.scheduled),
+                            width: .ratio(0.62))
+                        .foregroundStyle(Color.track)
+                        .cornerRadius(3)
+                    BarMark(x: .value("Week", "\(index)"),
+                            yStart: .value("From", 0), yEnd: .value("Done", week.done),
+                            width: .ratio(0.62))
+                        .foregroundStyle(Color.accent)
+                        .cornerRadius(3)
+                }
+                .chartXAxis(.hidden).chartYAxis(.hidden)
+                .frame(height: Self.miniChartHeight)
             }
-            .chartXAxis(.hidden).chartYAxis(.hidden)
-            .frame(height: Self.miniChartHeight)
         }
     }
 
