@@ -30,10 +30,9 @@ struct BalanceDetailView: View {
         return max(1, Calendar.current.dateComponents([.day], from: first, to: Date()).day ?? 1)
     }
 
-    private var shares: [MuscleShare] {
-        ProgressAnalytics.muscleShares(history: history, days: window.days ?? 730,
-                                       muscles: { catalog.exercise(id: $0)?.primaryMuscles ?? [] },
-                                       load: load)
+    private var muscleSets: [(muscle: Muscle, sets: Int)] {
+        ProgressAnalytics.muscleSets(history: history, days: window.days ?? 3650,
+                                     muscles: { catalog.exercise(id: $0)?.primaryMuscles ?? [] })
     }
 
     /// Push vs pull vs static volume within the window, from the catalog's force facet.
@@ -57,12 +56,11 @@ struct BalanceDetailView: View {
                 Text("Muscle Balance").font(.screenTitle).foregroundStyle(Color.textPrimary)
                 RangePicker(selection: $window, historySpanDays: historySpanDays)
 
-                if shares.isEmpty {
-                    ProgressEmptyCard(text: "No attributed volume in this window yet.")
+                if muscleSets.isEmpty {
+                    ProgressEmptyCard(text: "No attributed sets in this window yet.")
                 } else {
-                    donut
+                    muscleBars
                     if forceSplit.count > 1 { pushPull }
-                    muscleList
                 }
             }
             .padding(20)
@@ -71,33 +69,46 @@ struct BalanceDetailView: View {
         .navigationBarTitleDisplayMode(.inline)
     }
 
-    private var donut: some View {
-        let top = Array(shares.prefix(6))
-        let other = shares.dropFirst(6).reduce(0.0) { $0 + $1.volumeKg }
-        return VStack(spacing: 10) {
-            Chart {
-                ForEach(Array(top.enumerated()), id: \.element.id) { index, share in
-                    SectorMark(angle: .value("Volume", share.volumeKg),
-                               innerRadius: .ratio(0.62), angularInset: 1.5)
-                        .foregroundStyle(ProgressPalette.ramp(index))
-                        .cornerRadius(3)
-                }
-                if other > 0 {
-                    SectorMark(angle: .value("Volume", other),
-                               innerRadius: .ratio(0.62), angularInset: 1.5)
-                        .foregroundStyle(Color.track)
-                        .cornerRadius(3)
-                }
-            }
-            .frame(height: 190)
-            FlowLayout(spacing: 8) {
-                ForEach(Array(top.enumerated()), id: \.element.id) { index, share in
-                    HStack(spacing: 5) {
-                        Circle().fill(ProgressPalette.ramp(index)).frame(width: 7, height: 7)
-                        Text("\(share.muscle.displayName) \(Int((share.share * 100).rounded()))%")
-                            .font(.rounded(11, .bold)).foregroundStyle(Color.text2)
+    /// Ranked horizontal bars, not a donut.
+    ///
+    /// The task here is "which muscle am I under-training", which is a ranked comparison
+    /// — and a ring cannot draw a muscle you trained zero sets of, which on a balance
+    /// chart is the single most useful row. Seven slices also blew the colour budget and
+    /// forced a wrapping legend that clipped. One hue, direct labels, no legend.
+    private var muscleBars: some View {
+        let ranked = muscleSets
+        let top = Array(ranked.prefix(6))
+        let other = ranked.dropFirst(6)
+        let maxSets = max(1, top.first?.sets ?? 1)
+        return VStack(alignment: .leading, spacing: 12) {
+            ForEach(top, id: \.muscle) { row in
+                NavigationLink(value: ProgressRoute.muscle(row.muscle)) {
+                    VStack(alignment: .leading, spacing: 5) {
+                        HStack {
+                            Text(row.muscle.displayName)
+                                .font(.rounded(13, .heavy)).foregroundStyle(Color.textPrimary)
+                            Spacer()
+                            Text("\(row.sets) set\(row.sets == 1 ? "" : "s")")
+                                .font(.rounded(12, .heavy)).foregroundStyle(Color.text2)
+                                .tabularNumbers()
+                        }
+                        GeometryReader { geo in
+                            ZStack(alignment: .leading) {
+                                Capsule().fill(Color.track)
+                                Capsule().fill(Color.accent)
+                                    .frame(width: max(4, geo.size.width * CGFloat(row.sets) / CGFloat(maxSets)))
+                            }
+                        }
+                        .frame(height: 8)
                     }
+                    .padding(.vertical, 4)
+                    .contentShape(Rectangle())
                 }
+                .buttonStyle(.plain)
+            }
+            if !other.isEmpty {
+                Text("+ \(other.count) more muscle\(other.count == 1 ? "" : "s") · \(other.reduce(0) { $0 + $1.sets }) sets")
+                    .font(.rounded(11, .semibold)).foregroundStyle(Color.text3)
             }
         }
         .padding(14)
@@ -135,32 +146,6 @@ struct BalanceDetailView: View {
         }
     }
 
-    private var muscleList: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            SectionHeader(title: "By Muscle")
-            VStack(spacing: 0) {
-                ForEach(Array(shares.enumerated()), id: \.element.id) { index, share in
-                    if index > 0 { Divider() }
-                    NavigationLink(value: ProgressRoute.muscle(share.muscle)) {
-                        HStack(spacing: 10) {
-                            Text(share.muscle.displayName)
-                                .font(.rounded(14, .heavy)).foregroundStyle(Color.textPrimary)
-                            Spacer()
-                            Text("\(Int((share.share * 100).rounded()))%")
-                                .font(.rounded(13, .heavy)).foregroundStyle(Color.text2).tabularNumbers()
-                            Image(systemName: "chevron.right")
-                                .font(.system(size: 11, weight: .bold)).foregroundStyle(Color.text3)
-                        }
-                        .padding(.vertical, 11)
-                        .contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain)
-                }
-            }
-            .padding(.horizontal, 14)
-            .cardSurface()
-        }
-    }
 }
 
 // MARK: - L3: one muscle

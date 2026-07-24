@@ -108,7 +108,8 @@ struct ProgressHomeView: View {
                 headline: "\(top.bestE1rm) est. 1RM",
                 caption: "\(catalog.exercise(id: top.exId)?.name ?? top.exId)"
                     + (recentPRCount > 0 ? " · \(recentPRCount) PR\(recentPRCount == 1 ? "" : "s") this month" : ""),
-                route: .strength
+                route: .strength,
+                showsChart: ChartDensity.of(top.series.count).count >= 3
             ) {
                 Chart(Array(top.series.suffix(20).enumerated()), id: \.offset) { index, value in
                     LineMark(x: .value("Session", index), y: .value("1RM", value))
@@ -143,7 +144,8 @@ struct ProgressHomeView: View {
             eyebrow: "Volume",
             headline: Formulas.formatWeight(kg: thisWeek, units: units, includeUnit: false),
             caption: "\(units.label) this week",
-            route: .volume
+            route: .volume,
+            showsChart: buckets.count >= 2
         ) {
             Chart(buckets) { bucket in
                 BarMark(x: .value("Week", bucket.weekStart, unit: .weekOfYear),
@@ -158,26 +160,29 @@ struct ProgressHomeView: View {
 
     // MARK: Muscle balance
 
-    private var muscleShares: [MuscleShare] {
-        ProgressAnalytics.muscleShares(history: history, days: 28,
-                                       muscles: { catalog.exercise(id: $0)?.primaryMuscles ?? [] },
-                                       load: load)
+    private var muscleShares: [(muscle: Muscle, sets: Int)] {
+        ProgressAnalytics.muscleSets(history: history, days: 28,
+                                     muscles: { catalog.exercise(id: $0)?.primaryMuscles ?? [] })
     }
 
     private var balanceCard: some View {
-        let shares = Array(muscleShares.prefix(5))
+        let shares = Array(muscleShares.prefix(4))
         return DashboardCard(
             eyebrow: "Muscles",
-            headline: shares.first.map { $0.muscle.displayName } ?? "—",
-            caption: shares.first.map { "\(Int(($0.share * 100).rounded()))% of 4-week volume" },
-            route: .balance
+            headline: shares.first?.muscle.displayName ?? "—",
+            caption: shares.first.map { "\($0.sets) set\($0.sets == 1 ? "" : "s") in 4 weeks" },
+            route: .balance,
+            showsChart: shares.count >= 2
         ) {
-            Chart(Array(shares.enumerated()), id: \.element.id) { index, share in
-                SectorMark(angle: .value("Volume", share.volumeKg),
-                           innerRadius: .ratio(0.62), angularInset: 1.5)
-                    .foregroundStyle(ProgressPalette.ramp(index))
+            // Ranked bars, one hue — a mini donut cannot be read at 56pt and cannot
+            // show a muscle trained zero times, which is the row that matters.
+            Chart(shares, id: \.muscle) { row in
+                BarMark(x: .value("Sets", row.sets),
+                        y: .value("Muscle", row.muscle.displayName))
+                    .foregroundStyle(Color.accent)
                     .cornerRadius(2)
             }
+            .chartXAxis(.hidden).chartYAxis(.hidden)
             .frame(height: 56)
         }
     }
@@ -195,7 +200,8 @@ struct ProgressHomeView: View {
             eyebrow: "Consistency",
             headline: scheduled == 0 ? "—" : "\(percent)%",
             caption: "of scheduled days, 4 weeks",
-            route: .consistency
+            route: .consistency,
+            showsChart: weeks.count >= 2
         ) {
             // Spans from zero so the done bar overlays the scheduled track rather than
             // stacking on top of it (see ConsistencyDetailView).
@@ -224,7 +230,8 @@ struct ProgressHomeView: View {
             headline: snapshot.map { Formulas.formatBodyweight(kg: $0.currentKg, units: units,
                                                               includeUnit: false) } ?? "—",
             caption: snapshot == nil ? "log your bodyweight" : units.label + " bodyweight",
-            route: .body
+            route: .body,
+            showsChart: series.count >= 3
         ) {
             Chart(Array(series), id: \.id) { entry in
                 LineMark(x: .value("Date", entry.date), y: .value("Weight", entry.weightKg))

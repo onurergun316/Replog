@@ -182,6 +182,35 @@ struct ProgressAnalyticsTests {
         #expect(byWorkout.first?.workout == "Legs")          // 1000 outranks Push's 500
     }
 
+    @Test func muscleSetsCountHardSetsAndRankThem() {
+        // Sets, not kilograms: tonnage makes a leg-press day look heroic and a strict
+        // overhead-press day look like nothing, which is the wrong unit for balance.
+        let history = [
+            entry(date(2026, 6, 8), exId: "Bench",
+                  sets: [RecordedSet(w: 100, r: 10), RecordedSet(w: 100, r: 10)]),
+            entry(date(2026, 6, 9), exId: "Squat", sets: [RecordedSet(w: 20, r: 30)]),
+        ]
+        let muscles: (String) -> [Muscle] = { $0 == "Bench" ? [.chest] : [.quadriceps] }
+
+        let ranked = ProgressAnalytics.muscleSets(history: history, days: 30,
+                                                  muscles: muscles, today: today, calendar: cal)
+        #expect(ranked.map(\.muscle) == [.chest, .quadriceps])   // 2 sets beats 1...
+        #expect(ranked.map(\.sets) == [2, 1])
+        // ...even though the squat moved more total weight (600 kg vs 2000 kg is not
+        // the question a balance chart asks).
+    }
+
+    @Test func muscleSetsCountABodyweightSessionTheSameAsALoadedOne() {
+        // A set is a set: this is why balance is counted in sets and needs no resolver.
+        let history = [entry(date(2026, 6, 8), exId: "Pushups",
+                             sets: [RecordedSet(w: 0, r: 20), RecordedSet(w: 0, r: 20)])]
+        let ranked = ProgressAnalytics.muscleSets(history: history, days: 30,
+                                                  muscles: { _ in [.chest] },
+                                                  today: today, calendar: cal)
+        #expect(ranked.map(\.muscle) == [.chest])
+        #expect(ranked.map(\.sets) == [2])
+    }
+
     @Test func muscleSharesNormalizeAndSortLargestFirst() {
         let history = [
             entry(date(2026, 6, 8), exId: "Bench", sets: [RecordedSet(w: 100, r: 10)]),  // 1000 → chest

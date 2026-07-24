@@ -87,6 +87,15 @@ struct RangePicker: View {
     }
 
     var body: some View {
+        // A control offering one option is not a control — with four days of history
+        // every preset renders the identical chart, and five pills that visibly do
+        // nothing read as broken.
+        if offered.count > 1 || selection.window == .custom {
+            picker
+        }
+    }
+
+    private var picker: some View {
         HStack(spacing: 8) {
             Menu {
                 Picker("Range", selection: Binding(
@@ -192,6 +201,9 @@ struct DashboardCard<Chart: View>: View {
     let headline: String
     var caption: String? = nil
     let route: ProgressRoute
+    /// Rendered only when the data has earned a chart — a card must shrink rather than
+    /// reserve whitespace around a single dot.
+    var showsChart: Bool = true
     @ViewBuilder var chart: () -> Chart
 
     var body: some View {
@@ -210,7 +222,7 @@ struct DashboardCard<Chart: View>: View {
                     Text(caption).font(.rounded(11, .semibold)).foregroundStyle(Color.text2)
                         .lineLimit(1)
                 }
-                chart()
+                if showsChart { chart() }
             }
             .padding(14)
             .frame(maxWidth: .infinity, alignment: .leading)

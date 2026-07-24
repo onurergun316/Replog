@@ -132,6 +132,32 @@ enum ProgressAnalytics {
             .sorted { $0.volumeKg > $1.volumeKg }
     }
 
+    /// Hard sets per primary muscle over the last `days` days, most-trained first.
+    ///
+    /// Sets, not kilograms. Tonnage makes a leg-press day look heroic and a strict
+    /// overhead-press day look like nothing, so it is the wrong unit for asking whether
+    /// training is balanced — every app that does this well counts sets. Tonnage stays
+    /// the Volume headline, where it is a fair celebration number.
+    ///
+    /// A count is also honest on session one, where a *share* is not: "chest 38%" from
+    /// three sessions swings wildly and reads as precision the data doesn't have.
+    static func muscleSets(history: [HistoryEntry], days: Int,
+                           muscles: (String) -> [Muscle],
+                           today: Date = Date(),
+                           calendar: Calendar = .current) -> [(muscle: Muscle, sets: Int)] {
+        guard let cutoff = calendar.date(byAdding: .day, value: -days,
+                                         to: calendar.startOfDay(for: today)) else { return [] }
+        var counts: [Muscle: Int] = [:]
+        for entry in history where entry.date >= cutoff {
+            let targets = muscles(entry.exId)
+            guard !targets.isEmpty else { continue }
+            for muscle in targets { counts[muscle, default: 0] += entry.sets.count }
+        }
+        return counts.map { (muscle: $0.key, sets: $0.value) }
+            .sorted { $0.sets == $1.sets ? $0.muscle.displayName < $1.muscle.displayName
+                                         : $0.sets > $1.sets }
+    }
+
     /// Sets by rep range over the last `days` days.
     ///
     /// Timed holds are excluded: their stored "reps" are seconds, so a 45-second plank
