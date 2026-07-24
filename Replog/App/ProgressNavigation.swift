@@ -36,6 +36,8 @@ enum ProgressRoute: Hashable {
     case volumeStat(VolumeStat, days: Int?)
     /// External load vs the athlete's own body, opened from the Volume screen's split.
     case loadSplit(days: Int?)
+    /// The strength / hypertrophy / endurance mix, opened from the Volume screen.
+    case repRanges(days: Int?)
 }
 
 extension View {
@@ -57,6 +59,8 @@ extension View {
                     VolumeStatDetailView(stat: stat, days: days)
                 case .loadSplit(let days):
                     LoadSplitDetailView(days: days)
+                case .repRanges(let days):
+                    RepRangeDetailView(days: days)
                 }
             }
             .navigationDestination(for: ExerciseRef.self) { ref in

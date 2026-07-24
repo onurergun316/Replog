@@ -223,39 +223,17 @@ struct VolumeDetailView: View {
         return "\(Formulas.formatWeight(kg: value, units: units)) · \(percent)%"
     }
 
+    @ViewBuilder
     private var repMixSection: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            SectionHeader(title: "Rep Ranges")
-            VStack(alignment: .leading, spacing: 10) {
-                if mix.total > 0 {
-                    Chart {
-                        BarMark(x: .value("Sets", mix.strength))
-                            .foregroundStyle(ProgressPalette.ramp(0))
-                        BarMark(x: .value("Sets", mix.hypertrophy))
-                            .foregroundStyle(ProgressPalette.ramp(1))
-                        BarMark(x: .value("Sets", mix.endurance))
-                            .foregroundStyle(ProgressPalette.ramp(2))
-                    }
-                    .chartXAxis(.hidden).chartYAxis(.hidden)
-                    .frame(height: 26)
-                    .clipShape(Capsule())
-                    legendRow("1–5 reps · strength", mix.strength, 0)
-                    legendRow("6–12 reps · hypertrophy", mix.hypertrophy, 1)
-                    legendRow("13+ reps · endurance", mix.endurance, 2)
-                }
+        if mix.total > 0 {
+            // Opens onto which movements you train in which range — the thing you'd
+            // actually change, which the shape alone never says.
+            SectionLink(title: "Rep Ranges", route: .repRanges(days: window.days)) {
+                RepRangeBar(mix: mix)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(14)
+                    .cardSurface()
             }
-            .padding(14)
-            .cardSurface()
-        }
-    }
-
-    private func legendRow(_ label: String, _ count: Int, _ rampIndex: Int) -> some View {
-        HStack(spacing: 8) {
-            Circle().fill(ProgressPalette.ramp(rampIndex)).frame(width: 8, height: 8)
-            Text(label).font(.rounded(12, .semibold)).foregroundStyle(Color.text2)
-            Spacer()
-            Text("\(count) sets").font(.rounded(12, .heavy)).foregroundStyle(Color.textPrimary)
-                .tabularNumbers()
         }
     }
 
