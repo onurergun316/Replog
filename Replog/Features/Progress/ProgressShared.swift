@@ -56,9 +56,16 @@ struct RangeSelection: Equatable {
 
     var label: String {
         guard window == .custom else { return window.label }
-        return customDays % 7 == 0
-            ? "Last \(customDays / 7) week\(customDays / 7 == 1 ? "" : "s")"
-            : "Last \(customDays) days"
+        return Self.label(days: customDays)
+    }
+
+    /// The same wording from a bare span, for screens that are handed the window as a
+    /// number of days rather than a selection (a route can carry `Int?`, not a picker).
+    static func label(days: Int?) -> String {
+        guard let days else { return "All time" }
+        return days % 7 == 0
+            ? "Last \(days / 7) week\(days / 7 == 1 ? "" : "s")"
+            : "Last \(days) days"
     }
 }
 
@@ -331,6 +338,49 @@ struct ContributionRow: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+    }
+}
+
+/// One direct-labelled row under a part-to-whole capsule. The house form for 2–3
+/// categories: a legend of swatches is what clipped, so the label sits in the row.
+struct LegendRow: View {
+    let label: String
+    let value: String
+    let ramp: Int
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Circle().fill(ProgressPalette.ramp(ramp)).frame(width: 8, height: 8)
+            Text(label).font(.rounded(12, .semibold)).foregroundStyle(Color.text2)
+                .lineLimit(1).minimumScaleFactor(0.75)
+            Spacer(minLength: 6)
+            Text(value).font(.rounded(12, .heavy)).foregroundStyle(Color.textPrimary)
+                .tabularNumbers().lineLimit(1)
+        }
+    }
+}
+
+/// The strength / hypertrophy / endurance mix as one capsule plus its rows.
+struct RepRangeBar: View {
+    let mix: RepRangeMix
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Chart {
+                BarMark(x: .value("Sets", mix.strength))
+                    .foregroundStyle(ProgressPalette.ramp(0))
+                BarMark(x: .value("Sets", mix.hypertrophy))
+                    .foregroundStyle(ProgressPalette.ramp(1))
+                BarMark(x: .value("Sets", mix.endurance))
+                    .foregroundStyle(ProgressPalette.ramp(2))
+            }
+            .chartXAxis(.hidden).chartYAxis(.hidden).chartLegend(.hidden)
+            .frame(height: 26)
+            .clipShape(Capsule())
+            LegendRow(label: "1–5 reps · strength", value: "\(mix.strength) sets", ramp: 0)
+            LegendRow(label: "6–12 reps · hypertrophy", value: "\(mix.hypertrophy) sets", ramp: 1)
+            LegendRow(label: "13+ reps · endurance", value: "\(mix.endurance) sets", ramp: 2)
+        }
     }
 }
 

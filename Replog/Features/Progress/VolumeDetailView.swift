@@ -66,38 +66,36 @@ struct VolumeDetailView: View {
         .navigationBarTitleDisplayMode(.inline)
     }
 
+    /// Every tile opens. A headline you can read but cannot question is where the screen
+    /// used to stop — "23,188 kg" is only useful next to which lifts produced it.
     private func summaryRow(trained: [WeekBucket]) -> some View {
         let total = trained.reduce(0.0) { $0 + $1.volumeKg }
         let groups = sessions
         return HStack(spacing: 12) {
-            summaryTile(Formulas.formatWeight(kg: total, units: units, includeUnit: false),
-                        "total \(units.label)")
+            StatTile(value: Formulas.formatWeight(kg: total, units: units, includeUnit: false),
+                     label: "total \(units.label)",
+                     route: .volumeStat(.total, days: window.days))
             // An average over one week is just the total again — two tiles showing the
             // identical number reads as a bug. Below two trained weeks, report the
             // per-session average instead, which is a real second reading.
             if trained.count > 1 {
-                summaryTile(Formulas.formatWeight(kg: total / Double(trained.count),
-                                                  units: units, includeUnit: false),
-                            "avg / week")
+                StatTile(value: Formulas.formatWeight(kg: total / Double(trained.count),
+                                                      units: units, includeUnit: false),
+                         label: "avg / week",
+                         route: .volumeStat(.average, days: window.days))
             } else if groups.count > 1 {
-                summaryTile(Formulas.formatWeight(kg: total / Double(groups.count),
-                                                  units: units, includeUnit: false),
-                            "avg / session")
+                StatTile(value: Formulas.formatWeight(kg: total / Double(groups.count),
+                                                      units: units, includeUnit: false),
+                         label: "avg / session",
+                         route: .volumeStat(.average, days: window.days))
             } else {
-                summaryTile("\(groups.count)", groups.count == 1 ? "session" : "sessions")
+                StatTile(value: "\(groups.count)",
+                         label: groups.count == 1 ? "session" : "sessions",
+                         route: .volumeStat(.average, days: window.days))
             }
-            summaryTile("\(trained.reduce(0) { $0 + $1.sets })", "sets")
+            StatTile(value: "\(trained.reduce(0) { $0 + $1.sets })", label: "sets",
+                     route: .volumeStat(.sets, days: window.days))
         }
-    }
-
-    private func summaryTile(_ value: String, _ label: String) -> some View {
-        VStack(spacing: 2) {
-            Text(value).font(.rounded(18, .black)).foregroundStyle(Color.textPrimary)
-                .tabularNumbers().lineLimit(1).minimumScaleFactor(0.7)
-            Text(label).font(.rounded(11, .bold)).foregroundStyle(Color.text2)
-        }
-        .frame(maxWidth: .infinity).padding(.vertical, 12)
-        .cardSurface()
     }
 
     private var weeklyChart: some View {

@@ -30,6 +30,10 @@ enum ProgressRoute: Hashable {
     case week(Date)
     /// A start-of-day.
     case day(Date)
+    /// One of the Volume screen's headline numbers, opened up. `days` carries the window
+    /// it was read in — a route can hold an `Int?` where it can't hold a `RangeSelection`,
+    /// and a breakdown that silently changed window would contradict the tile you tapped.
+    case volumeStat(VolumeStat, days: Int?)
 }
 
 extension View {
@@ -47,6 +51,8 @@ extension View {
                 case .muscle(let m):   MuscleDetailView(muscle: m)
                 case .week(let start): WeekDetailView(weekStart: start)
                 case .day(let day):    TrainingDayView(day: day)
+                case .volumeStat(let stat, let days):
+                    VolumeStatDetailView(stat: stat, days: days)
                 }
             }
             .navigationDestination(for: ExerciseRef.self) { ref in
