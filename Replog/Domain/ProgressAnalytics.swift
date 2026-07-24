@@ -67,9 +67,13 @@ struct ExerciseContribution: Equatable, Identifiable {
     var mix = RepRangeMix()
     /// Start-of-day for every day this exercise was trained, newest first.
     var days: [Date] = []
+    /// Finished sessions this exercise appeared in — not days. Two workouts in one day
+    /// are two sessions, which is exactly what the session lists beside these rows show;
+    /// counting days made a row say "1 session" next to a list showing two.
+    var sessionCount: Int = 0
 
     var id: String { exId }
-    var sessionCount: Int { days.count }
+    var dayCount: Int { days.count }
     var lastTrained: Date? { days.first }
     /// True when any of the load came from moving the athlete's own body.
     var isBodyweight: Bool { bodyweightKg > 0 }
@@ -362,6 +366,9 @@ enum ProgressAnalytics {
                                          to: calendar.startOfDay(for: today)) else { return [] }
         var byExercise: [String: ExerciseContribution] = [:]
         var daysSeen: [String: Set<Date>] = [:]
+        // Keyed exactly like `sessions(history:)`, so a contribution row and the session
+        // list on the same screen agree on what counts as one session.
+        var sessionsSeen: [String: Set<AnyHashable>] = [:]
         for entry in history.sorted(by: { $0.date < $1.date }) where entry.date >= cutoff {
             var row = byExercise[entry.exId] ?? ExerciseContribution(exId: entry.exId)
             let isHold = load.isTimedHold(exId: entry.exId)
@@ -384,11 +391,14 @@ enum ProgressAnalytics {
             row.bestE1rm = Swift.max(row.bestE1rm, load.e1rm(entry))
             byExercise[entry.exId] = row
             daysSeen[entry.exId, default: []].insert(calendar.startOfDay(for: entry.date))
+            sessionsSeen[entry.exId, default: []]
+                .insert(entry.sessionId.map { AnyHashable($0) } ?? AnyHashable(entry.date))
         }
         return byExercise.values.map { row in
             var row = row
             row.bodyweightKg = Swift.max(0, row.volumeKg - row.externalKg)
             row.days = (daysSeen[row.exId] ?? []).sorted(by: >)
+            row.sessionCount = sessionsSeen[row.exId]?.count ?? 0
             return row
         }
         .sorted { $0.volumeKg == $1.volumeKg ? $0.exId < $1.exId : $0.volumeKg > $1.volumeKg }

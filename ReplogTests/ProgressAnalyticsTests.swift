@@ -298,7 +298,7 @@ struct ProgressAnalyticsTests {
         #expect(rows[0].volumeKg == 1500)
         #expect(rows[0].sets == 2)
         #expect(rows[0].reps == 15)
-        #expect(rows[0].sessionCount == 2)                    // two distinct days
+        #expect(rows[0].dayCount == 2)                        // two distinct days
         #expect(rows[0].lastTrained == cal.startOfDay(for: date(2026, 6, 9)))  // newest first
         #expect(rows[1].volumeKg == 500)
     }
@@ -342,6 +342,21 @@ struct ProgressAnalyticsTests {
                                                     today: today, calendar: cal)
         #expect(rows.reduce(0) { $0 + $1.volumeKg } == buckets.reduce(0) { $0 + $1.volumeKg })
         #expect(rows.reduce(0) { $0 + $1.sets } == buckets.reduce(0) { $0 + $1.sets })
+    }
+
+    @Test func exerciseContributionsCountSessionsNotDays() {
+        // Two finishes on one day is two sessions — which is what the session list beside
+        // these rows shows, so counting distinct days made the two disagree.
+        let morning = UUID(), evening = UUID()
+        let history = [
+            entry(date(2026, 6, 8), sets: [RecordedSet(w: 100, r: 5)], sessionId: morning),
+            entry(date(2026, 6, 8), sets: [RecordedSet(w: 100, r: 5)], sessionId: evening),
+        ]
+        let rows = ProgressAnalytics.exerciseContributions(history: history, days: 30,
+                                                           today: today, calendar: cal)
+        #expect(rows[0].sessionCount == 2)
+        #expect(rows[0].dayCount == 1)
+        #expect(rows[0].sessionCount == ProgressAnalytics.sessions(history: history).count)
     }
 
     @Test func cutoffAnchorsAtStartOfDaySoAScreensFilterMatchesTheAggregates() {
