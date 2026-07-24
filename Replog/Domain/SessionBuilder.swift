@@ -43,16 +43,14 @@ enum SessionBuilder {
 
             for (setIndex, template) in item.orderedSets.enumerated() {
                 let prev = previous?.sets[safe: setIndex]
-                // Start from what was actually lifted last time.
+                // Start from what was actually lifted last time — seed from the last
+                // session whenever it is newer information than the template.
                 //
-                // `SessionFinisher` normally writes logged values back onto the template,
-                // so the two agree. This covers every case where it couldn't: sessions
-                // finished before write-back existed, partial finishes, and a plan whose
-                // exercise was swapped. `estimated` is the guard — it means the number is
-                // still a computed seed nobody has touched, so history is strictly better
-                // information. Once a human edits the template, or a finished session
-                // writes to it, the flag clears and the template wins.
-                let seed = template.estimated ? prev : nil
+                // This must NOT key on `estimated`: manually added sets leave that false,
+                // so gating on it skipped most real plans and the whole carry-forward
+                // silently did nothing. `updatedAt` is the honest question — has anything
+                // deliberately set this number since the athlete last lifted it?
+                let seed = previous.map { template.supersededBy($0.date) } == true ? prev : nil
                 let logged = LoggedSet(
                     weightKg: seed?.w ?? template.weightKg,
                     reps: seed?.r ?? template.reps,

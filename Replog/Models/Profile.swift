@@ -89,9 +89,10 @@ final class AppSettings {
     var restTimerAuto: Bool = false
     var restSeconds: Int = 90
 
-    /// Whether the one-time `TemplateBackfill` has run — repairing plans whose sets were
-    /// logged before finishing a workout started writing its numbers back.
-    var didBackfillTemplates: Bool = false
+    /// Which `TemplateBackfill` version has run — repairing plans whose sets were logged
+    /// before finishing a workout started writing its numbers back. Versioned rather than
+    /// a bool so a corrected repair can re-run on a device that already saw an earlier one.
+    var templateBackfillVersion: Int = 0
 
     // MARK: Notifications (Phase 7)
     /// Master switch — off until the user opts in (permission is requested in context).

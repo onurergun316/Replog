@@ -21,13 +21,18 @@ import SwiftData
 @MainActor
 enum TemplateBackfill {
 
+    /// Bump to re-run the repair on devices that already ran an earlier version.
+    static let version = 2
+
     /// Applies the latest logged values to every untouched template across all plans.
     /// Returns the number of templates updated.
     @discardableResult
     static func run(context: ModelContext) -> Int {
         let settings = context.appSettings()
-        guard !settings.didBackfillTemplates else { return 0 }
-        settings.didBackfillTemplates = true
+        // Versioned, not a bool: the first attempt gated on `estimated` and repaired
+        // almost nothing, so a device that already ran it still needs this pass.
+        guard settings.templateBackfillVersion < Self.version else { return 0 }
+        settings.templateBackfillVersion = Self.version
 
         var updated = 0
         for plan in context.allPlans() {
@@ -51,12 +56,13 @@ enum TemplateBackfill {
         guard !sets.isEmpty else { return 0 }
         var updated = 0
         for (index, template) in item.orderedSets.enumerated() {
-            // Only seeds. A template the athlete edited, or one a finished session has
-            // already written, is authoritative and must not be rewritten from history.
-            guard template.estimated, let recorded = sets[safe: index] else { continue }
+            // Recency decides. A template edited *after* this session keeps its number;
+            // one nobody has touched since takes the logged value.
+            guard template.supersededBy(latest.date), let recorded = sets[safe: index] else { continue }
             template.weightKg = recorded.w
             template.reps = recorded.r
             template.estimated = false
+            template.updatedAt = latest.date
             updated += 1
         }
         return updated

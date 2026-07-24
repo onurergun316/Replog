@@ -76,7 +76,7 @@ enum SessionFinisher {
         if isComplete {
             // The plan's templates are the athlete's current working numbers, not a frozen
             // prescription: what was just lifted is what the next session starts from.
-            TemplateWriteBack.applyIfComplete(session: session, context: context)
+            TemplateWriteBack.applyIfComplete(session: session, context: context, date: date)
             profile.totalWorkouts += 1
             profile.doneDates = StreakCalendar.recordingCompletion(date, into: profile.doneDates)
         }

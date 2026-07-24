@@ -55,7 +55,8 @@ enum TemplateWriteBack {
     ///
     /// Returns the number of template sets written, for tests and telemetry.
     @discardableResult
-    static func apply(session: ActiveSession, to workout: Workout, context: ModelContext) -> Int {
+    static func apply(session: ActiveSession, to workout: Workout, context: ModelContext,
+                      date: Date = Date()) -> Int {
         var written = 0
         for (exercise, item) in matches(sessionExercises: session.exercises, items: workout.items) {
             let templatesByOrder = Dictionary(item.orderedSets.map { ($0.order, $0) },
@@ -66,9 +67,11 @@ enum TemplateWriteBack {
                     template.weightKg = logged.weightKg
                     template.reps = logged.reps
                     template.estimated = false
+                    template.updatedAt = date
                 } else {
                     let template = SetTemplate(weightKg: logged.weightKg, reps: logged.reps,
                                                rpe: logged.rpe, order: nextOrder, estimated: false)
+                    template.updatedAt = date
                     template.item = item
                     context.insert(template)
                     nextOrder += 1
@@ -83,10 +86,11 @@ enum TemplateWriteBack {
     /// No-op when the workout is incomplete, when the session has no source workout
     /// (or it has since been deleted), so callers can invoke this unconditionally.
     @discardableResult
-    static func applyIfComplete(session: ActiveSession, context: ModelContext) -> Int {
+    static func applyIfComplete(session: ActiveSession, context: ModelContext,
+                                date: Date = Date()) -> Int {
         guard session.isComplete, let workoutId = session.workoutId else { return 0 }
         let descriptor = FetchDescriptor<Workout>(predicate: #Predicate { $0.id == workoutId })
         guard let workout = try? context.fetch(descriptor).first else { return 0 }
-        return apply(session: session, to: workout, context: context)
+        return apply(session: session, to: workout, context: context, date: date)
     }
 }

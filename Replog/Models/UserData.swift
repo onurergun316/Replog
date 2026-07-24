@@ -126,7 +126,18 @@ final class SetTemplate {
     var order: Int = 0
     /// True when `weightKg` is a computed first-session estimate (see `StartingLoadEstimator`)
     /// rather than a user-set/logged value — drives the "suggested" UI treatment.
+    ///
+    /// Informational only. It is NOT a safe gate for "may this be replaced by history":
+    /// manually added sets default it to false, so gating on it silently skipped most
+    /// real plans. Use `updatedAt` for that.
     var estimated: Bool = false
+    /// When this number was last set deliberately — by an athlete editing the plan, or by
+    /// a finished session writing its logged values back. `nil` means nobody has ever
+    /// touched it, so anything logged beats it.
+    ///
+    /// This is what decides whether the last session overwrites the prescription: the
+    /// most recent information wins, whichever it came from.
+    var updatedAt: Date?
     var item: PlanItem?
 
     init(weightKg: Double, reps: Int, rpe: Int, order: Int = 0, estimated: Bool = false) {
@@ -135,5 +146,18 @@ final class SetTemplate {
         self.rpe = rpe
         self.order = order
         self.estimated = estimated
+    }
+
+    /// Marks this number as deliberately set by the athlete, so a session logged *before*
+    /// the edit no longer overrides it.
+    func markEdited(at date: Date = Date()) {
+        estimated = false
+        updatedAt = date
+    }
+
+    /// Whether a session logged on `date` is newer information than this template.
+    func supersededBy(_ date: Date) -> Bool {
+        guard let updatedAt else { return true }   // never touched: anything logged wins
+        return date > updatedAt
     }
 }

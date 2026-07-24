@@ -26,7 +26,10 @@ struct TemplateBackfillTests {
         workout.plan = plan; ctx.insert(workout)
         let item = PlanItem(exId: "Bench", order: 0); item.workout = workout; ctx.insert(item)
         for s in 0..<sets {
-            let template = SetTemplate(weightKg: 50, reps: 10, rpe: 8, order: s, estimated: true)
+            // Deliberately NOT flagged `estimated` — this is how PlanFactory.addExercise
+            // and the editor's "add set" create them, and gating the carry-forward on that
+            // flag is exactly why it silently did nothing on a real plan.
+            let template = SetTemplate(weightKg: 50, reps: 10, rpe: 8, order: s)
             template.item = item; ctx.insert(template)
         }
         try? ctx.save()
@@ -80,8 +83,8 @@ struct TemplateBackfillTests {
         seedYesterdaysHistory(ctx)
 
         #expect(TemplateBackfill.run(context: ctx) == 3)
-        #expect(TemplateBackfill.run(context: ctx) == 0)   // flag set, never repeats
-        #expect(ctx.appSettings().didBackfillTemplates)
+        #expect(TemplateBackfill.run(context: ctx) == 0)   // version recorded, never repeats
+        #expect(ctx.appSettings().templateBackfillVersion == TemplateBackfill.version)
     }
 
     // MARK: - What must not be overwritten
@@ -90,10 +93,11 @@ struct TemplateBackfillTests {
         let ctx = makeContext()
         let workout = seedWorkout(ctx, sets: 1)
         seedYesterdaysHistory(ctx)
-        // The athlete deliberately set 80 kg in the Workout Editor, which clears the flag.
+        // The athlete deliberately set 80 kg in the Workout Editor *today* — newer
+        // information than yesterday's session.
         let template = workout.orderedItems[0].orderedSets[0]
         template.weightKg = 80
-        template.estimated = false
+        template.markEdited()
         try ctx.save()
 
         TemplateBackfill.run(context: ctx)
@@ -111,7 +115,7 @@ struct TemplateBackfillTests {
         seedYesterdaysHistory(ctx)
         let template = workout.orderedItems[0].orderedSets[0]
         template.weightKg = 70
-        template.estimated = false          // write-back cleared it
+        template.markEdited()               // a newer session already wrote this
         try ctx.save()
 
         TemplateBackfill.run(context: ctx)
@@ -125,9 +129,9 @@ struct TemplateBackfillTests {
         #expect(TemplateBackfill.run(context: ctx) == 0)
         #expect(workout.orderedItems[0].orderedSets.allSatisfy { $0.weightKg == 50 })
 
-        // And a first-ever session still shows the "est" badge.
+        // Nothing logged, so the plan's own numbers are all there is.
         let session = SessionBuilder.start(workout: workout, into: ctx)
-        #expect(session.exercises.first!.orderedSets.allSatisfy { $0.estimated })
+        #expect(session.exercises.first!.orderedSets.allSatisfy { $0.weightKg == 50 })
     }
 
     @Test func moreTemplatesThanLoggedSetsKeepsTheSurplusAsASeed() throws {
@@ -138,6 +142,6 @@ struct TemplateBackfillTests {
         #expect(TemplateBackfill.run(context: ctx) == 3)
         let templates = workout.orderedItems[0].orderedSets
         #expect(templates.map(\.weightKg) == [60, 60, 57.5, 50])
-        #expect(templates[3].estimated)             // never logged against
+        #expect(templates[3].updatedAt == nil)      // never logged against
     }
 }
