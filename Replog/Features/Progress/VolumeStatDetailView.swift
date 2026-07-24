@@ -71,28 +71,26 @@ struct VolumeStatDetailView: View {
         ProgressAnalytics.exerciseContributions(history: history, days: days ?? 36_500, load: load)
     }
 
-    private var totalVolume: Double {
-        contributions.reduce(0) { $0 + $1.volumeKg }
-    }
-    private var totalSets: Int {
-        contributions.reduce(0) { $0 + $1.sets }
-    }
-
+    // One derivation per render, threaded down: each read of `contributions` or
+    // `sessions` re-walks the history, JSON-decoding every entry's sets on the way past.
     var body: some View {
-        ScrollView {
+        let rows = contributions
+        let groups = sessions
+        let volume = rows.reduce(0.0) { $0 + $1.volumeKg }
+        return ScrollView {
             VStack(alignment: .leading, spacing: 16) {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(RangeSelection.label(days: days)).eyebrow()
                     Text(stat.title).font(.screenTitle).foregroundStyle(Color.textPrimary)
                 }
 
-                if contributions.isEmpty {
+                if rows.isEmpty {
                     ProgressEmptyCard(text: "No sets logged in this window yet.")
                 } else {
-                    headlineCard
-                    chartSection
-                    exerciseSection
-                    if stat != .sets { sessionSection }
+                    headlineCard(rows: rows, sessions: groups, volume: volume)
+                    chartSection(rows: rows, sessions: groups)
+                    exerciseSection(rows: rows, volume: volume)
+                    if stat != .sets { sessionSection(groups) }
                 }
             }
             .padding(20)
@@ -103,19 +101,22 @@ struct VolumeStatDetailView: View {
 
     // MARK: Headline
 
-    private var headlineValue: String {
+    private func headlineValue(rows: [ExerciseContribution],
+                               sessions: [ProgressAnalytics.SessionGroup],
+                               volume: Double) -> String {
         switch stat {
-        case .total: return Formulas.formatWeight(kg: totalVolume, units: units)
+        case .total: return Formulas.formatWeight(kg: volume, units: units)
         case .average:
-            let count = max(1, sessions.count)
-            return Formulas.formatWeight(kg: totalVolume / Double(count), units: units)
-        case .sets: return "\(totalSets)"
+            return Formulas.formatWeight(kg: volume / Double(max(1, sessions.count)), units: units)
+        case .sets: return "\(rows.reduce(0) { $0 + $1.sets })"
         }
     }
 
-    private var headlineCard: some View {
+    private func headlineCard(rows: [ExerciseContribution],
+                              sessions: [ProgressAnalytics.SessionGroup],
+                              volume: Double) -> some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text(headlineValue)
+            Text(headlineValue(rows: rows, sessions: sessions, volume: volume))
                 .font(.rounded(30, .black)).foregroundStyle(Color.textPrimary)
                 .tabularNumbers().lineLimit(1).minimumScaleFactor(0.6)
             Text(stat.definition)
@@ -130,18 +131,19 @@ struct VolumeStatDetailView: View {
     // MARK: Charts — a different question per stat, not the same bars three times
 
     @ViewBuilder
-    private var chartSection: some View {
+    private func chartSection(rows: [ExerciseContribution],
+                              sessions: [ProgressAnalytics.SessionGroup]) -> some View {
         switch stat {
-        case .total: exerciseRankChart
-        case .average: sessionAverageChart
-        case .sets: setsChart
+        case .total: exerciseRankChart(rows)
+        case .average: sessionAverageChart(sessions)
+        case .sets: setsChart(rows: rows, sessions: sessions)
         }
     }
 
     /// Where the total came from: the exercises that produced it, ranked. A total is a
     /// composition question, so the chart is the composition, not the timeline — that is
     /// what the session list below is for.
-    private var exerciseRankChart: some View {
+    private func exerciseRankChart(_ contributions: [ExerciseContribution]) -> some View {
         let top = Array(contributions.prefix(8))
         return VStack(alignment: .leading, spacing: 8) {
             SectionHeader(title: "Biggest Contributors")
@@ -167,8 +169,7 @@ struct VolumeStatDetailView: View {
     }
 
     /// Every session against the average, so "typical" has something to be typical of.
-    private var sessionAverageChart: some View {
-        let groups = sessions
+    private func sessionAverageChart(_ groups: [ProgressAnalytics.SessionGroup]) -> some View {
         let density = ChartDensity.of(groups.count)
         let load = self.load
         let tonnages = groups.map { ProgressAnalytics.tonnage(of: $0, load: load) }
@@ -210,10 +211,10 @@ struct VolumeStatDetailView: View {
 
     /// Sets per session, with the rep ranges they landed in — the two readings that make
     /// a set count mean something.
-    private var setsChart: some View {
-        let groups = sessions
+    private func setsChart(rows: [ExerciseContribution],
+                           sessions groups: [ProgressAnalytics.SessionGroup]) -> some View {
         let counts = groups.map(\.setCount)
-        let mix = contributions.reduce(into: RepRangeMix()) { total, row in
+        let mix = rows.reduce(into: RepRangeMix()) { total, row in
             total.strength += row.mix.strength
             total.hypertrophy += row.mix.hypertrophy
             total.endurance += row.mix.endurance
@@ -247,15 +248,15 @@ struct VolumeStatDetailView: View {
 
     // MARK: Lists
 
-    private var exerciseSection: some View {
+    private func exerciseSection(rows: [ExerciseContribution], volume: Double) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             SectionHeader(title: "By Exercise")
-            ProgressCardList(items: contributions) { row in
+            ProgressCardList(items: rows) { row in
                 ContributionRow(
                     exId: row.exId,
                     name: catalog.exercise(id: row.exId)?.name ?? row.exId,
                     detail: detail(for: row),
-                    value: value(for: row))
+                    value: value(for: row, of: volume))
             }
         }
     }
@@ -269,16 +270,16 @@ struct VolumeStatDetailView: View {
         return parts.joined(separator: " · ")
     }
 
-    private func value(for row: ExerciseContribution) -> String {
+    private func value(for row: ExerciseContribution, of volume: Double) -> String {
         switch stat {
         case .sets: return "\(row.sets)"
         case .total, .average:
-            let share = totalVolume > 0 ? Int((row.volumeKg / totalVolume * 100).rounded()) : 0
+            let share = volume > 0 ? Int((row.volumeKg / volume * 100).rounded()) : 0
             return "\(Formulas.formatWeight(kg: row.volumeKg, units: units)) · \(share)%"
         }
     }
 
-    private var sessionSection: some View {
+    private func sessionSection(_ sessions: [ProgressAnalytics.SessionGroup]) -> some View {
         let groups = sessions.reversed()
         let load = self.load
         return VStack(alignment: .leading, spacing: 10) {

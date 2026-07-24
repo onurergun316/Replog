@@ -32,37 +32,38 @@ struct RepRangeDetailView: View {
         ProgressAnalytics.exerciseContributions(history: history, days: windowDays, load: load)
     }
 
-    private var mix: RepRangeMix {
-        contributions.reduce(into: RepRangeMix()) { total, row in
+    private func mix(of rows: [ExerciseContribution]) -> RepRangeMix {
+        rows.reduce(into: RepRangeMix()) { total, row in
             total.strength += row.mix.strength
             total.hypertrophy += row.mix.hypertrophy
             total.endurance += row.mix.endurance
         }
     }
 
-    /// Movements whose logged "reps" are seconds. They are excluded from every rep-range
-    /// count — a 45-second plank is not a set of 45 — so the screen has to say so rather
-    /// than let the totals quietly disagree with the Volume screen's set count.
-    private var timedHolds: [ExerciseContribution] {
-        contributions.filter { load.isTimedHold(exId: $0.exId) }
-    }
-
+    // One derivation per render: every reader used to re-walk history, JSON-decoding
+    // every entry's sets on the way past.
     var body: some View {
-        ScrollView {
+        let rows = contributions
+        let total = mix(of: rows)
+        // Movements whose logged "reps" are seconds. They are excluded from every
+        // rep-range count — a 45-second plank is not a set of 45 — so the screen says so
+        // rather than letting its totals quietly disagree with the Volume screen's.
+        let holds = rows.filter { load.isTimedHold(exId: $0.exId) }
+        return ScrollView {
             VStack(alignment: .leading, spacing: 16) {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(RangeSelection.label(days: days)).eyebrow()
                     Text("Rep Ranges").font(.screenTitle).foregroundStyle(Color.textPrimary)
                 }
 
-                if mix.total == 0 {
+                if total.total == 0 {
                     ProgressEmptyCard(text: "No counted sets in this window yet.")
                 } else {
-                    mixCard
+                    mixCard(total)
                     ForEach(RepRange.allCases) { range in
-                        rangeSection(range)
+                        rangeSection(range, rows: rows, total: total)
                     }
-                    if !timedHolds.isEmpty { holdsSection }
+                    if !holds.isEmpty { holdsSection(holds) }
                 }
             }
             .padding(20)
@@ -71,7 +72,7 @@ struct RepRangeDetailView: View {
         .navigationBarTitleDisplayMode(.inline)
     }
 
-    private var mixCard: some View {
+    private func mixCard(_ mix: RepRangeMix) -> some View {
         VStack(alignment: .leading, spacing: 12) {
             RepRangeBar(mix: mix)
             Divider()
@@ -84,15 +85,16 @@ struct RepRangeDetailView: View {
     }
 
     @ViewBuilder
-    private func rangeSection(_ range: RepRange) -> some View {
-        let rows = contributions
+    private func rangeSection(_ range: RepRange, rows all: [ExerciseContribution],
+                              total: RepRangeMix) -> some View {
+        let rows = all
             .filter { range.sets(in: $0.mix) > 0 }
             .sorted { range.sets(in: $0.mix) > range.sets(in: $1.mix) }
         if !rows.isEmpty {
             VStack(alignment: .leading, spacing: 10) {
                 HStack(alignment: .firstTextBaseline) {
                     SectionHeader(title: range.title)
-                    Text("\(range.sets(in: mix)) set\(range.sets(in: mix) == 1 ? "" : "s")")
+                    Text("\(range.sets(in: total)) set\(range.sets(in: total) == 1 ? "" : "s")")
                         .font(.rounded(11, .heavy)).foregroundStyle(Color.text3).tabularNumbers()
                 }
                 Text(range.purpose)
@@ -109,13 +111,13 @@ struct RepRangeDetailView: View {
         }
     }
 
-    private var holdsSection: some View {
+    private func holdsSection(_ holds: [ExerciseContribution]) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             SectionHeader(title: "Timed Holds · Not Counted")
             Text("These log seconds rather than reps, so counting them would file a 45-second plank as a 45-rep endurance set.")
                 .font(.rounded(12, .semibold)).foregroundStyle(Color.text2)
                 .fixedSize(horizontal: false, vertical: true)
-            ProgressCardList(items: timedHolds) { row in
+            ProgressCardList(items: holds) { row in
                 ContributionRow(
                     exId: row.exId,
                     name: catalog.exercise(id: row.exId)?.name ?? row.exId,

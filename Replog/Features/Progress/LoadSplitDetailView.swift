@@ -39,12 +39,14 @@ struct LoadSplitDetailView: View {
         ProgressAnalytics.dailyLoadSplit(history: history, days: windowDays, load: load)
     }
 
-    private var externalTotal: Double { contributions.reduce(0) { $0 + $1.externalKg } }
-    private var bodyweightTotal: Double { contributions.reduce(0) { $0 + $1.bodyweightKg } }
-    private var total: Double { externalTotal + bodyweightTotal }
-
+    // Every reader below used to touch `contributions`, and each touch re-walks the whole
+    // history JSON-decoding every entry's sets. One derivation per render, threaded down.
     var body: some View {
-        ScrollView {
+        let rows = contributions
+        let external = rows.reduce(0) { $0 + $1.externalKg }
+        let bodyweight = rows.reduce(0) { $0 + $1.bodyweightKg }
+        let perDay = daily
+        return ScrollView {
             VStack(alignment: .leading, spacing: 16) {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(RangeSelection.label(days: days)).eyebrow()
@@ -52,19 +54,19 @@ struct LoadSplitDetailView: View {
                         .font(.screenTitle).foregroundStyle(Color.textPrimary)
                 }
 
-                if total <= 0 {
+                if external + bodyweight <= 0 {
                     ProgressEmptyCard(text: "No load logged in this window yet.")
                 } else {
-                    splitCard
-                    if daily.count >= 2 { dailyChart }
+                    splitCard(external: external, bodyweight: bodyweight)
+                    if perDay.count >= 2 { dailyChart(perDay) }
                     exerciseSection(title: "External Load",
-                                    rows: contributions.filter { $0.externalKg > 0 }
+                                    rows: rows.filter { $0.externalKg > 0 }
                                         .sorted { $0.externalKg > $1.externalKg },
-                                    value: { $0.externalKg }, ramp: 0)
+                                    value: { $0.externalKg })
                     exerciseSection(title: "Bodyweight Movements",
-                                    rows: contributions.filter { $0.bodyweightKg > 0 }
+                                    rows: rows.filter { $0.bodyweightKg > 0 }
                                         .sorted { $0.bodyweightKg > $1.bodyweightKg },
-                                    value: { $0.bodyweightKg }, ramp: 2)
+                                    value: { $0.bodyweightKg })
                 }
             }
             .padding(20)
@@ -75,19 +77,20 @@ struct LoadSplitDetailView: View {
 
     // MARK: The split itself
 
-    private var splitCard: some View {
-        VStack(alignment: .leading, spacing: 12) {
+    private func splitCard(external: Double, bodyweight: Double) -> some View {
+        let total = external + bodyweight
+        return VStack(alignment: .leading, spacing: 12) {
             Chart {
-                BarMark(x: .value("kg", externalTotal))
+                BarMark(x: .value("kg", external))
                     .foregroundStyle(ProgressPalette.ramp(0))
-                BarMark(x: .value("kg", bodyweightTotal))
+                BarMark(x: .value("kg", bodyweight))
                     .foregroundStyle(ProgressPalette.ramp(2))
             }
             .chartXAxis(.hidden).chartYAxis(.hidden).chartLegend(.hidden)
             .frame(height: 26)
             .clipShape(Capsule())
-            LegendRow(label: "External load", value: legend(externalTotal), ramp: 0)
-            LegendRow(label: "Bodyweight", value: legend(bodyweightTotal), ramp: 2)
+            LegendRow(label: "External load", value: legend(external, of: total), ramp: 0)
+            LegendRow(label: "Bodyweight", value: legend(bodyweight, of: total), ramp: 2)
             Divider()
             Text("Weight on the bar is what you typed. Bodyweight movements are credited at the share of your bodyweight the movement actually lifts — which is why a set logged as 0 kg still counts.")
                 .font(.rounded(11, .semibold)).foregroundStyle(Color.text3)
@@ -97,14 +100,16 @@ struct LoadSplitDetailView: View {
         .cardSurface()
     }
 
-    private func legend(_ value: Double) -> String {
+    private func legend(_ value: Double, of total: Double) -> String {
         let percent = total > 0 ? Int((value / total * 100).rounded()) : 0
         return "\(Formulas.formatWeight(kg: value, units: units)) · \(percent)%"
     }
 
     /// Stacked by day, so the answer to "when was this bodyweight work" is the chart
     /// rather than a paragraph.
-    private var dailyChart: some View {
+    private func dailyChart(
+        _ daily: [(day: Date, externalKg: Double, bodyweightKg: Double)]
+    ) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             SectionHeader(title: "Day By Day")
             VStack(alignment: .leading, spacing: 8) {
@@ -140,9 +145,9 @@ struct LoadSplitDetailView: View {
     // MARK: The movements behind each half
 
     @ViewBuilder
+    // `value` escapes: it is captured by the row builder `ProgressCardList` stores.
     private func exerciseSection(title: String, rows: [ExerciseContribution],
-                                 value: @escaping (ExerciseContribution) -> Double,
-                                 ramp: Int) -> some View {
+                                 value: @escaping (ExerciseContribution) -> Double) -> some View {
         if !rows.isEmpty {
             VStack(alignment: .leading, spacing: 10) {
                 SectionHeader(title: title)

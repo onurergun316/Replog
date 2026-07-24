@@ -24,35 +24,30 @@ struct ForceSplitDetailView: View {
     @Query private var settingsRows: [AppSettings]
     @Query(sort: \BodyweightEntry.date) private var bodyweightEntries: [BodyweightEntry]
 
+    /// One force's share of the window.
+    private typealias ForceGroup = (key: Force, volumeKg: Double, sets: Int,
+                                    exercises: [ExerciseContribution])
+
     private var units: Units { settingsRows.first?.units ?? .kg }
     private var load: LoadResolver { .live(catalog: catalog, bodyweightEntries: bodyweightEntries) }
     private var windowDays: Int { days ?? 36_500 }
 
-    private var contributions: [ExerciseContribution] {
-        ProgressAnalytics.exerciseContributions(history: history, days: windowDays, load: load)
-    }
-
     private func force(of exId: String) -> Force? { catalog.exercise(id: exId)?.force }
 
-    private var groups: [(key: Force, volumeKg: Double, sets: Int, exercises: [ExerciseContribution])] {
-        ProgressAnalytics.grouped(contributions) { force(of: $0.exId) }
-    }
-
-    private var daily: [(day: Date, key: Force, volumeKg: Double)] {
-        ProgressAnalytics.dailyVolume(history: history, days: windowDays, load: load,
-                                      key: { force(of: $0) })
-    }
-
-    private var total: Double { groups.reduce(0) { $0 + $1.volumeKg } }
-
-    /// Movements the catalog doesn't classify. Named rather than silently dropped — the
-    /// percentages below don't add up to the Volume screen's total without them.
-    private var unclassified: [ExerciseContribution] {
-        contributions.filter { force(of: $0.exId) == nil }
-    }
-
+    // One derivation per render, threaded down: each read of `contributions` re-walks the
+    // whole history and JSON-decodes every entry's sets on the way past.
     var body: some View {
-        ScrollView {
+        let rows = ProgressAnalytics.exerciseContributions(history: history, days: windowDays,
+                                                           load: load)
+        let groups = ProgressAnalytics.grouped(rows) { force(of: $0.exId) }
+        let total = groups.reduce(0.0) { $0 + $1.volumeKg }
+        let perDay = ProgressAnalytics.dailyVolume(history: history, days: windowDays,
+                                                   load: load, key: { force(of: $0) })
+        // Movements the catalog doesn't classify. Named rather than silently dropped —
+        // the percentages don't reconcile with the Volume screen's total without them.
+        let unclassified = rows.filter { force(of: $0.exId) == nil }
+
+        return ScrollView {
             VStack(alignment: .leading, spacing: 16) {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(RangeSelection.label(days: days)).eyebrow()
@@ -62,13 +57,13 @@ struct ForceSplitDetailView: View {
                 if groups.isEmpty {
                     ProgressEmptyCard(text: "Nothing classified as push or pull in this window yet.")
                 } else {
-                    splitCard
-                    ratioCard
-                    if daily.count >= 2 { dailyChart }
+                    splitCard(groups, total: total)
+                    ratioCard(groups)
+                    if perDay.count >= 2 { dailyChart(perDay) }
                     ForEach(groups, id: \.key) { group in
-                        forceSection(group)
+                        forceSection(group, total: total)
                     }
-                    if !unclassified.isEmpty { unclassifiedSection }
+                    if !unclassified.isEmpty { unclassifiedSection(unclassified) }
                 }
             }
             .padding(20)
@@ -79,7 +74,7 @@ struct ForceSplitDetailView: View {
 
     // MARK: The split
 
-    private var splitCard: some View {
+    private func splitCard(_ groups: [ForceGroup], total: Double) -> some View {
         VStack(alignment: .leading, spacing: 12) {
             Chart(Array(groups.enumerated()), id: \.element.key) { index, group in
                 BarMark(x: .value("Volume", group.volumeKg))
@@ -90,47 +85,42 @@ struct ForceSplitDetailView: View {
             .clipShape(Capsule())
             ForEach(Array(groups.enumerated()), id: \.element.key) { index, group in
                 LegendRow(label: "\(group.key.displayName) · \(group.sets) set\(group.sets == 1 ? "" : "s")",
-                          value: legend(group.volumeKg), ramp: index * 2)
+                          value: legend(group.volumeKg, of: total), ramp: index * 2)
             }
         }
         .padding(14)
         .cardSurface()
     }
 
-    private func legend(_ value: Double) -> String {
+    private func legend(_ value: Double, of total: Double) -> String {
         let percent = total > 0 ? Int((value / total * 100).rounded()) : 0
         return "\(Formulas.formatWeight(kg: value, units: units)) · \(percent)%"
     }
 
     // MARK: The reading that matters
 
-    private var pushVolume: Double { groups.first { $0.key == .push }?.volumeKg ?? 0 }
-    private var pullVolume: Double { groups.first { $0.key == .pull }?.volumeKg ?? 0 }
-
-    /// Push tonnage per unit of pull tonnage. `nil` when one side is missing entirely,
-    /// where a ratio is a division by zero rather than an imbalance.
-    private var pushPullRatio: Double? {
-        guard pushVolume > 0, pullVolume > 0 else { return nil }
-        return pushVolume / pullVolume
-    }
-
     @ViewBuilder
-    private var ratioCard: some View {
+    private func ratioCard(_ groups: [ForceGroup]) -> some View {
+        let push = groups.first { $0.key == .push }?.volumeKg ?? 0
+        let pull = groups.first { $0.key == .pull }?.volumeKg ?? 0
         VStack(alignment: .leading, spacing: 6) {
-            if let ratio = pushPullRatio {
-                Text(String(format: "%.2f : 1", ratio))
+            // A ratio needs both sides; with one of them at zero this is a division by
+            // zero rather than an imbalance.
+            if push > 0, pull > 0 {
+                Text(String(format: "%.2f : 1", push / pull))
                     .font(.rounded(30, .black)).foregroundStyle(Color.textPrimary)
                     .tabularNumbers().lineLimit(1).minimumScaleFactor(0.6)
                 Text("push to pull")
                     .font(.rounded(11, .bold)).foregroundStyle(Color.text2)
-                Text(ratioReading(ratio))
+                Text(ratioReading(push / pull))
                     .font(.rounded(12, .semibold)).foregroundStyle(Color.text2)
                     .fixedSize(horizontal: false, vertical: true)
                     .padding(.top, 4)
             } else {
-                Text(pushVolume > 0 ? "All push, no pull" : "All pull, no push")
+                Text(push > 0 ? "All push, no pull" : "All pull, no push")
                     .font(.rounded(22, .black)).foregroundStyle(Color.textPrimary)
-                Text("A ratio needs both sides. Log some \(pushVolume > 0 ? "pulling" : "pressing") work and this becomes a reading.")
+                    .lineLimit(1).minimumScaleFactor(0.7)
+                Text("A ratio needs both sides. Log some \(push > 0 ? "pulling" : "pressing") work and this becomes a reading.")
                     .font(.rounded(12, .semibold)).foregroundStyle(Color.text2)
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -154,7 +144,7 @@ struct ForceSplitDetailView: View {
 
     // MARK: When
 
-    private var dailyChart: some View {
+    private func dailyChart(_ daily: [(day: Date, key: Force, volumeKg: Double)]) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             SectionHeader(title: "Day By Day")
             VStack(alignment: .leading, spacing: 8) {
@@ -183,13 +173,11 @@ struct ForceSplitDetailView: View {
 
     // MARK: The movements
 
-    private func forceSection(
-        _ group: (key: Force, volumeKg: Double, sets: Int, exercises: [ExerciseContribution])
-    ) -> some View {
+    private func forceSection(_ group: ForceGroup, total: Double) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(alignment: .firstTextBaseline) {
                 SectionHeader(title: group.key.displayName)
-                Text(legend(group.volumeKg))
+                Text(legend(group.volumeKg, of: total))
                     .font(.rounded(11, .heavy)).foregroundStyle(Color.text3).tabularNumbers()
             }
             ProgressCardList(items: group.exercises) { row in
@@ -202,13 +190,13 @@ struct ForceSplitDetailView: View {
         }
     }
 
-    private var unclassifiedSection: some View {
+    private func unclassifiedSection(_ rows: [ExerciseContribution]) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             SectionHeader(title: "Not Classified")
             Text("The catalog records no push/pull direction for these, so they sit outside the split above.")
                 .font(.rounded(12, .semibold)).foregroundStyle(Color.text2)
                 .fixedSize(horizontal: false, vertical: true)
-            ProgressCardList(items: unclassified) { row in
+            ProgressCardList(items: rows) { row in
                 ContributionRow(
                     exId: row.exId,
                     name: catalog.exercise(id: row.exId)?.name ?? row.exId,
