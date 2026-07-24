@@ -81,9 +81,12 @@ struct CalendarView: View {
                 }
             }
         }
-        .onAppear { refreshCaches() }
-        .onChange(of: history.count) { refreshCaches() }
-        .onChange(of: doneDates.count) { refreshCaches() }
+        // `initial: true` rather than onAppear: the caches are @State, and onAppear can
+        // run before @Query has delivered its first results — leaving an empty grid that
+        // only a *subsequent* change would repair, which never comes. This form seeds on
+        // the first evaluation that has data and refreshes on every change after.
+        .onChange(of: history.count, initial: true) { refreshCaches() }
+        .onChange(of: doneDates.count, initial: true) { refreshCaches() }
         .sensoryFeedback(.impact(weight: .medium), trigger: armTicks)
         .sensoryFeedback(.selection, trigger: selection)
     }
@@ -132,10 +135,23 @@ struct CalendarView: View {
     // MARK: Month paging
 
     private var monthHeader: some View {
-        HStack {
+        HStack(spacing: 8) {
             Text((visibleMonth ?? today).formatted(.dateTime.month(.wide).year()))
                 .font(.rounded(18, .black)).foregroundStyle(Color.textPrimary)
                 .contentTransition(.numericText())
+            // Only shown when the pager has wandered off the current month, so there is
+            // always one tap back to today rather than an unknown number of swipes.
+            if let visible = visibleMonth, !cal.isDate(visible, equalTo: today, toGranularity: .month) {
+                Button {
+                    withAnimation(.snappy) { visibleMonth = CalendarMath.month(0, from: Date(), calendar: cal) }
+                } label: {
+                    Text("Today").font(.rounded(12, .heavy)).foregroundStyle(Color.accent)
+                        .padding(.horizontal, 10).padding(.vertical, 5)
+                        .background(Capsule().fill(Color.accentSoft))
+                }
+                .buttonStyle(.plain)
+                .transition(.opacity.combined(with: .scale))
+            }
             Spacer()
             monthChevron("chevron.left", step: -1)
             monthChevron("chevron.right", step: 1)

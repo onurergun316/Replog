@@ -117,17 +117,46 @@ struct BodyDetailView: View {
                 .cardSurface()
             }
         } else {
-            Chart(windowed, id: \.id) { entry in
-                LineMark(x: .value("Date", entry.date), y: .value("Weight", entry.weightKg))
-                    .foregroundStyle(Color.accent)
-                    .interpolationMethod(.monotone)
-                PointMark(x: .value("Date", entry.date), y: .value("Weight", entry.weightKg))
-                    .foregroundStyle(Color.accent)
-                    .symbolSize(40)
+            let density = ChartDensity.of(windowed.count)
+            let weights = windowed.map(\.weightKg)
+            VStack(alignment: .leading, spacing: 8) {
+                Chart {
+                    ForEach(windowed, id: \.id) { entry in
+                        LineMark(x: .value("Date", entry.date), y: .value("Weight", entry.weightKg))
+                            .foregroundStyle(Color.accent)
+                            .interpolationMethod(density.allowsSmoothing ? .monotone : .linear)
+                        if density.showsSymbols {
+                            PointMark(x: .value("Date", entry.date), y: .value("Weight", entry.weightKg))
+                                .foregroundStyle(Color.accent)
+                                .symbolSize(40)
+                        }
+                    }
+                    // The direction of travel, stated rather than left to the eye.
+                    if let first = weights.first, let last = weights.last, density.allowsLine {
+                        RuleMark(y: .value("Start", first))
+                            .foregroundStyle(Color.text3.opacity(0.45))
+                            .lineStyle(StrokeStyle(lineWidth: 1, dash: [4, 4]))
+                            .annotation(position: .top, alignment: .leading) {
+                                Text(last >= first ? "start" : "start")
+                                    .font(.rounded(9, .bold)).foregroundStyle(Color.text3)
+                            }
+                    }
+                }
+                // Never `.automatic` alone: two readings a few hundred grams apart would
+                // fill the card and read as a cliff.
+                .chartYScale(domain: ChartScales.yDomain(
+                    min: weights.min() ?? 0, max: weights.max() ?? 0,
+                    minSpan: ChartScales.bodyweightMinSpanKg))
+                .chartYAxis { AxisMarks(position: .leading) }
+                .chartXAxis { AxisMarks(format: .dateTime.month(.abbreviated).day()) }
+                .frame(height: density.chartHeight)
+                if let first = weights.first, let last = weights.last, windowed.count >= 2 {
+                    let delta = last - first
+                    Text("\(delta >= 0 ? "+" : "")\(String(format: "%.1f", delta)) \(units.label) since \(windowed[0].date.formatted(.dateTime.month(.abbreviated).day()))")
+                        .font(.rounded(12, .heavy))
+                        .foregroundStyle(delta == 0 ? Color.text2 : Color.accent)
+                }
             }
-            .chartYScale(domain: .automatic(includesZero: false))
-            .chartYAxis { AxisMarks(position: .leading) }
-            .frame(height: 200)
             .padding(14)
             .cardSurface()
         }

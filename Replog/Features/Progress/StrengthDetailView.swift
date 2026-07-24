@@ -167,11 +167,11 @@ struct StrengthDetailView: View {
                 LineMark(x: .value("Date", point.date), y: .value("1RM", point.e1rm))
                     .foregroundStyle(by: .value("Exercise", point.name))
                     .interpolationMethod(.monotone)
-                // Most lifts have a single session early on, and a one-point line is
-                // invisible — which is why this chart read as empty after two workouts.
+                // Points stay on so a single session is visible, but they sit *under* the
+                // line rather than standing in for it — a field of dots reads as noise.
                 PointMark(x: .value("Date", point.date), y: .value("1RM", point.e1rm))
                     .foregroundStyle(by: .value("Exercise", point.name))
-                    .symbolSize(40)
+                    .symbolSize(28)
             }
             .chartForegroundStyleScale(range: [ProgressPalette.ramp(0), ProgressPalette.ramp(1),
                                                ProgressPalette.ramp(2)])

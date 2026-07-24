@@ -153,6 +153,38 @@ struct VolumeDetailView: View {
             }
             .padding(14)
             .cardSurface()
+
+            // Every session opens: a chart you cannot tap is a dead end, and this is the
+            // step from "23,188 kg" to the individual workout that produced it.
+            VStack(spacing: 0) {
+                ForEach(Array(groups.reversed().enumerated()), id: \.element.id) { index, session in
+                    if index > 0 { Divider() }
+                    NavigationLink(value: ProgressRoute.day(Calendar.current.startOfDay(for: session.date))) {
+                        HStack(spacing: 10) {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(session.workoutName ?? "Workout")
+                                    .font(.rounded(14, .heavy)).foregroundStyle(Color.textPrimary)
+                                    .lineLimit(1)
+                                Text("\(session.date.formatted(.dateTime.weekday(.abbreviated).month().day())) · \(session.entries.count) exercises · \(session.setCount) sets")
+                                    .font(.rounded(12, .semibold)).foregroundStyle(Color.text3)
+                                    .lineLimit(1)
+                            }
+                            Spacer()
+                            Text(Formulas.formatWeight(
+                                kg: ProgressAnalytics.tonnage(of: session, load: load), units: units))
+                                .font(.rounded(13, .heavy)).foregroundStyle(Color.text2)
+                                .tabularNumbers()
+                            Image(systemName: "chevron.right")
+                                .font(.system(size: 11, weight: .bold)).foregroundStyle(Color.text3)
+                        }
+                        .padding(.vertical, 11)
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(.horizontal, 14)
+            .cardSurface()
         }
     }
 

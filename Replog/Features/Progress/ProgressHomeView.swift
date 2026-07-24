@@ -20,6 +20,10 @@ struct ProgressHomeView: View {
     @Query private var settingsRows: [AppSettings]
     @State private var path = NavigationPath()
 
+    /// One height for every mini chart, so the 2-up cards stay the same size — a taller
+    /// bar chart beside a shorter one is what made the grid look unbalanced.
+    private static let miniChartHeight: CGFloat = 56
+
     /// Read-only: `ReplogApp.init` bootstraps the singletons at launch precisely so no
     /// view body mutates the context. Fetch-or-create here would re-introduce that.
     private var doneDates: [Date] { profiles.first?.doneDates ?? [] }
@@ -111,18 +115,12 @@ struct ProgressHomeView: View {
                 route: .strength,
                 showsChart: ChartDensity.of(top.series.count).count >= 3
             ) {
+                // Bars, not a dotted line: at 72pt a scatter of points reads as noise,
+                // while a bar per session shows the shape at a glance.
                 Chart(Array(top.series.suffix(20).enumerated()), id: \.offset) { index, value in
-                    LineMark(x: .value("Session", index), y: .value("1RM", value))
-                        .foregroundStyle(Color.accent)
-                        .interpolationMethod(.monotone)
-                    AreaMark(x: .value("Session", index), y: .value("1RM", value))
-                        .foregroundStyle(LinearGradient(colors: [Color.accent.opacity(0.22), .clear],
-                                                        startPoint: .top, endPoint: .bottom))
-                        .interpolationMethod(.monotone)
-                    // A line through one point draws nothing; the point always shows.
-                    PointMark(x: .value("Session", index), y: .value("1RM", value))
-                        .foregroundStyle(Color.accent)
-                        .symbolSize(36)
+                    BarMark(x: .value("Session", index), y: .value("1RM", value))
+                        .foregroundStyle(Color.accent.opacity(index == top.series.count - 1 ? 1 : 0.45))
+                        .cornerRadius(2)
                 }
                 .chartXAxis(.hidden).chartYAxis(.hidden)
                 .frame(height: 72)
@@ -154,7 +152,7 @@ struct ProgressHomeView: View {
                     .cornerRadius(3)
             }
             .chartXAxis(.hidden).chartYAxis(.hidden)
-            .frame(height: 56)
+            .frame(height: Self.miniChartHeight)
         }
     }
 
@@ -183,7 +181,7 @@ struct ProgressHomeView: View {
                     .cornerRadius(2)
             }
             .chartXAxis(.hidden).chartYAxis(.hidden)
-            .frame(height: 56)
+            .frame(height: Self.miniChartHeight)
         }
     }
 
@@ -216,7 +214,7 @@ struct ProgressHomeView: View {
                     .cornerRadius(3)
             }
             .chartXAxis(.hidden).chartYAxis(.hidden)
-            .frame(height: 56)
+            .frame(height: Self.miniChartHeight)
         }
     }
 
@@ -243,7 +241,7 @@ struct ProgressHomeView: View {
             }
             .chartYScale(domain: .automatic(includesZero: false))
             .chartXAxis(.hidden).chartYAxis(.hidden)
-            .frame(height: 56)
+            .frame(height: Self.miniChartHeight)
         }
     }
 
