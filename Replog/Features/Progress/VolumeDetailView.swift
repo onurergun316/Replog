@@ -138,7 +138,9 @@ struct VolumeDetailView: View {
             SectionHeader(title: "Per Session")
             VStack(alignment: .leading, spacing: 8) {
                 Chart(groups, id: \.id) { session in
-                    BarMark(x: .value("Session", session.date, unit: .day),
+                    // Not `unit: .day`: marks sharing an x value stack, so two workouts
+                    // done on the same day merged into a single "per session" bar.
+                    BarMark(x: .value("Session", session.date),
                             y: .value("Volume", ProgressAnalytics.tonnage(of: session, load: load)))
                         .foregroundStyle(Color.accent)
                         .cornerRadius(3)

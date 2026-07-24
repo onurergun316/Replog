@@ -199,8 +199,11 @@ struct VolumeStatDetailView: View {
             SectionHeader(title: "Every Session vs Average")
             VStack(alignment: .leading, spacing: 8) {
                 Chart {
+                    // No `unit: .day`: Swift Charts stacks marks that share an x value,
+                    // so banding on the day silently merged two workouts done on the same
+                    // day into one bar — on a chart whose whole subject is per-session.
                     ForEach(Array(groups.enumerated()), id: \.element.id) { index, session in
-                        BarMark(x: .value("Session", session.date, unit: .day),
+                        BarMark(x: .value("Session", session.date),
                                 y: .value("Volume", tonnages[index]))
                             .foregroundStyle(tonnages[index] >= average
                                              ? Color.accent : Color.accent.opacity(0.45))
@@ -244,7 +247,8 @@ struct VolumeStatDetailView: View {
             SectionHeader(title: "Sets Per Session")
             VStack(alignment: .leading, spacing: 10) {
                 Chart(Array(groups.enumerated()), id: \.element.id) { index, session in
-                    BarMark(x: .value("Session", session.date, unit: .day),
+                    // Per session, so no `unit: .day` — see `sessionAverageChart`.
+                    BarMark(x: .value("Session", session.date),
                             y: .value("Sets", counts[index]))
                         .foregroundStyle(Color.accent)
                         .cornerRadius(3)
