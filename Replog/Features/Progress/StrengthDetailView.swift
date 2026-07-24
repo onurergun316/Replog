@@ -170,9 +170,12 @@ struct StrengthDetailView: View {
     /// is exactly when a time series is not.
     private var rankChart: some View {
         let top = Array(filtered.prefix(8))
+        // Banded on the exercise id, never on the display name: names are clipped to fit
+        // the axis, and the catalog has clusters sharing their first fifteen characters.
+        // Two of those would band together and stack into one bar of their summed 1RM.
         return Chart(top, id: \.exId) { progress in
             BarMark(x: .value("Estimated 1RM", progress.bestE1rm),
-                    y: .value("Exercise", shortName(of: progress.exId)))
+                    y: .value("Exercise", progress.exId))
                 .foregroundStyle(Color.accent)
                 .cornerRadius(3)
                 .annotation(position: .trailing) {
@@ -181,7 +184,13 @@ struct StrengthDetailView: View {
                 }
         }
         .chartXAxis { AxisMarks(values: .automatic(desiredCount: 3)) }
-        .chartYAxis { AxisMarks(position: .leading) }
+        .chartYAxis {
+            AxisMarks(position: .leading) { value in
+                AxisValueLabel {
+                    if let exId = value.as(String.self) { Text(shortName(of: exId)) }
+                }
+            }
+        }
         .chartXAxisLabel("Estimated 1RM")
         // Grows with the number of bars rather than squeezing eight lifts into 200pt.
         .frame(height: CGFloat(top.count) * 30 + 36)

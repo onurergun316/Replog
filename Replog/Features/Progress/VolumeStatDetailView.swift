@@ -169,14 +169,25 @@ struct VolumeStatDetailView: View {
         return VStack(alignment: .leading, spacing: 8) {
             SectionHeader(title: "Biggest Contributors")
             VStack(alignment: .leading, spacing: 8) {
+                // Banded on the exercise id, never on the display name: names are clipped
+                // to fit the axis, and the catalog has clusters that share their first
+                // fifteen characters ("Barbell Incline Bench Press — Medium Grip" and
+                // friends). Two of those on one screen would band together and stack into
+                // a single bar of their summed volume. The axis maps id back to a label.
                 Chart(top) { row in
                     BarMark(x: .value("Volume", row.volumeKg),
-                            y: .value("Exercise", shortName(row.exId)))
+                            y: .value("Exercise", row.exId))
                         .foregroundStyle(Color.accent)
                         .cornerRadius(3)
                 }
                 .chartXAxis { AxisMarks(values: .automatic(desiredCount: 3)) }
-                .chartYAxis { AxisMarks(position: .leading) }
+                .chartYAxis {
+                    AxisMarks(position: .leading) { value in
+                        AxisValueLabel {
+                            if let exId = value.as(String.self) { Text(shortName(exId)) }
+                        }
+                    }
+                }
                 .chartXAxisLabel("Volume (\(units.label))")
                 .frame(height: CGFloat(top.count) * 26 + 34)
                 if contributions.count > top.count {
