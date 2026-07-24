@@ -360,6 +360,28 @@ struct ProgressAnalyticsTests {
         #expect(rows[0].bodyweightKg == 0)
     }
 
+    @Test func dailyVolumeSplitsEachDayByTheCallersFacet() {
+        let history = [
+            entry(date(2026, 6, 8), sets: [RecordedSet(w: 100, r: 10)]),             // 1000 push
+            entry(date(2026, 6, 8), exId: "Row", sets: [RecordedSet(w: 50, r: 10)]), // 500 pull
+            entry(date(2026, 6, 9), sets: [RecordedSet(w: 100, r: 5)]),              // 500 push
+            entry(date(2026, 6, 9), exId: "Mystery", sets: [RecordedSet(w: 10, r: 1)]),
+        ]
+        let rows = ProgressAnalytics.dailyVolume(history: history, days: 30,
+                                                 key: { exId -> String? in
+            switch exId {
+            case "Bench": return "Push"
+            case "Row": return "Pull"
+            default: return nil          // unfacetted work is not a slice
+            }
+        }, today: today, calendar: cal)
+        #expect(rows.count == 3)
+        #expect(rows.first?.day == cal.startOfDay(for: date(2026, 6, 8)))   // oldest first
+        let day1 = rows.filter { $0.day == cal.startOfDay(for: date(2026, 6, 8)) }
+        #expect(Set(day1.map(\.key)) == ["Push", "Pull"])
+        #expect(day1.first { $0.key == "Push" }?.volumeKg == 1000)
+    }
+
     @Test func groupedFoldsContributionsAndDropsUnkeyedRows() {
         let history = [
             entry(date(2026, 6, 8), sets: [RecordedSet(w: 100, r: 10)]),             // 1000

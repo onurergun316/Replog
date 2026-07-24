@@ -443,6 +443,28 @@ enum ProgressAnalytics {
         }
     }
 
+    /// Volume per training day, split by whatever facet the caller can name — the
+    /// stacked series behind "and when did that happen". Entries with no key are
+    /// dropped, and rest days are simply absent.
+    static func dailyVolume<Key: Hashable>(history: [HistoryEntry], days: Int,
+                                           load: LoadResolver = .stored,
+                                           key: (String) -> Key?,
+                                           today: Date = Date(),
+                                           calendar: Calendar = .current)
+    -> [(day: Date, key: Key, volumeKg: Double)] {
+        guard let cutoff = calendar.date(byAdding: .day, value: -days,
+                                         to: calendar.startOfDay(for: today)) else { return [] }
+        var totals: [Date: [Key: Double]] = [:]
+        for entry in history where entry.date >= cutoff {
+            guard let key = key(entry.exId) else { continue }
+            let day = calendar.startOfDay(for: entry.date)
+            totals[day, default: [:]][key, default: 0] += load.volumeKg(entry)
+        }
+        return totals.keys.sorted().flatMap { day in
+            (totals[day] ?? [:]).map { (day: day, key: $0.key, volumeKg: $0.value) }
+        }
+    }
+
     /// The athlete's first day of training: the earlier of their first logged set and
     /// their first completed day. `nil` before they have trained at all. Charts clamp
     /// their x-domain to this so nothing is drawn from before they started.
