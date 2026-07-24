@@ -72,8 +72,21 @@ Valid from n=1 with no ladder. This is the form to lean on — it is a cross-sec
 Apple: small static charts "don't require grid lines, labels, or interactivity" ([WWDC22 110342](https://wwdcnotes.com/documentation/wwdc22-110342-design-app-experiences-with-charts/)).
 - **Bar mini:** renders at n ≥ 2.
 - **Line mini:** renders at n ≥ 3.
-- **Below that: no mini chart.** `DashboardCard` renders `EmptyView()` for the chart and gains a second caption line instead. **This is the single fix for "one lone dot in a large empty card."** The card must shrink, not hold whitespace.
+- ~~**Below that: no mini chart.** `DashboardCard` renders `EmptyView()` for the chart and gains a second caption line instead. The card must shrink, not hold whitespace.~~
 - `DesignSystem/Sparkline.swift`: requires **≥5** points.
+
+> **Overruled by the owner, 24 Jul 2026 — every L1 card carries a preview.** Shipping the shrink
+> rule made the dashboard look broken rather than restrained: Muscles rendered four bars while
+> Volume, Consistency and Body beside it collapsed to a headline, and two cards of different sizes
+> and shapes in the same grid read as a layout bug. `showsChart` is gone.
+>
+> The replacement rule keeps the honesty and drops the whitespace: **a card switches to a form its
+> data supports rather than dropping to nothing.** Volume shows per-session bars until two weeks
+> exist; Strength shows the ranked cross-section of lifts until one lift has three sessions;
+> Consistency bands its bars on week position so a single week has width; Body plots its check-ins
+> against a dashed starting-weight rule, which reads as one observation against a baseline instead
+> of a dot adrift. Still no ghost data, no skeletons, no demo series — every mark is the athlete's.
+> The 2-up rows are a `Grid`, so the pairs are the same height whatever the content does.
 
 ---
 

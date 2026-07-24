@@ -177,10 +177,21 @@ L1  ProgressHomeView ✎     [Calendar · Strength · Volume · Muscles · Consi
 ├── Calendar    ─▶ L2 CalendarView ✎ ─▶ L3 day detail (DayLogCard ★) ─▶ L4 ExerciseDetail
 ├── Strength    ─▶ L2 Strength ✎     ─▶ L3 ExerciseDetail ✎          ─▶ L4 session log
 ├── Volume      ─▶ L2 Volume ✎       ─▶ L3 WeekDetailView ★ ─▶ L4 TrainingDayView ★ ─▶ L5 Exercise
+│                                    ─▶ L3 VolumeStatDetail ★ (total · avg · sets)
+│                                    ─▶ L3 LoadSplitDetail ★
+│                                    ─▶ L3 RepRangeDetail ★
 ├── Muscles     ─▶ L2 Balance ✎      ─▶ L3 MuscleDetail ✎   ─▶ L4 ExerciseDetail ─▶ L5 session log
+│                                    ─▶ L3 ForceSplitDetail ★
 ├── Consistency ─▶ L2 Consistency ✎  ─▶ L3 WeekDetailView ★ ─▶ L4 TrainingDayView ★
 └── Body        ─▶ L2 Body ✎         ─▶ L3 BodyweightHistoryView ★ ─▶ L4 TrainingDayView ★
 ```
+
+**Every headline opens.** A number a user can read but not question is a dead end, so each L2
+summary tile and each part-to-whole card carries a route into what it is made of. All four of those
+L3 breakdowns are views of one derivation — `ProgressAnalytics.exerciseContributions` — so a
+headline and its breakdown cannot disagree about a total (pinned by test). The route carries the
+window as `days: Int?`, because a breakdown that silently described a different span than the tile
+that opened it would be worse than no breakdown at all.
 
 **Canonical home for every "total weight lifted per X"** — per set → the L4 log expansion · per
 session and per day → `TrainingDayView` · per week → `WeekDetailView` · per month and per arbitrary

@@ -74,6 +74,15 @@ screens (Strava's top community merge request).
   `.scrollTargetBehavior(.paging)` + `.scrollPosition(id:)`, each page
   `containerRelativeFrame(.horizontal)`. Not `TabView(.page)` — its internal pan can't be
   disabled during selection.
+- **The pager must be full-bleed, and each page carries its own 20pt inset.** This is
+  load-bearing. `scrollPosition(id:)` converts the initial month into a content offset
+  before the lazy stack has realised a page, so it estimates page width from the
+  container; inside a padded column that estimate (the full screen width) disagreed with
+  the width `containerRelativeFrame` resolved (screen − 40), and the scroll settled at
+  `36 × 402 / 362 ≈ page 40` — the grid drew November while the header, reading the
+  untouched binding, still said July. A chevron tap re-assigned the binding against a
+  resolved layout and the two silently came back into sync, which is why it presented as
+  "it fixes itself once I page". Keep both widths the same number.
 - **Date math**: explicit Gregorian calendar with `firstWeekday = 1`; grids built from
   `dateInterval(of:)`, days iterated with `date(byAdding: .day)` (never +86 400 s); a fixed
   42-cell (6-row) page so month heights never jump; "today" refreshed on day change.
