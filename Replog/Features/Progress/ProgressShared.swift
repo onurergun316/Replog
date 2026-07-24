@@ -253,14 +253,18 @@ enum ProgressPalette {
 /// Takes a `ProgressRoute` rather than a destination closure: a destination-based push
 /// isn't represented in the stack's path, and mixing the two styles in one stack is
 /// what made deeper exercise rows push-then-pop and pile up (see `ProgressNavigation`).
+///
+/// Every card carries a preview. The earlier rule — draw a chart only once the data has
+/// earned one, and let the card shrink otherwise — read as breakage on the dashboard:
+/// two cards side by side in different sizes and shapes look like a layout bug, not like
+/// restraint. So each card picks a *form its data supports* instead (per-session bars
+/// before there are two weeks, a ranked cross-section before there is a time series)
+/// rather than dropping to nothing. Same footprint, still no invented data.
 struct DashboardCard<Chart: View>: View {
     let eyebrow: String
     let headline: String
     var caption: String? = nil
     let route: ProgressRoute
-    /// Rendered only when the data has earned a chart — a card must shrink rather than
-    /// reserve whitespace around a single dot.
-    var showsChart: Bool = true
     @ViewBuilder var chart: () -> Chart
 
     var body: some View {
@@ -279,7 +283,7 @@ struct DashboardCard<Chart: View>: View {
                     Text(caption).font(.rounded(11, .semibold)).foregroundStyle(Color.text2)
                         .lineLimit(1)
                 }
-                if showsChart { chart() }
+                chart()
             }
             .padding(14)
             .frame(maxWidth: .infinity, alignment: .leading)

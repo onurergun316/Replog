@@ -180,8 +180,7 @@ struct ProgressHomeView: View {
             eyebrow: "Muscles",
             headline: shares.first?.muscle.displayName ?? "—",
             caption: shares.first.map { "\($0.sets) set\($0.sets == 1 ? "" : "s") in 4 weeks" },
-            route: .balance,
-            showsChart: shares.count >= 2
+            route: .balance
         ) {
             // Ranked bars, one hue — a mini donut cannot be read at 56pt and cannot
             // show a muscle trained zero times, which is the row that matters.
