@@ -94,6 +94,10 @@ final class AppSettings {
     /// a bool so a corrected repair can re-run on a device that already saw an earlier one.
     var templateBackfillVersion: Int = 0
 
+    /// Which `SessionAttributionBackfill` version has run — naming sessions finished
+    /// before history recorded which workout produced them.
+    var sessionAttributionVersion: Int = 0
+
     // MARK: Notifications (Phase 7)
     /// Master switch — off until the user opts in (permission is requested in context).
     var notificationsEnabled: Bool = false

@@ -25,6 +25,8 @@ struct ReplogApp: App {
         try? context.save()
         // One-time repair for plans logged before finishing wrote its numbers back.
         TemplateBackfill.run(context: context)
+        // …and for sessions finished before history recorded which workout they were.
+        SessionAttributionBackfill.run(context: context)
         // Register the best-effort background report refresh (no-ops if not permitted).
         ReportScheduler.registerBackgroundTask(container: container)
     }
