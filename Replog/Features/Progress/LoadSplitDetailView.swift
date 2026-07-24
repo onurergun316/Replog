@@ -29,7 +29,7 @@ struct LoadSplitDetailView: View {
 
     private var units: Units { settingsRows.first?.units ?? .kg }
     private var load: LoadResolver { .live(catalog: catalog, bodyweightEntries: bodyweightEntries) }
-    private var windowDays: Int { days ?? 36_500 }
+    private var windowDays: Int { days ?? RangeSelection.allTimeDays }
 
     private var contributions: [ExerciseContribution] {
         ProgressAnalytics.exerciseContributions(history: history, days: windowDays, load: load)

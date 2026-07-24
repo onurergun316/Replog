@@ -32,11 +32,11 @@ struct VolumeDetailView: View {
 
     private var buckets: [WeekBucket] {
         ProgressAnalytics.trimmingLeadingEmptyWeeks(
-            ProgressAnalytics.weekBuckets(history: history, weeks: window.weeks ?? 104, load: load))
+            ProgressAnalytics.weekBuckets(history: history, weeks: window.weeks ?? RangeSelection.allTimeWeeks, load: load))
     }
 
     private var mix: RepRangeMix {
-        ProgressAnalytics.repRangeMix(history: history, days: window.days ?? 730, load: load)
+        ProgressAnalytics.repRangeMix(history: history, days: window.days ?? RangeSelection.allTimeDays, load: load)
     }
 
     var body: some View {
@@ -189,7 +189,7 @@ struct VolumeDetailView: View {
     /// How much of the tonnage was plates and how much was the athlete's own body.
     @ViewBuilder
     private var loadSplitSection: some View {
-        let split = ProgressAnalytics.loadSplit(history: history, days: window.days ?? 3650, load: load)
+        let split = ProgressAnalytics.loadSplit(history: history, days: window.days ?? RangeSelection.allTimeDays, load: load)
         let total = split.externalKg + split.bodyweightKg
         if total > 0, split.bodyweightKg > 0 {
             // The whole card opens: a split raises "which movements, and when", and the

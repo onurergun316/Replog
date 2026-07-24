@@ -31,7 +31,7 @@ struct BalanceDetailView: View {
     }
 
     private var muscleSets: [(muscle: Muscle, sets: Int)] {
-        ProgressAnalytics.muscleSets(history: history, days: window.days ?? 3650,
+        ProgressAnalytics.muscleSets(history: history, days: window.days ?? RangeSelection.allTimeDays,
                                      muscles: { catalog.exercise(id: $0)?.primaryMuscles ?? [] })
     }
 
@@ -186,7 +186,7 @@ struct MuscleDetailView: View {
 
     private var buckets: [WeekBucket] {
         ProgressAnalytics.trimmingLeadingEmptyWeeks(
-            ProgressAnalytics.weekBuckets(history: relevant, weeks: window.weeks ?? 104, load: load))
+            ProgressAnalytics.weekBuckets(history: relevant, weeks: window.weeks ?? RangeSelection.allTimeWeeks, load: load))
     }
 
     /// This muscle's exercises ranked by window volume.

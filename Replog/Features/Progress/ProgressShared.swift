@@ -50,9 +50,24 @@ struct RangeSelection: Equatable {
     /// Only meaningful when `window == .custom`.
     var customDays: Int = 30
 
+    /// What "all time" resolves to when a derivation needs a concrete span.
+    ///
+    /// One pair of constants, and `allTimeDays == allTimeWeeks * 7` on purpose. Screens
+    /// were each inventing their own fallback — 104 weeks here, 730 days there, 3,650
+    /// somewhere else — so the same "All time" capsule showed one set count on the card
+    /// and a different one on the screen that card opened. Ten years is past any real
+    /// training history and still bounded, unlike the 36,500-day span that had a chart
+    /// allocating a hundred years of empty weekly buckets.
+    static let allTimeWeeks = 520
+    static let allTimeDays = allTimeWeeks * 7
+
     /// Days the window spans, or `nil` for all time.
     var days: Int? { window == .custom ? customDays : window.days }
     var weeks: Int? { window == .custom ? max(1, Int(ceil(Double(customDays) / 7))) : window.weeks }
+
+    /// The span as a concrete number of days/weeks, with "all time" resolved.
+    var resolvedDays: Int { days ?? Self.allTimeDays }
+    var resolvedWeeks: Int { weeks ?? Self.allTimeWeeks }
 
     var label: String {
         guard window == .custom else { return window.label }

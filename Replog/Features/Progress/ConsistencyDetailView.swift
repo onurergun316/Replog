@@ -34,7 +34,7 @@ struct ConsistencyDetailView: View {
     private var weeks: [AdherenceWeek] {
         ProgressAnalytics.adherence(
             scheduledDays: scheduledDays, doneDates: doneDates,
-            weeks: window.weeks ?? 104,
+            weeks: window.weeks ?? RangeSelection.allTimeWeeks,
             since: ProgressAnalytics.firstActivity(history: history, doneDates: doneDates))
     }
 

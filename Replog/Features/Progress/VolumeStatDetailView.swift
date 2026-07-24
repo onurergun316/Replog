@@ -68,7 +68,9 @@ struct VolumeStatDetailView: View {
     }
 
     private var contributions: [ExerciseContribution] {
-        ProgressAnalytics.exerciseContributions(history: history, days: days ?? 36_500, load: load)
+        ProgressAnalytics.exerciseContributions(history: history,
+                                                days: days ?? RangeSelection.allTimeDays,
+                                                load: load)
     }
 
     // One derivation per render, threaded down: each read of `contributions` or
