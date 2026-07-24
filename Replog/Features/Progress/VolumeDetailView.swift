@@ -36,7 +36,18 @@ struct VolumeDetailView: View {
     }
 
     private var mix: RepRangeMix {
-        ProgressAnalytics.repRangeMix(history: history, days: window.days ?? RangeSelection.allTimeDays, load: load)
+        ProgressAnalytics.repRangeMix(history: history, days: window.resolvedDays, load: load)
+    }
+
+    /// The exact rows the tiles' breakdown screens derive from.
+    ///
+    /// The tiles used to sum `weekBuckets`, which is Sunday-anchored and capped in
+    /// *weeks*, while the screen each tile opened summed `exerciseContributions`, which
+    /// is day-anchored and capped in days. Tapping "23,188 kg" could therefore land on a
+    /// different 23,188 kg — the one thing a drill-down must never do.
+    private var contributions: [ExerciseContribution] {
+        ProgressAnalytics.exerciseContributions(history: history, days: window.resolvedDays,
+                                                load: load)
     }
 
     var body: some View {
@@ -69,7 +80,8 @@ struct VolumeDetailView: View {
     /// Every tile opens. A headline you can read but cannot question is where the screen
     /// used to stop — "23,188 kg" is only useful next to which lifts produced it.
     private func summaryRow(trained: [WeekBucket]) -> some View {
-        let total = trained.reduce(0.0) { $0 + $1.volumeKg }
+        let rows = contributions
+        let total = rows.reduce(0.0) { $0 + $1.volumeKg }
         let groups = sessions
         return HStack(spacing: 12) {
             StatTile(value: Formulas.formatWeight(kg: total, units: units, includeUnit: false),
@@ -82,7 +94,7 @@ struct VolumeDetailView: View {
                 StatTile(value: Formulas.formatWeight(kg: total / Double(trained.count),
                                                       units: units, includeUnit: false),
                          label: "avg / week",
-                         route: .volumeStat(.average, days: window.days))
+                         route: .volumeStat(.weeklyAverage, days: window.days))
             } else if groups.count > 1 {
                 StatTile(value: Formulas.formatWeight(kg: total / Double(groups.count),
                                                       units: units, includeUnit: false),
@@ -93,7 +105,7 @@ struct VolumeDetailView: View {
                          label: groups.count == 1 ? "session" : "sessions",
                          route: .volumeStat(.average, days: window.days))
             }
-            StatTile(value: "\(trained.reduce(0) { $0 + $1.sets })", label: "sets",
+            StatTile(value: "\(rows.reduce(0) { $0 + $1.sets })", label: "sets",
                      route: .volumeStat(.sets, days: window.days))
         }
     }

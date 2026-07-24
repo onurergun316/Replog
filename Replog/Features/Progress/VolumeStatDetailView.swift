@@ -17,14 +17,16 @@ import SwiftUI
 import SwiftData
 import Charts
 
-/// Which Volume headline is being opened.
+/// Which Volume headline is being opened. One case per tile, so the screen always opens
+/// on the reading that was tapped rather than a near neighbour of it.
 enum VolumeStat: String, Hashable, CaseIterable {
-    case total, average, sets
+    case total, average, weeklyAverage, sets
 
     var title: String {
         switch self {
         case .total: return "Total volume"
         case .average: return "Average session"
+        case .weeklyAverage: return "Average week"
         case .sets: return "Sets"
         }
     }
@@ -37,10 +39,15 @@ enum VolumeStat: String, Hashable, CaseIterable {
             return "Every kilogram you moved in this window: weight × reps for each set, with bodyweight movements credited at their share of your bodyweight."
         case .average:
             return "Total volume divided by the number of finished sessions — what a typical workout weighs in this window."
+        case .weeklyAverage:
+            return "Total volume divided by the weeks you actually trained in. Weeks with nothing logged are left out, so a holiday doesn't halve the number."
         case .sets:
             return "Every set you completed and logged. Sets, not kilograms, are the unit training volume is usually prescribed in."
         }
     }
+
+    /// Whether this reading is about sessions over time rather than a composition.
+    var listsSessions: Bool { self != .sets }
 }
 
 struct VolumeStatDetailView: View {
@@ -92,7 +99,7 @@ struct VolumeStatDetailView: View {
                     headlineCard(rows: rows, sessions: groups, volume: volume)
                     chartSection(rows: rows, sessions: groups)
                     exerciseSection(rows: rows, volume: volume)
-                    if stat != .sets { sessionSection(groups) }
+                    if stat.listsSessions { sessionSection(groups) }
                 }
             }
             .padding(20)
@@ -103,6 +110,16 @@ struct VolumeStatDetailView: View {
 
     // MARK: Headline
 
+    /// Weeks with at least one logged set inside the window — the denominator the Volume
+    /// screen's "avg / week" tile uses, so both sides divide by the same number.
+    private var trainedWeeks: Int {
+        ProgressAnalytics.weekBuckets(history: history,
+                                      weeks: days.map { max(1, Int(ceil(Double($0) / 7))) }
+                                          ?? RangeSelection.allTimeWeeks,
+                                      load: load)
+            .filter { $0.volumeKg > 0 }.count
+    }
+
     private func headlineValue(rows: [ExerciseContribution],
                                sessions: [ProgressAnalytics.SessionGroup],
                                volume: Double) -> String {
@@ -110,6 +127,8 @@ struct VolumeStatDetailView: View {
         case .total: return Formulas.formatWeight(kg: volume, units: units)
         case .average:
             return Formulas.formatWeight(kg: volume / Double(max(1, sessions.count)), units: units)
+        case .weeklyAverage:
+            return Formulas.formatWeight(kg: volume / Double(max(1, trainedWeeks)), units: units)
         case .sets: return "\(rows.reduce(0) { $0 + $1.sets })"
         }
     }
@@ -137,7 +156,7 @@ struct VolumeStatDetailView: View {
                               sessions: [ProgressAnalytics.SessionGroup]) -> some View {
         switch stat {
         case .total: exerciseRankChart(rows)
-        case .average: sessionAverageChart(sessions)
+        case .average, .weeklyAverage: sessionAverageChart(sessions)
         case .sets: setsChart(rows: rows, sessions: sessions)
         }
     }
@@ -275,7 +294,7 @@ struct VolumeStatDetailView: View {
     private func value(for row: ExerciseContribution, of volume: Double) -> String {
         switch stat {
         case .sets: return "\(row.sets)"
-        case .total, .average:
+        case .total, .average, .weeklyAverage:
             let share = volume > 0 ? Int((row.volumeKg / volume * 100).rounded()) : 0
             return "\(Formulas.formatWeight(kg: row.volumeKg, units: units)) · \(share)%"
         }
