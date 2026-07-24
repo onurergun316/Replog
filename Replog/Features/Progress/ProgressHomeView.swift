@@ -47,13 +47,20 @@ struct ProgressHomeView: View {
                         emptyState
                     } else {
                         strengthCard
-                        HStack(alignment: .top, spacing: 12) {
-                            volumeCard
-                            balanceCard
-                        }
-                        HStack(alignment: .top, spacing: 12) {
-                            consistencyCard
-                            bodyCard
+                        // A Grid, not two HStacks: an HStack sizes each child to its own
+                        // ideal height, so a card whose headline scaled down or whose
+                        // preview differed by a point sat visibly shorter than its
+                        // neighbour. Grid offers both cells the row's height, and the
+                        // card's flexible frame fills it — the pairs always match.
+                        Grid(horizontalSpacing: 12, verticalSpacing: 14) {
+                            GridRow {
+                                volumeCard
+                                balanceCard
+                            }
+                            GridRow {
+                                consistencyCard
+                                bodyCard
+                            }
                         }
                     }
                 }

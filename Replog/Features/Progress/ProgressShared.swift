@@ -286,7 +286,10 @@ struct DashboardCard<Chart: View>: View {
                 chart()
             }
             .padding(14)
-            .frame(maxWidth: .infinity, alignment: .leading)
+            // `maxHeight` is what makes the 2-up rows match: the row is a Grid, so both
+            // cells are offered the taller card's height and a flexible child fills it.
+            // Without it, one wrapped line anywhere leaves two mismatched cards again.
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             .cardSurface()
         }
         .buttonStyle(.plain)
