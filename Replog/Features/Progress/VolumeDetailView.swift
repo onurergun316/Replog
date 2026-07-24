@@ -114,9 +114,7 @@ struct VolumeDetailView: View {
     /// Sessions inside the window, oldest first — "total weight lifted per session",
     /// which per-exercise-per-day history could not answer before finishes were stamped.
     private var sessions: [ProgressAnalytics.SessionGroup] {
-        let cutoff = window.days.flatMap {
-            Calendar.current.date(byAdding: .day, value: -$0, to: Date())
-        } ?? .distantPast
+        let cutoff = ProgressAnalytics.cutoff(days: window.resolvedDays)
         return ProgressAnalytics.sessions(history: history.filter { $0.date >= cutoff })
     }
 

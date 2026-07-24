@@ -85,6 +85,18 @@ struct PREvent: Equatable, Identifiable {
 
 enum ProgressAnalytics {
 
+    /// The start of a `days`-long window ending today, anchored at **start of day**.
+    ///
+    /// Every windowed derivation in here uses this anchor, and so must any screen that
+    /// filters history itself — otherwise the two disagree by up to a day. Anchoring one
+    /// on `Date()` and the other on `startOfDay(Date())` is what let a session logged
+    /// this morning count toward a total while being missing from the list of sessions
+    /// printed directly underneath it.
+    static func cutoff(days: Int, today: Date = Date(), calendar: Calendar = .current) -> Date {
+        calendar.date(byAdding: .day, value: -days, to: calendar.startOfDay(for: today))
+            ?? .distantPast
+    }
+
     /// The last `weeks` Sunday-anchored weeks (oldest → newest, empty weeks included),
     /// with volume, set count, and distinct training days per week.
     ///

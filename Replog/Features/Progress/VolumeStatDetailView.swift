@@ -56,10 +56,10 @@ struct VolumeStatDetailView: View {
     private var units: Units { settingsRows.first?.units ?? .kg }
     private var load: LoadResolver { .live(catalog: catalog, bodyweightEntries: bodyweightEntries) }
 
+    /// Filtered through the same start-of-day cutoff the aggregates use, so the session
+    /// list can't omit a session that the totals above it counted.
     private var windowed: [HistoryEntry] {
-        guard let days,
-              let cutoff = Calendar.current.date(byAdding: .day, value: -days, to: Date())
-        else { return history }
+        let cutoff = ProgressAnalytics.cutoff(days: days ?? RangeSelection.allTimeDays)
         return history.filter { $0.date >= cutoff }
     }
 

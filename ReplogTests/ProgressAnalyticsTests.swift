@@ -344,6 +344,15 @@ struct ProgressAnalyticsTests {
         #expect(rows.reduce(0) { $0 + $1.sets } == buckets.reduce(0) { $0 + $1.sets })
     }
 
+    @Test func cutoffAnchorsAtStartOfDaySoAScreensFilterMatchesTheAggregates() {
+        // today is 2026-06-10 12:00. A 2-day window must reach back to the start of the
+        // 8th, not to noon on the 8th — otherwise a morning session counts toward a total
+        // while being absent from the list printed underneath it.
+        let cutoff = ProgressAnalytics.cutoff(days: 2, today: today, calendar: cal)
+        #expect(cutoff == cal.startOfDay(for: date(2026, 6, 8)))
+        #expect(date(2026, 6, 8) >= cutoff)          // a session that morning is inside
+    }
+
     @Test func dailyLoadSplitEmitsOneRowPerTrainingDayOldestFirst() {
         let history = [
             entry(date(2026, 6, 9), sets: [RecordedSet(w: 100, r: 5)]),              // 500

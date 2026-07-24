@@ -111,7 +111,7 @@ struct ProgressHomeView: View {
     private var topLift: ExerciseProgress? { rankedLifts.first }
 
     private var recentPRCount: Int {
-        let cutoff = Calendar.current.date(byAdding: .day, value: -28, to: Date()) ?? Date()
+        let cutoff = ProgressAnalytics.cutoff(days: 28)
         return ProgressAnalytics.prEvents(history: history, load: load).filter { $0.date >= cutoff }.count
     }
 

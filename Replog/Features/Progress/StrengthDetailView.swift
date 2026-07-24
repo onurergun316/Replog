@@ -53,7 +53,7 @@ struct StrengthDetailView: View {
     }
 
     private var cutoff: Date? {
-        window.days.flatMap { Calendar.current.date(byAdding: .day, value: -$0, to: Date()) }
+        window.days.map { ProgressAnalytics.cutoff(days: $0) }
     }
 
     private var windowed: [HistoryEntry] {

@@ -37,9 +37,7 @@ struct BalanceDetailView: View {
 
     /// Push vs pull vs static volume within the window, from the catalog's force facet.
     private var forceSplit: [(label: String, volume: Double)] {
-        let cutoff = window.days.flatMap {
-            Calendar.current.date(byAdding: .day, value: -$0, to: Date())
-        } ?? .distantPast
+        let cutoff = ProgressAnalytics.cutoff(days: window.resolvedDays)
         var byForce: [Force: Double] = [:]
         let load = self.load
         for entry in history where entry.date >= cutoff {
@@ -176,9 +174,7 @@ struct MuscleDetailView: View {
 
     /// History entries whose exercise trains this muscle as a primary, within the window.
     private var relevant: [HistoryEntry] {
-        let cutoff = window.days.flatMap {
-            Calendar.current.date(byAdding: .day, value: -$0, to: Date())
-        } ?? .distantPast
+        let cutoff = ProgressAnalytics.cutoff(days: window.resolvedDays)
         return history.filter {
             $0.date >= cutoff && catalog.exercise(id: $0.exId)?.primaryMuscles.contains(muscle) == true
         }
