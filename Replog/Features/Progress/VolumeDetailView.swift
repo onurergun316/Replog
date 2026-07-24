@@ -50,7 +50,10 @@ struct VolumeDetailView: View {
                     ProgressEmptyCard(text: "No sets logged in this window yet.")
                 } else {
                     summaryRow(trained: trained)
-                    weeklyChart
+                    // The bucket follows the span. With four days of history a weekly
+                    // chart is one bar — technically correct and completely shapeless —
+                    // while the same data per session actually shows something.
+                    if trained.count >= 2 { weeklyChart }
                     if !sessions.isEmpty { sessionSection }
                     loadSplitSection
                     repMixSection
@@ -121,6 +124,8 @@ struct VolumeDetailView: View {
 
     private var sessionSection: some View {
         let groups = sessions
+        let density = ChartDensity.of(groups.count)
+        let load = self.load
         return VStack(alignment: .leading, spacing: 10) {
             SectionHeader(title: "Per Session")
             VStack(alignment: .leading, spacing: 8) {
@@ -129,9 +134,18 @@ struct VolumeDetailView: View {
                             y: .value("Volume", ProgressAnalytics.tonnage(of: session, load: load)))
                         .foregroundStyle(Color.accent)
                         .cornerRadius(3)
+                        // Two bars read better labelled than measured against an axis.
+                        .annotation(position: .top) {
+                            if density.labelsMarksDirectly {
+                                Text(Formulas.formatWeight(
+                                    kg: ProgressAnalytics.tonnage(of: session, load: load),
+                                    units: units, includeUnit: false))
+                                    .font(.rounded(10, .heavy)).foregroundStyle(Color.text3)
+                            }
+                        }
                 }
-                .chartYAxis { AxisMarks(position: .leading) }
-                .frame(height: 150)
+                .chartYAxis { if density.showsAxis { AxisMarks(position: .leading) } }
+                .frame(height: density.chartHeight)
                 Text(groups.count == 1
                      ? "One session logged"
                      : "\(groups.count) sessions · heaviest \(Formulas.formatWeight(kg: groups.map { ProgressAnalytics.tonnage(of: $0, load: load) }.max() ?? 0, units: units))")
