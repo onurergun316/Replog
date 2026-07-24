@@ -94,12 +94,13 @@ struct CalendarView: View {
     private var content: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
-                header
-                monthHeader
+                header.padding(.horizontal, 20)
+                monthHeader.padding(.horizontal, 20)
+                // Full-bleed by design — the page inset lives inside the pager. See `monthPager`.
                 monthPager
-                detailSection
+                detailSection.padding(.horizontal, 20)
             }
-            .padding(20)
+            .padding(.vertical, 20)
         }
         .scrollDisabled(isSelecting)
         .background(Color.bg.ignoresSafeArea())
@@ -173,6 +174,18 @@ struct CalendarView: View {
         .buttonStyle(.plain)
     }
 
+    /// The pager spans the full screen width and each page carries its own 20pt inset,
+    /// rather than the pager sitting inside a padded column.
+    ///
+    /// This is load-bearing, not cosmetic. `scrollPosition(id:)` has to convert the
+    /// initial month into a content offset before the lazy stack has realised a page, so
+    /// it estimates page width from the container — and inside a padded column that
+    /// estimate (the full 402pt) disagreed with the width `containerRelativeFrame`
+    /// finally resolved (362pt). The scroll settled at 36 × 402 / 362 ≈ page 40: the grid
+    /// showed November while the header, reading the untouched binding, still said July,
+    /// and only a chevron tap (which re-assigns the binding against a resolved layout)
+    /// put them back in agreement. Full-bleed makes both widths the same number, so the
+    /// estimate is exact on the first pass.
     private var monthPager: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             LazyHStack(spacing: 0) {
@@ -186,6 +199,7 @@ struct CalendarView: View {
                         onDragMoved: { dragMoved($0) },
                         onDragEnded: { dragEnded() }
                     )
+                    .padding(.horizontal, 20)
                     .containerRelativeFrame(.horizontal)
                 }
             }
