@@ -8,7 +8,7 @@
 
 import Foundation
 
-struct ExerciseProgress: Equatable, Sendable {
+struct ExerciseProgress: Equatable, Sendable, Identifiable {
     var exId: String
     var bestE1rm: Int
     var currentE1rm: Int
@@ -18,6 +18,7 @@ struct ExerciseProgress: Equatable, Sendable {
     var series: [Int]
     var sessionCount: Int
 
+    var id: String { exId }
     var hasData: Bool { sessionCount > 0 }
     var trend: Trend {
         guard let trendPercent else { return .none }

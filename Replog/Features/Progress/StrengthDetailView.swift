@@ -2,9 +2,20 @@
 //  StrengthDetailView.swift
 //  Replog
 //
-//  Progress L2 — Strength: the top lifts' e1RM trends over a chosen window, the PR
-//  feed, and every trained exercise ranked by best e1RM. Rows push the exercise's own
-//  detail (L3), whose session log is the deepest layer.
+//  Progress L2 — Strength: estimated 1RM per lift over a chosen window, the PR feed, and
+//  every trained exercise ranked. Rows push the exercise's own detail (L3), whose session
+//  log is the deepest layer.
+//
+//  The filters sit above the chart because they drive it. Search and the muscle chips
+//  narrow one set of exercises, and the chart, the PR feed and the list are all views of
+//  that same set — a control that visibly reorders a list while the chart above it stays
+//  frozen reads as a broken screen.
+//
+//  The chart picks its form from the data rather than always plotting time. One session
+//  per lift is not a time series; drawn as one it is a field of unconnected dots with a
+//  legend, which is what it used to be. With fewer than two sessions on every lift the
+//  chart becomes the cross-section — how the lifts rank right now — which is a valid
+//  reading from the very first session and turns into the trend as soon as one exists.
 //
 
 import SwiftUI
@@ -33,7 +44,6 @@ struct StrengthDetailView: View {
                                             catalog: { catalog.exercise(id: $0) })
     }
 
-
     /// Days from the athlete's first activity to today — the range control offers only
     /// windows that actually contain something.
     private var historySpanDays: Int? {
@@ -53,13 +63,18 @@ struct StrengthDetailView: View {
 
     /// Every trained exercise summarized, best lift first.
     private var ranked: [ExerciseProgress] {
-        Dictionary(grouping: windowed, by: \.exId)
+        let load = self.load
+        return Dictionary(grouping: windowed, by: \.exId)
             .map { ProgressAggregator.summarize(exId: $0.key, history: $0.value, load: load) }
             .sorted { $0.bestE1rm > $1.bestE1rm }
     }
 
+    /// PRs inside the window, narrowed to whatever the filters are showing — a feed that
+    /// ignored the muscle chip would name lifts the rest of the screen has hidden.
     private var prs: [PREvent] {
+        let visible = Set(filtered.map(\.exId))
         let events = ProgressAnalytics.prEvents(history: history, load: load)
+            .filter { visible.contains($0.exId) }
         guard let cutoff else { return events }
         return events.filter { $0.date >= cutoff }
     }
@@ -73,76 +88,14 @@ struct StrengthDetailView: View {
                 if ranked.isEmpty {
                     ProgressEmptyCard(text: "No lifts in this window yet.")
                 } else {
-                    topLiftChart
-
-                    if !prs.isEmpty {
-                        SectionHeader(title: "Personal Records")
-                        VStack(spacing: 0) {
-                            ForEach(Array(prs.prefix(10).enumerated()), id: \.element.id) { index, pr in
-                                if index > 0 { Divider() }
-                                HStack(spacing: 10) {
-                                    Image(systemName: "trophy.fill").foregroundStyle(Color.accent)
-                                    VStack(alignment: .leading, spacing: 1) {
-                                        Text(catalog.exercise(id: pr.exId)?.name ?? pr.exId)
-                                            .font(.rounded(14, .heavy)).foregroundStyle(Color.textPrimary)
-                                            .lineLimit(1)
-                                        Text(pr.date, format: .dateTime.month(.wide).day())
-                                            .font(.rounded(12, .semibold)).foregroundStyle(Color.text3)
-                                    }
-                                    Spacer()
-                                    Text("\(pr.e1rm)").font(.rounded(16, .black))
-                                        .foregroundStyle(Color.accent).tabularNumbers()
-                                }
-                                .padding(.vertical, 10)
-                            }
-                        }
-                        .padding(.horizontal, 14)
-                        .cardSurface()
-                    }
-
-                    SectionHeader(title: "All Exercises")
-                    SearchField(placeholder: "Search your exercises", text: $filter.query)
-                    // Keep the chip row while a muscle is selected even if the window no
-                    // longer offers it — otherwise changing range hides the only control
-                    // that could clear the filter, stranding the athlete on an empty list.
-                    if muscleOptions.count > 1 || filter.muscle != nil {
-                        FilterChipRow(options: muscleOptions.map { ($0, $0.displayName) },
-                                      selection: $filter.muscle,
-                                      allLabel: "All muscles")
-                    }
+                    filterControls
                     if filtered.isEmpty {
                         ProgressEmptyCard(text: "No trained exercises match — clear the filters above.")
                     } else {
-                    VStack(spacing: 0) {
-                        ForEach(Array(filtered.enumerated()), id: \.element.exId) { index, progress in
-                            if index > 0 { Divider() }
-                            NavigationLink(value: ExerciseRef(id: progress.exId)) {
-                                HStack(spacing: 10) {
-                                    ExerciseThumbnail(
-                                        resourceName: catalog.exercise(id: progress.exId)?
-                                            .imageResourceNames.first,
-                                        size: 40, cornerRadius: 9)
-                                    VStack(alignment: .leading, spacing: 1) {
-                                        Text(catalog.exercise(id: progress.exId)?.name ?? progress.exId)
-                                            .font(.rounded(14, .heavy)).foregroundStyle(Color.textPrimary)
-                                            .lineLimit(1)
-                                        Text("\(progress.sessionCount) session\(progress.sessionCount == 1 ? "" : "s")")
-                                            .font(.rounded(12, .semibold)).foregroundStyle(Color.text3)
-                                    }
-                                    Spacer()
-                                    TrendArrow(trend: progress.trend)
-                                    Text("\(progress.bestE1rm)")
-                                        .font(.rounded(16, .black)).foregroundStyle(Color.textPrimary)
-                                        .tabularNumbers()
-                                }
-                                .padding(.vertical, 10)
-                                .contentShape(Rectangle())
-                            }
-                            .buttonStyle(.plain)
-                        }
-                    }
-                    .padding(.horizontal, 14)
-                    .cardSurface()
+                        chartCard
+                        prSection
+                        SectionHeader(title: "All Exercises")
+                        exerciseList
                     }
                 }
             }
@@ -152,35 +105,194 @@ struct StrengthDetailView: View {
         .navigationBarTitleDisplayMode(.inline)
     }
 
-    /// The top three lifts' e1RM over time, one accent-ramp line each.
-    private var topLiftChart: some View {
-        let top = Array(ranked.prefix(3))
-        let series = top.flatMap { progress in
+    // MARK: Filters — above the chart, because they drive it
+
+    private var filterControls: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            SearchField(placeholder: "Search your exercises", text: $filter.query)
+            // Keep the chip row while a muscle is selected even if the window no longer
+            // offers it — otherwise changing range hides the only control that could
+            // clear the filter, stranding the athlete on an empty screen.
+            if muscleOptions.count > 1 || filter.muscle != nil {
+                FilterChipRow(options: muscleOptions.map { ($0, $0.displayName) },
+                              selection: $filter.muscle,
+                              allLabel: "All muscles")
+            }
+        }
+    }
+
+    // MARK: The chart
+
+    /// Lifts with enough sessions in the window to draw a line. Ranked by how much
+    /// history each has, so the three series plotted are the three with something to
+    /// show rather than simply the three heaviest.
+    private var plottable: [ExerciseProgress] {
+        filtered
+            .filter { $0.sessionCount >= 2 }
+            .sorted { $0.sessionCount == $1.sessionCount ? $0.bestE1rm > $1.bestE1rm
+                                                        : $0.sessionCount > $1.sessionCount }
+            .prefix(3)
+            .map { $0 }
+    }
+
+    private var chartCard: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(alignment: .firstTextBaseline) {
+                Text(plottable.isEmpty ? "Where your lifts stand" : "Estimated 1RM over time")
+                    .font(.rounded(13, .heavy)).foregroundStyle(Color.textPrimary)
+                Spacer(minLength: 6)
+                if let muscle = filter.muscle {
+                    Pill(text: muscle.displayName, style: .accentSoft)
+                }
+            }
+            if plottable.isEmpty { rankChart } else { trendChart }
+            Text(caption)
+                .font(.rounded(11, .semibold)).foregroundStyle(Color.text3)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .cardSurface()
+    }
+
+    private var caption: String {
+        if plottable.isEmpty {
+            let n = filtered.count
+            return "\(n) lift\(n == 1 ? "" : "s") in this window, one session each — ranked by estimated 1RM rather than plotted over time. A second session on any of them draws the trend instead."
+        }
+        let names = plottable.map { name(of: $0.exId) }
+        let language = ChartDensity.of(plottable.map(\.sessionCount).max() ?? 0)
+        return "\(names.joined(separator: ", ")) · "
+            + (language.allowsTrendLanguage ? "trend over the window" : "recent sessions, not yet a trend")
+    }
+
+    /// The cross-section: how the lifts rank right now. Valid at one session each, which
+    /// is exactly when a time series is not.
+    private var rankChart: some View {
+        let top = Array(filtered.prefix(8))
+        return Chart(top, id: \.exId) { progress in
+            BarMark(x: .value("Estimated 1RM", progress.bestE1rm),
+                    y: .value("Exercise", shortName(of: progress.exId)))
+                .foregroundStyle(Color.accent)
+                .cornerRadius(3)
+                .annotation(position: .trailing) {
+                    Text("\(progress.bestE1rm)")
+                        .font(.rounded(10, .heavy)).foregroundStyle(Color.text3)
+                }
+        }
+        .chartXAxis { AxisMarks(values: .automatic(desiredCount: 3)) }
+        .chartYAxis { AxisMarks(position: .leading) }
+        .chartXAxisLabel("Estimated 1RM")
+        // Grows with the number of bars rather than squeezing eight lifts into 200pt.
+        .frame(height: CGFloat(top.count) * 30 + 36)
+    }
+
+    /// The trend: one line per lift that has a history, over a padded, minimum-span axis.
+    private var trendChart: some View {
+        let series = plottable.flatMap { progress in
             windowed
                 .filter { $0.exId == progress.exId }
                 .sorted { $0.date < $1.date }
-                .map { (name: catalog.exercise(id: progress.exId)?.name ?? progress.exId,
-                        date: $0.date, e1rm: load.e1rm($0)) }
+                .map { (name: name(of: progress.exId), date: $0.date, e1rm: load.e1rm($0)) }
         }
-        return VStack(alignment: .leading, spacing: 8) {
-            Chart(Array(series.enumerated()), id: \.offset) { _, point in
-                LineMark(x: .value("Date", point.date), y: .value("1RM", point.e1rm))
+        let values = series.map { Double($0.e1rm) }
+        let best = values.max() ?? 0
+        let density = ChartDensity.of(plottable.map(\.sessionCount).max() ?? 0)
+        return Chart(Array(series.enumerated()), id: \.offset) { _, point in
+            LineMark(x: .value("Date", point.date), y: .value("Estimated 1RM", point.e1rm))
+                .foregroundStyle(by: .value("Exercise", point.name))
+                // Smoothing invents curvature that isn't in a handful of sessions.
+                .interpolationMethod(density.allowsSmoothing ? .monotone : .linear)
+            // Points sit under the line rather than standing in for it, and drop away
+            // once the line is dense enough to read on its own.
+            if density.showsSymbols {
+                PointMark(x: .value("Date", point.date), y: .value("Estimated 1RM", point.e1rm))
                     .foregroundStyle(by: .value("Exercise", point.name))
-                    .interpolationMethod(.monotone)
-                // Points stay on so a single session is visible, but they sit *under* the
-                // line rather than standing in for it — a field of dots reads as noise.
-                PointMark(x: .value("Date", point.date), y: .value("1RM", point.e1rm))
-                    .foregroundStyle(by: .value("Exercise", point.name))
-                    .symbolSize(28)
+                    .symbolSize(34)
             }
-            .chartForegroundStyleScale(range: [ProgressPalette.ramp(0), ProgressPalette.ramp(1),
-                                               ProgressPalette.ramp(2)])
-            .chartYScale(domain: .automatic(includesZero: false))
-            .chartLegend(position: .bottom, spacing: 8)
-            .frame(height: 200)
         }
-        .padding(14)
-        .cardSurface()
+        .chartForegroundStyleScale(range: [ProgressPalette.ramp(0), ProgressPalette.ramp(1),
+                                           ProgressPalette.ramp(2)])
+        // Never `.automatic` alone: a 2.5kg PR on an auto-fitted axis reads as a doubling.
+        .chartYScale(domain: ChartScales.yDomain(min: values.min() ?? 0, max: best,
+                                                 minSpan: ChartScales.e1rmMinSpan(best: best)))
+        .chartXAxis { AxisMarks(values: .automatic(desiredCount: 4)) {
+            AxisGridLine()
+            AxisValueLabel(format: .dateTime.month(.abbreviated).day())
+        } }
+        .chartYAxis { AxisMarks(position: .leading, values: .automatic(desiredCount: 4)) }
+        .chartXAxisLabel("Session date")
+        .chartYAxisLabel("Estimated 1RM")
+        .chartLegend(position: .bottom, spacing: 8)
+        .frame(height: 220)
+    }
+
+    // MARK: PRs
+
+    @ViewBuilder
+    private var prSection: some View {
+        if !prs.isEmpty {
+            VStack(alignment: .leading, spacing: 10) {
+                SectionHeader(title: "Personal Records")
+                ProgressCardList(items: Array(prs.prefix(10))) { pr in
+                    HStack(spacing: 10) {
+                        Image(systemName: "trophy.fill").foregroundStyle(Color.accent)
+                        VStack(alignment: .leading, spacing: 1) {
+                            Text(name(of: pr.exId))
+                                .font(.rounded(14, .heavy)).foregroundStyle(Color.textPrimary)
+                                .lineLimit(1)
+                            Text(pr.date, format: .dateTime.month(.wide).day())
+                                .font(.rounded(12, .semibold)).foregroundStyle(Color.text3)
+                        }
+                        Spacer(minLength: 6)
+                        Text("\(pr.e1rm)").font(.rounded(16, .black))
+                            .foregroundStyle(Color.accent).tabularNumbers()
+                    }
+                    .padding(.vertical, 10)
+                }
+            }
+        }
+    }
+
+    // MARK: The list
+
+    private var exerciseList: some View {
+        ProgressCardList(items: filtered) { progress in
+            NavigationLink(value: ExerciseRef(id: progress.exId)) {
+                HStack(spacing: 10) {
+                    ExerciseThumbnail(
+                        resourceName: catalog.exercise(id: progress.exId)?.imageResourceNames.first,
+                        size: 40, cornerRadius: 9)
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text(name(of: progress.exId))
+                            .font(.rounded(14, .heavy)).foregroundStyle(Color.textPrimary)
+                            .lineLimit(1)
+                        Text("\(progress.sessionCount) session\(progress.sessionCount == 1 ? "" : "s")")
+                            .font(.rounded(12, .semibold)).foregroundStyle(Color.text3)
+                    }
+                    Spacer(minLength: 6)
+                    TrendArrow(trend: progress.trend)
+                    Text("\(progress.bestE1rm)")
+                        .font(.rounded(16, .black)).foregroundStyle(Color.textPrimary)
+                        .tabularNumbers()
+                }
+                .padding(.vertical, 10)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+        }
+    }
+
+    // MARK: Helpers
+
+    private func name(of exId: String) -> String {
+        catalog.exercise(id: exId)?.name ?? exId
+    }
+
+    /// Axis labels have to fit a 393pt screen; the list below carries the full name.
+    private func shortName(of exId: String) -> String {
+        let full = name(of: exId)
+        return full.count <= 16 ? full : String(full.prefix(15)) + "…"
     }
 }
 
