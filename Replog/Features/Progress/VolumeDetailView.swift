@@ -192,8 +192,10 @@ struct VolumeDetailView: View {
         let split = ProgressAnalytics.loadSplit(history: history, days: window.days ?? 3650, load: load)
         let total = split.externalKg + split.bodyweightKg
         if total > 0, split.bodyweightKg > 0 {
-            VStack(alignment: .leading, spacing: 10) {
-                SectionHeader(title: "Where The Load Came From")
+            // The whole card opens: a split raises "which movements, and when", and the
+            // percentages here cannot answer either.
+            SectionLink(title: "Where The Load Came From",
+                        route: .loadSplit(days: window.days)) {
                 VStack(alignment: .leading, spacing: 10) {
                     Chart {
                         BarMark(x: .value("kg", split.externalKg))
@@ -204,23 +206,21 @@ struct VolumeDetailView: View {
                     .chartXAxis(.hidden).chartYAxis(.hidden).chartLegend(.hidden)
                     .frame(height: 26)
                     .clipShape(Capsule())
-                    splitRow("External load", split.externalKg, total, 0)
-                    splitRow("Bodyweight", split.bodyweightKg, total, 2)
+                    LegendRow(label: "External load",
+                              value: splitValue(split.externalKg, total), ramp: 0)
+                    LegendRow(label: "Bodyweight",
+                              value: splitValue(split.bodyweightKg, total), ramp: 2)
                 }
+                .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(14)
                 .cardSurface()
             }
         }
     }
 
-    private func splitRow(_ label: String, _ value: Double, _ total: Double, _ ramp: Int) -> some View {
-        HStack(spacing: 8) {
-            Circle().fill(ProgressPalette.ramp(ramp)).frame(width: 8, height: 8)
-            Text(label).font(.rounded(12, .semibold)).foregroundStyle(Color.text2)
-            Spacer()
-            Text("\(Formulas.formatWeight(kg: value, units: units)) · \(Int((value / total * 100).rounded()))%")
-                .font(.rounded(12, .heavy)).foregroundStyle(Color.textPrimary).tabularNumbers()
-        }
+    private func splitValue(_ value: Double, _ total: Double) -> String {
+        let percent = total > 0 ? Int((value / total * 100).rounded()) : 0
+        return "\(Formulas.formatWeight(kg: value, units: units)) · \(percent)%"
     }
 
     private var repMixSection: some View {

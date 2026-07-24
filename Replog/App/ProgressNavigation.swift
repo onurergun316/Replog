@@ -34,6 +34,8 @@ enum ProgressRoute: Hashable {
     /// it was read in — a route can hold an `Int?` where it can't hold a `RangeSelection`,
     /// and a breakdown that silently changed window would contradict the tile you tapped.
     case volumeStat(VolumeStat, days: Int?)
+    /// External load vs the athlete's own body, opened from the Volume screen's split.
+    case loadSplit(days: Int?)
 }
 
 extension View {
@@ -53,6 +55,8 @@ extension View {
                 case .day(let day):    TrainingDayView(day: day)
                 case .volumeStat(let stat, let days):
                     VolumeStatDetailView(stat: stat, days: days)
+                case .loadSplit(let days):
+                    LoadSplitDetailView(days: days)
                 }
             }
             .navigationDestination(for: ExerciseRef.self) { ref in

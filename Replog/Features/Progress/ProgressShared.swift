@@ -287,8 +287,9 @@ struct StatTile: View {
     }
 }
 
-/// A card-wide header that is itself the way into the section's detail. Used where a
-/// whole card — the load split, the rep-range mix — opens rather than a single number.
+/// A section whose header *and* card both open its detail. Used where a whole card —
+/// the load split, the rep-range mix, push/pull — is the thing worth opening rather than
+/// one number inside it.
 struct SectionLink<Content: View>: View {
     let title: String
     let route: ProgressRoute
@@ -296,13 +297,23 @@ struct SectionLink<Content: View>: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 6) {
-                Text(title).eyebrow()
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 10, weight: .bold)).foregroundStyle(Color.text3)
-                Spacer(minLength: 0)
+            NavigationLink(value: route) {
+                HStack(spacing: 6) {
+                    Text(title).eyebrow()
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 10, weight: .bold)).foregroundStyle(Color.text3)
+                    Spacer(minLength: 0)
+                }
+                .contentShape(Rectangle())
             }
-            content()
+            .buttonStyle(.plain)
+            // A second link rather than one wrapping both: a card inside a header's tap
+            // target inherits its padding and the hit area stops matching the card.
+            NavigationLink(value: route) {
+                content()
+                    .contentShape(RoundedRectangle(cornerRadius: Radius.card, style: .continuous))
+            }
+            .buttonStyle(.plain)
         }
     }
 }
