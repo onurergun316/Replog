@@ -34,6 +34,18 @@ struct ForceSplitDetailView: View {
 
     private func force(of exId: String) -> Force? { catalog.exercise(id: exId)?.force }
 
+    /// Colour is a property of the force, not of its current rank.
+    ///
+    /// The capsule and legend used to take `ramp(index * 2)` over volume-sorted groups
+    /// while the day chart inferred its own domain from a dictionary's iteration order —
+    /// so push could be dark in one chart and light in the other on the same screen, and
+    /// differently again on the next launch. Fixing the mapping also stops a colour
+    /// changing meaning just because the athlete pulled more than they pressed this week.
+    private static let ramp: [Force: Int] = [.push: 0, .pull: 2, .static: 4]
+
+    private func rampIndex(for force: Force) -> Int { Self.ramp[force] ?? 4 }
+    private func color(for force: Force) -> Color { ProgressPalette.ramp(rampIndex(for: force)) }
+
     // One derivation per render, threaded down: each read of `contributions` re-walks the
     // whole history and JSON-decodes every entry's sets on the way past.
     var body: some View {
@@ -76,16 +88,16 @@ struct ForceSplitDetailView: View {
 
     private func splitCard(_ groups: [ForceGroup], total: Double) -> some View {
         VStack(alignment: .leading, spacing: 12) {
-            Chart(Array(groups.enumerated()), id: \.element.key) { index, group in
+            Chart(groups, id: \.key) { group in
                 BarMark(x: .value("Volume", group.volumeKg))
-                    .foregroundStyle(ProgressPalette.ramp(index * 2))
+                    .foregroundStyle(color(for: group.key))
             }
             .chartXAxis(.hidden).chartYAxis(.hidden).chartLegend(.hidden)
             .frame(height: 26)
             .clipShape(Capsule())
-            ForEach(Array(groups.enumerated()), id: \.element.key) { index, group in
+            ForEach(groups, id: \.key) { group in
                 LegendRow(label: "\(group.key.displayName) · \(group.sets) set\(group.sets == 1 ? "" : "s")",
-                          value: legend(group.volumeKg, of: total), ramp: index * 2)
+                          value: legend(group.volumeKg, of: total), ramp: rampIndex(for: group.key))
             }
         }
         .padding(14)
@@ -150,12 +162,16 @@ struct ForceSplitDetailView: View {
             VStack(alignment: .leading, spacing: 8) {
                 Chart(Array(daily.enumerated()), id: \.offset) { _, row in
                     BarMark(x: .value("Day", row.day, unit: .day),
-                            y: .value("Volume", row.volumeKg))
+                            y: .value("Volume", Formulas.displayWeight(kg: row.volumeKg,
+                                                                       units: units)))
                         .foregroundStyle(by: .value("Force", row.key.displayName))
                         .cornerRadius(2)
                 }
-                .chartForegroundStyleScale(range: [ProgressPalette.ramp(0), ProgressPalette.ramp(2),
-                                                   ProgressPalette.ramp(4)])
+                // Explicit domain→range pairs: with `range:` alone the mapping comes from
+                // an inferred domain, which disagreed with the capsule above and wasn't
+                // even stable between launches.
+                .chartForegroundStyleScale(domain: Force.allCases.map(\.displayName),
+                                           range: Force.allCases.map { color(for: $0) })
                 .chartXAxis { AxisMarks(values: .automatic(desiredCount: 4)) {
                     AxisGridLine()
                     AxisValueLabel(format: .dateTime.month(.abbreviated).day())

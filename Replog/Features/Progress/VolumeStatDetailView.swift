@@ -175,7 +175,8 @@ struct VolumeStatDetailView: View {
                 // friends). Two of those on one screen would band together and stack into
                 // a single bar of their summed volume. The axis maps id back to a label.
                 Chart(top) { row in
-                    BarMark(x: .value("Volume", row.volumeKg),
+                    BarMark(x: .value("Volume", Formulas.displayWeight(kg: row.volumeKg,
+                                                                       units: units)),
                             y: .value("Exercise", row.exId))
                         .foregroundStyle(Color.accent)
                         .cornerRadius(3)
@@ -215,12 +216,14 @@ struct VolumeStatDetailView: View {
                     // day into one bar — on a chart whose whole subject is per-session.
                     ForEach(Array(groups.enumerated()), id: \.element.id) { index, session in
                         BarMark(x: .value("Session", session.date),
-                                y: .value("Volume", tonnages[index]))
+                                y: .value("Volume", Formulas.displayWeight(kg: tonnages[index],
+                                                                           units: units)))
                             .foregroundStyle(tonnages[index] >= average
                                              ? Color.accent : Color.accent.opacity(0.45))
                             .cornerRadius(3)
                     }
-                    RuleMark(y: .value("Average", average))
+                    RuleMark(y: .value("Average", Formulas.displayWeight(kg: average,
+                                                                         units: units)))
                         .foregroundStyle(Color.text3)
                         .lineStyle(StrokeStyle(lineWidth: 1, dash: [4, 4]))
                         .annotation(position: .top, alignment: .trailing) {

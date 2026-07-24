@@ -115,12 +115,17 @@ struct LoadSplitDetailView: View {
             VStack(alignment: .leading, spacing: 8) {
                 Chart {
                     ForEach(daily, id: \.day) { row in
+                        // Plotted in the athlete's display unit, because the axis is
+                        // labelled with it — a lb user was reading "lb" against numbers
+                        // that were still kilograms.
                         BarMark(x: .value("Day", row.day, unit: .day),
-                                y: .value("Volume", row.externalKg))
+                                y: .value("Volume", Formulas.displayWeight(kg: row.externalKg,
+                                                                           units: units)))
                             .foregroundStyle(by: .value("Source", "External"))
                             .cornerRadius(2)
                         BarMark(x: .value("Day", row.day, unit: .day),
-                                y: .value("Volume", row.bodyweightKg))
+                                y: .value("Volume", Formulas.displayWeight(kg: row.bodyweightKg,
+                                                                           units: units)))
                             .foregroundStyle(by: .value("Source", "Bodyweight"))
                             .cornerRadius(2)
                     }
