@@ -100,8 +100,8 @@ struct TrainingDayView: View {
             // Only name the session when the day held more than one — otherwise the
             // heading just repeats the screen title.
             SectionHeader(title: count > 1
-                          ? (session.workoutName ?? "Session \(index + 1)")
-                          : (session.workoutName ?? "Logged"))
+                          ? session.title(fallback: "Session \(index + 1)")
+                          : session.title(fallback: "Logged"))
             VStack(spacing: 0) {
                 ForEach(Array(session.entries.sorted { load.e1rm($0) > load.e1rm($1) }.enumerated()),
                         id: \.element.id) { row, entry in

@@ -124,7 +124,7 @@ struct WeekDetailView: View {
                     NavigationLink(value: ProgressRoute.day(cal.startOfDay(for: session.date))) {
                         HStack(spacing: 10) {
                             VStack(alignment: .leading, spacing: 2) {
-                                Text(session.workoutName ?? "Workout")
+                                Text(session.title())
                                     .font(.rounded(14, .heavy)).foregroundStyle(Color.textPrimary)
                                     .lineLimit(1)
                                 Text(sessionCaption(session))

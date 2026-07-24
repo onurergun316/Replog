@@ -162,7 +162,7 @@ struct VolumeDetailView: View {
                     NavigationLink(value: ProgressRoute.day(Calendar.current.startOfDay(for: session.date))) {
                         HStack(spacing: 10) {
                             VStack(alignment: .leading, spacing: 2) {
-                                Text(session.workoutName ?? "Workout")
+                                Text(session.title())
                                     .font(.rounded(14, .heavy)).foregroundStyle(Color.textPrimary)
                                     .lineLimit(1)
                                 Text("\(session.date.formatted(.dateTime.weekday(.abbreviated).month().day())) · \(session.entries.count) exercises · \(session.setCount) sets")

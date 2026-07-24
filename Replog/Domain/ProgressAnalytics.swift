@@ -253,6 +253,17 @@ enum ProgressAnalytics {
         var id: Date { date }
 
         var setCount: Int { entries.reduce(0) { $0 + $1.sets.count } }
+
+        /// What to call this session on screen — its workout's real name ("Day 2"),
+        /// never a generic label while the store still knows one.
+        ///
+        /// The plan is the second-best answer and only reached when the workout itself
+        /// can't be named: a session finished before attribution existed whose exercises
+        /// no longer match any workout closely enough for `SessionAttributionBackfill`
+        /// to claim one. `fallback` is the caller's last resort for that case.
+        func title(fallback: String = "Workout") -> String {
+            workoutName ?? planName ?? fallback
+        }
     }
 
     /// Every finished session, oldest → newest.
