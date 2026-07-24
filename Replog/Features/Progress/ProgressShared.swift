@@ -80,7 +80,7 @@ struct RangeSelection: Equatable {
         guard let days else { return "All time" }
         return days % 7 == 0
             ? "Last \(days / 7) week\(days / 7 == 1 ? "" : "s")"
-            : "Last \(days) days"
+            : "Last \(days) day\(days == 1 ? "" : "s")"
     }
 }
 
@@ -130,11 +130,13 @@ struct RangePicker: View {
                     ForEach(offered) { window in
                         Text(window.label).tag(window)
                     }
-                    if selection.window == .custom {
-                        Text(selection.label).tag(RangeWindow.custom)
-                    }
                     Divider()
-                    Text("Custom range…").tag(RangeWindow.custom)
+                    // One row tagged `.custom`, and its label carries the active span.
+                    // Two rows with the same tag made the picker mark both of them
+                    // selected the moment a custom range was in use — a tag is an
+                    // identity, and the active span was already legible on the button.
+                    Text(selection.window == .custom ? selection.label : "Custom range…")
+                        .tag(RangeWindow.custom)
                 }
             } label: {
                 HStack(spacing: 6) {
