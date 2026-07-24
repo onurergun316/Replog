@@ -421,6 +421,28 @@ enum ProgressAnalytics {
         return (external, bodyweight)
     }
 
+    /// One training day's external/bodyweight split, oldest → newest. Rest days are not
+    /// emitted: a zero-height stacked bar is not a reading, it's a gap.
+    static func dailyLoadSplit(history: [HistoryEntry], days: Int,
+                               load: LoadResolver = .stored,
+                               today: Date = Date(),
+                               calendar: Calendar = .current)
+    -> [(day: Date, externalKg: Double, bodyweightKg: Double)] {
+        guard let cutoff = calendar.date(byAdding: .day, value: -days,
+                                         to: calendar.startOfDay(for: today)) else { return [] }
+        var totals: [Date: (external: Double, bodyweight: Double)] = [:]
+        for entry in history where entry.date >= cutoff {
+            let day = calendar.startOfDay(for: entry.date)
+            var running = totals[day] ?? (0, 0)
+            running.external += load.externalVolumeKg(entry)
+            running.bodyweight += load.bodyweightVolumeKg(entry)
+            totals[day] = running
+        }
+        return totals.keys.sorted().map {
+            (day: $0, externalKg: totals[$0]?.external ?? 0, bodyweightKg: totals[$0]?.bodyweight ?? 0)
+        }
+    }
+
     /// The athlete's first day of training: the earlier of their first logged set and
     /// their first completed day. `nil` before they have trained at all. Charts clamp
     /// their x-domain to this so nothing is drawn from before they started.

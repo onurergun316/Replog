@@ -344,6 +344,22 @@ struct ProgressAnalyticsTests {
         #expect(rows.reduce(0) { $0 + $1.sets } == buckets.reduce(0) { $0 + $1.sets })
     }
 
+    @Test func dailyLoadSplitEmitsOneRowPerTrainingDayOldestFirst() {
+        let history = [
+            entry(date(2026, 6, 9), sets: [RecordedSet(w: 100, r: 5)]),              // 500
+            entry(date(2026, 6, 8), sets: [RecordedSet(w: 100, r: 10)]),             // 1000
+            entry(date(2026, 6, 8), exId: "Row", sets: [RecordedSet(w: 50, r: 10)]), // 500, same day
+        ]
+        let rows = ProgressAnalytics.dailyLoadSplit(history: history, days: 30,
+                                                    today: today, calendar: cal)
+        #expect(rows.count == 2)                                  // no row for the rest day between
+        #expect(rows.map(\.day) == [cal.startOfDay(for: date(2026, 6, 8)),
+                                    cal.startOfDay(for: date(2026, 6, 9))])
+        #expect(rows[0].externalKg == 1500)
+        // The default resolver reads the stored weight, so nothing is credited as bodyweight.
+        #expect(rows[0].bodyweightKg == 0)
+    }
+
     @Test func groupedFoldsContributionsAndDropsUnkeyedRows() {
         let history = [
             entry(date(2026, 6, 8), sets: [RecordedSet(w: 100, r: 10)]),             // 1000
