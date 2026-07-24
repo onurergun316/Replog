@@ -237,27 +237,58 @@ struct ProgressHomeView: View {
 
     private var bodyCard: some View {
         let snapshot = BodyweightTracker.snapshot(entries: bodyweightEntries)
-        let series = bodyweightEntries.suffix(30)
+        let series = Array(bodyweightEntries.suffix(30))
+        let weights = series.map(\.weightKg)
         return DashboardCard(
             eyebrow: "Body",
             headline: snapshot.map { Formulas.formatBodyweight(kg: $0.currentKg, units: units,
                                                               includeUnit: false) } ?? "—",
             caption: snapshot == nil ? "log your bodyweight" : units.label + " bodyweight",
-            route: .body,
-            showsChart: series.count >= 3
+            route: .body
         ) {
-            Chart(Array(series), id: \.id) { entry in
-                LineMark(x: .value("Date", entry.date), y: .value("Weight", entry.weightKg))
-                    .foregroundStyle(Color.accent)
-                    .interpolationMethod(.monotone)
-                PointMark(x: .value("Date", entry.date), y: .value("Weight", entry.weightKg))
-                    .foregroundStyle(Color.accent)
-                    .symbolSize(28)
+            if series.isEmpty {
+                // Nothing to plot and nothing invented — a baseline the first check-in
+                // will land on, so the card keeps the geometry of its neighbours.
+                dashedBaseline
+            } else {
+                Chart {
+                    // The first reading, as the line everything after it is measured
+                    // against. At one check-in this is what stops a lone dot from
+                    // floating in an empty frame.
+                    if let first = weights.first {
+                        RuleMark(y: .value("Start", first))
+                            .foregroundStyle(Color.text3.opacity(0.4))
+                            .lineStyle(StrokeStyle(lineWidth: 1, dash: [3, 3]))
+                    }
+                    ForEach(series, id: \.id) { entry in
+                        if series.count >= 2 {
+                            LineMark(x: .value("Date", entry.date),
+                                     y: .value("Weight", entry.weightKg))
+                                .foregroundStyle(Color.accent)
+                                .interpolationMethod(series.count >= 8 ? .monotone : .linear)
+                        }
+                        PointMark(x: .value("Date", entry.date),
+                                  y: .value("Weight", entry.weightKg))
+                            .foregroundStyle(Color.accent)
+                            .symbolSize(series.count >= 12 ? 20 : 34)
+                    }
+                }
+                // Never `.automatic` alone: two readings a few hundred grams apart fill
+                // the card and read as a cliff (ChartScales).
+                .chartYScale(domain: ChartScales.yDomain(
+                    min: weights.min() ?? 0, max: weights.max() ?? 0,
+                    minSpan: ChartScales.bodyweightMinSpanKg))
+                .chartXAxis(.hidden).chartYAxis(.hidden)
+                .frame(height: Self.miniChartHeight)
             }
-            .chartYScale(domain: .automatic(includesZero: false))
-            .chartXAxis(.hidden).chartYAxis(.hidden)
-            .frame(height: Self.miniChartHeight)
         }
+    }
+
+    private var dashedBaseline: some View {
+        Rectangle()
+            .fill(Color.text3.opacity(0.35))
+            .frame(height: 1)
+            .frame(height: Self.miniChartHeight)
     }
 
     private var emptyState: some View {
