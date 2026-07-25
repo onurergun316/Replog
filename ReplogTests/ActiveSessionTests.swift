@@ -186,6 +186,40 @@ struct ActiveSessionTests {
         #expect(entry.durationSeconds == 45 * 60)
     }
 
+    @Test func aWorkoutIsLoggedOnTheDayItStartedNotWhenItFinished() throws {
+        // Start 23:00, finish 00:15 the next day: it must count for the START day.
+        let ctx = makeContext()
+        let workout = seedWorkout(ctx)
+        let cal = Calendar.current
+        let started = cal.date(from: DateComponents(year: 2026, month: 6, day: 15, hour: 23, minute: 0))!
+        let finishedAt = started.addingTimeInterval(75 * 60)     // 00:15 the next day
+        #expect(!cal.isDate(started, inSameDayAs: finishedAt))    // sanity: really crosses midnight
+
+        let session = ActiveSession(workoutId: workout.id, name: workout.name,
+                                    planName: workout.plan?.name ?? "", startedAt: started)
+        ctx.insert(session)
+        let exercise = SessionExercise(exId: "Bench", order: 0)
+        exercise.session = session; ctx.insert(exercise)
+        let set = LoggedSet(weightKg: 60, reps: 8, rpe: 8, order: 0)
+        set.done = true; set.exercise = exercise; ctx.insert(set)
+        try ctx.save()
+
+        let profile = ctx.userProfile()
+        SessionFinisher.finish(session, profile: profile, context: ctx, date: finishedAt)
+        try ctx.save()
+
+        // History is dated on the start day; duration is still the real elapsed time.
+        let entry = try #require(ctx.history(forExercise: "Bench").first)
+        #expect(cal.isDate(entry.date, inSameDayAs: started))
+        #expect(!cal.isDate(entry.date, inSameDayAs: finishedAt))
+        #expect(entry.durationSeconds == 75 * 60)
+
+        // The streak's "done" day is the start day, not the finish day.
+        let doneDays = Set(profile.doneDates.map { cal.startOfDay(for: $0) })
+        #expect(doneDays.contains(cal.startOfDay(for: started)))
+        #expect(!doneDays.contains(cal.startOfDay(for: finishedAt)))
+    }
+
     @Test func estimatedSeedFlagPropagatesThenClearsOnceLogged() throws {
         let ctx = makeContext()
         let workout = seedWorkout(ctx)

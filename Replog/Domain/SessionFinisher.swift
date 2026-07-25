@@ -33,6 +33,10 @@ enum SessionFinisher {
     static func finish(_ session: ActiveSession, profile: UserProfile,
                        context: ModelContext, date: Date = Date()) -> Summary {
         let isComplete = session.isComplete
+        // A workout is logged on the day it STARTED, even when it's finished after midnight —
+        // a session begun at 23:00 and finished at 00:15 counts for the 23:00 day. `date`
+        // (the finish moment) is kept only for the elapsed duration and the as-of-now streak.
+        let loggedDate = session.startedAt
         // Captured before the session is deleted — otherwise this context is lost for good.
         let duration = max(0, Int(date.timeIntervalSince(session.startedAt)))
 
@@ -52,7 +56,7 @@ enum SessionFinisher {
             let prior = context.history(forExercise: exercise.exId)
             let entry = HistoryEntry(
                 exId: exercise.exId,
-                date: date,
+                date: loggedDate,
                 topW: top.weightKg,
                 topR: top.reps,
                 e1rm: Formulas.e1rmRounded(kg: top.weightKg, reps: top.reps),
@@ -78,7 +82,7 @@ enum SessionFinisher {
             // prescription: what was just lifted is what the next session starts from.
             TemplateWriteBack.applyIfComplete(session: session, context: context, date: date)
             profile.totalWorkouts += 1
-            profile.doneDates = StreakCalendar.recordingCompletion(date, into: profile.doneDates)
+            profile.doneDates = StreakCalendar.recordingCompletion(loggedDate, into: profile.doneDates)
         }
         context.recomputeStreaks(profile: profile, today: date)
 
