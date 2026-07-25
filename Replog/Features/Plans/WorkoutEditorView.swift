@@ -210,7 +210,10 @@ struct WorkoutEditorView: View {
 
     private func addSet(to item: PlanItem) {
         let last = item.orderedSets.last
-        let set = SetTemplate(weightKg: last?.weightKg ?? 20, reps: last?.reps ?? 10,
+        // Bodyweight moves store *added* load, so a fresh set is 0 (pure bodyweight);
+        // loaded moves seed 20 kg as before.
+        let isBodyweight = catalog.exercise(id: item.exId).map { BodyweightLoad.isBodyweightLoaded($0) } ?? false
+        let set = SetTemplate(weightKg: last?.weightKg ?? (isBodyweight ? 0 : 20), reps: last?.reps ?? 10,
                               rpe: last?.rpe ?? 8, order: Reordering.nextOrder(after: item.sets))
         set.item = item
         context.insert(set)
@@ -284,15 +287,26 @@ private struct ExerciseSetSheet: View {
     let onChange: () -> Void
 
     private var effectiveRest: Int { item.restSeconds ?? defaultRest }
+    /// A bodyweight movement logs the athlete's own weight — no kg to type. Extra load
+    /// (a dip belt, a vest) is optional per set. Detected the same way the live log is.
+    private var isBodyweight: Bool { exercise.map { BodyweightLoad.isBodyweightLoaded($0) } ?? false }
+    private var isTimedHold: Bool { exercise.map { BodyweightLoad.isTimedHold($0) } ?? false }
 
     var body: some View {
         ScrollView {
             VStack(spacing: 0) {
                 header
+                if isBodyweight {
+                    Text("Bodyweight movement — counts your bodyweight; add extra load per set only if you used any.")
+                        .font(.rounded(12, .semibold)).foregroundStyle(Color.text3)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.top, 10)
+                }
                 Divider().padding(.vertical, 12)
                 ForEach(Array(item.orderedSets.enumerated()), id: \.element.id) { index, set in
                     SetEditorRow(index: index + 1, template: set,
                                  canRemove: item.sets.count > 1,
+                                 isBodyweight: isBodyweight, isTimedHold: isTimedHold,
                                  onRemove: { onRemoveSet(set) }, onChange: onChange)
                 }
                 Button(action: onAddSet) {
@@ -353,37 +367,71 @@ private struct SetEditorRow: View {
     let index: Int
     @Bindable var template: SetTemplate
     let canRemove: Bool
+    /// A bodyweight movement: no weight to type. The stored `weightKg` is *added* load
+    /// only (belt/vest), revealed on demand. Everything else types a plain weight.
+    var isBodyweight: Bool = false
+    /// A timed hold (plank): the `reps` field is seconds, not reps.
+    var isTimedHold: Bool = false
     let onRemove: () -> Void
     let onChange: () -> Void
 
-    var body: some View {
-        HStack(spacing: 10) {
-            Text("\(index)").font(.rounded(13, .heavy)).foregroundStyle(Color.text3).frame(width: 16)
+    /// Whether the optional added-load stepper is showing for a bodyweight set.
+    @State private var showAddedWeight = false
 
-            VStack(spacing: 2) {
-                Text("WEIGHT (kg)").font(.rounded(10, .heavy)).foregroundStyle(Color.text3)
-                // Editing clears `estimated`: the number is the athlete's now, not a
-                // computed seed — which also stops a later session overwriting it.
-                NumericStepperField(display: weightText, keyboard: .decimalPad,
-                                    onMinus: { template.weightKg = max(0, template.weightKg - 2.5); template.markEdited(); onChange() },
-                                    onPlus: { template.weightKg += 2.5; template.markEdited(); onChange() },
-                                    onCommit: { if let kg = Formulas.parseWeightKg($0, units: .kg) { template.weightKg = kg; template.markEdited(); onChange() } })
+    var body: some View {
+        VStack(spacing: 8) {
+            HStack(spacing: 10) {
+                Text("\(index)").font(.rounded(13, .heavy)).foregroundStyle(Color.text3).frame(width: 16)
+
+                // Weight column: always for loaded movements; for bodyweight only once the
+                // athlete asks for it (or a previous session already logged added load).
+                if !isBodyweight || showAddedWeight || template.weightKg > 0 {
+                    column(isBodyweight ? "ADDED (kg)" : "WEIGHT (kg)") {
+                        // Editing clears `estimated`: the number is the athlete's now, not a
+                        // computed seed — which also stops a later session overwriting it.
+                        NumericStepperField(display: weightText, keyboard: .decimalPad,
+                                            onMinus: { template.weightKg = max(0, template.weightKg - 2.5); template.markEdited(); onChange() },
+                                            onPlus: { template.weightKg += 2.5; template.markEdited(); onChange() },
+                                            onCommit: { if let kg = Formulas.parseWeightKg($0, units: .kg) { template.weightKg = kg; template.markEdited(); onChange() } })
+                    }
+                }
+                column(isTimedHold ? "SECONDS" : "REPS") {
+                    NumericStepperField(display: "\(template.reps)", keyboard: .numberPad,
+                                        onMinus: { template.reps = max(1, template.reps - 1); template.markEdited(); onChange() },
+                                        onPlus: { template.reps += 1; template.markEdited(); onChange() },
+                                        onCommit: { if let reps = Formulas.parseReps($0) { template.reps = reps; template.markEdited(); onChange() } })
+                }
+                if canRemove {
+                    Button(action: onRemove) {
+                        Image(systemName: "minus.circle.fill").foregroundStyle(Color.down.opacity(0.7))
+                    }
+                    .buttonStyle(.plain)
+                }
             }
-            VStack(spacing: 2) {
-                Text("REPS").font(.rounded(10, .heavy)).foregroundStyle(Color.text3)
-                NumericStepperField(display: "\(template.reps)", keyboard: .numberPad,
-                                    onMinus: { template.reps = max(1, template.reps - 1); template.markEdited(); onChange() },
-                                    onPlus: { template.reps += 1; template.markEdited(); onChange() },
-                                    onCommit: { if let reps = Formulas.parseReps($0) { template.reps = reps; template.markEdited(); onChange() } })
-            }
-            if canRemove {
-                Button(action: onRemove) {
-                    Image(systemName: "minus.circle.fill").foregroundStyle(Color.down.opacity(0.7))
+
+            // Bodyweight, no added load yet: offer to add some (dip belt, vest).
+            if isBodyweight, !showAddedWeight, template.weightKg == 0 {
+                Button { withAnimation(.smooth) { showAddedWeight = true } } label: {
+                    HStack(spacing: 5) {
+                        Image(systemName: "plus.circle.fill").font(.system(size: 12, weight: .bold))
+                        Text("Add weight").font(.rounded(12, .heavy))
+                    }
+                    .foregroundStyle(Color.accent)
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
                 .buttonStyle(.plain)
+                .accessibilityHint("For a dip belt or weighted vest")
             }
         }
         .padding(.vertical, 6)
+    }
+
+    private func column<C: View>(_ title: String, @ViewBuilder _ content: () -> C) -> some View {
+        VStack(spacing: 2) {
+            Text(title).font(.rounded(10, .heavy)).foregroundStyle(Color.text3)
+            content()
+        }
+        .frame(maxWidth: .infinity)
     }
 
     private var weightText: String {
