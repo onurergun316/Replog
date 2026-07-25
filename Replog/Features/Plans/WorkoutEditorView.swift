@@ -2,10 +2,11 @@
 //  WorkoutEditorView.swift
 //  Replog
 //
-//  Edit one training day: name, weekday (taken days disabled), exercises with
-//  expandable set steppers, add/remove exercises, delete the workout. Exercise cards
-//  are long-press draggable to reorder, so this is a `List` (the only container with
-//  native reordering on iOS 26) styled as the app's cards via `plainListRow`.
+//  Edit one training day: name, weekday (taken days disabled), exercises, add/remove
+//  exercises, delete the workout. Tapping an exercise card opens a native bottom sheet
+//  of set steppers (weight/reps/rest). Exercise cards are long-press draggable to
+//  reorder, so this is a `List` (the only container with native reordering on iOS 26)
+//  styled as the app's cards via `plainListRow`.
 //
 
 import SwiftUI
@@ -18,7 +19,7 @@ struct WorkoutEditorView: View {
     @Bindable var workout: Workout
     @Query private var settingsList: [AppSettings]
 
-    @State private var expandedItemID: UUID?
+    @State private var detailItem: PlanItem?
     @State private var showPicker = false
     @State private var showRestSheet = false
     @State private var detailRef: ExerciseRef?
@@ -58,14 +59,9 @@ struct WorkoutEditorView: View {
                     ExerciseEditRow(
                         item: item,
                         exercise: catalog.exercise(id: item.exId),
-                        defaultRest: defaultRest,
-                        isExpanded: expandedItemID == item.id,
-                        onToggle: { toggle(item) },
+                        onOpen: { detailItem = item },
                         onInfo: { detailRef = ExerciseRef(id: item.exId) },
-                        onRemove: { remove(item) },
-                        onAddSet: { addSet(to: item) },
-                        onRemoveSet: { removeSet($0, from: item) },
-                        onChange: { try? context.save() }
+                        onRemove: { remove(item) }
                     )
                     .plainListRow(top: 8, bottom: 8)
                     .reorderAccessibilityActions(index: index, count: items.count, move: moveItems)
@@ -116,6 +112,16 @@ struct WorkoutEditorView: View {
         }
         .sheet(item: $detailRef) { ref in
             NavigationStack { ExerciseDetailView(exId: ref.id, showProgress: false) }
+        }
+        .sheet(item: $detailItem) { item in
+            ExerciseSetSheet(
+                item: item,
+                exercise: catalog.exercise(id: item.exId),
+                defaultRest: defaultRest,
+                onAddSet: { addSet(to: item) },
+                onRemoveSet: { removeSet($0, from: item) },
+                onChange: { try? context.save() }
+            )
         }
     }
 
@@ -178,20 +184,9 @@ struct WorkoutEditorView: View {
 
     // MARK: Actions
 
-    private func toggle(_ item: PlanItem) {
-        // Instant open/close — deliberately no `withAnimation`. Animating this reveal inside the
-        // reorder `List` (a spring height change that re-lays-out the row every frame) read as
-        // shaky/snappy on device across `.snappy` and `.smooth`; the instant toggle is clean
-        // (verified frame-by-frame in the simulator).
-        expandedItemID = expandedItemID == item.id ? nil : item.id
-    }
-
-    /// Drag-to-reorder. Collapsing after a real move closes any set editor that just
-    /// slid to a new position — a half-typed stepper left open over shuffled rows reads
-    /// as the wrong exercise's sets. A drop back in place leaves the disclosure alone.
+    /// Drag-to-reorder the exercise cards.
     private func moveItems(from source: IndexSet, to destination: Int) {
         guard Reordering.apply(from: source, to: destination, in: workout.orderedItems) else { return }
-        expandedItemID = nil
         try? context.save()
         moves += 1
     }
@@ -234,41 +229,16 @@ struct WorkoutEditorView: View {
     }
 }
 
-// MARK: - Exercise edit row
+// MARK: - Exercise card (taps to open the set-editor sheet)
 
 private struct ExerciseEditRow: View {
     let item: PlanItem
     let exercise: Exercise?
-    let defaultRest: Int
-    let isExpanded: Bool
-    let onToggle: () -> Void
+    let onOpen: () -> Void
     let onInfo: () -> Void
     let onRemove: () -> Void
-    let onAddSet: () -> Void
-    let onRemoveSet: (SetTemplate) -> Void
-    let onChange: () -> Void
-
-    private var effectiveRest: Int { item.restSeconds ?? defaultRest }
 
     var body: some View {
-        VStack(spacing: 0) {
-            header
-                .contentShape(Rectangle())
-                .onTapGesture { onToggle() }
-
-            // The set editors show/hide instantly on tap — intentionally unanimated. See
-            // `toggle`: an animated reveal inside this reorder `List` felt shaky/snappy, so it
-            // is a plain conditional (no measured-height/clip machinery, which only existed to
-            // make the animation smooth).
-            if isExpanded {
-                revealContent
-            }
-        }
-        .padding(14)
-        .cardSurface()
-    }
-
-    private var header: some View {
         HStack(spacing: 12) {
             ExerciseThumbnail(resourceName: exercise?.imageResourceNames.first, size: 52, cornerRadius: 12)
             VStack(alignment: .leading, spacing: 3) {
@@ -283,28 +253,76 @@ private struct ExerciseEditRow: View {
                 iconButton("minus", tint: .down, action: onRemove)
             }
         }
+        .padding(14)
+        .cardSurface()
+        // Tap anywhere on the card (except the two buttons) to open the set-editor sheet.
+        .contentShape(Rectangle())
+        .onTapGesture { onOpen() }
     }
 
-    /// Everything revealed under the header, in one container so the reveal is a single
-    /// view with a single measured height — never a pile of individually-transitioning rows.
-    private var revealContent: some View {
-        VStack(spacing: 0) {
-            Divider().padding(.vertical, 10)
-            ForEach(Array(item.orderedSets.enumerated()), id: \.element.id) { index, set in
-                SetEditorRow(index: index + 1, template: set,
-                             canRemove: item.sets.count > 1,
-                             onRemove: { onRemoveSet(set) }, onChange: onChange)
-            }
-            Button(action: onAddSet) {
-                HStack(spacing: 5) { Image(systemName: "plus"); Text("Add set") }
-                    .font(.rounded(13, .heavy)).foregroundStyle(Color.text2)
-                    .frame(maxWidth: .infinity).padding(.vertical, 8)
-            }
-            .buttonStyle(.plain)
-            Divider().padding(.vertical, 10)
-            restEditor
+    private func iconButton(_ symbol: String, tint: Color = .text2, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: symbol).font(.system(size: 13, weight: .bold)).foregroundStyle(tint)
+                .frame(width: 30, height: 30)
+                .background(Circle().fill(Color.surface2))
         }
-        .frame(maxWidth: .infinity)
+        .buttonStyle(.plain)
+    }
+}
+
+// MARK: - Set-editor bottom sheet (weight / reps / rest)
+
+/// Native bottom sheet that slides up to edit one exercise's sets. Dismiss-only via the
+/// grabber / swipe-down (edits auto-save through `onChange`), matching the app's other
+/// dismiss-only sheets — no "Done" button.
+private struct ExerciseSetSheet: View {
+    @Bindable var item: PlanItem
+    let exercise: Exercise?
+    let defaultRest: Int
+    let onAddSet: () -> Void
+    let onRemoveSet: (SetTemplate) -> Void
+    let onChange: () -> Void
+
+    private var effectiveRest: Int { item.restSeconds ?? defaultRest }
+
+    var body: some View {
+        ScrollView {
+            VStack(spacing: 0) {
+                header
+                Divider().padding(.vertical, 12)
+                ForEach(Array(item.orderedSets.enumerated()), id: \.element.id) { index, set in
+                    SetEditorRow(index: index + 1, template: set,
+                                 canRemove: item.sets.count > 1,
+                                 onRemove: { onRemoveSet(set) }, onChange: onChange)
+                }
+                Button(action: onAddSet) {
+                    HStack(spacing: 5) { Image(systemName: "plus"); Text("Add set") }
+                        .font(.rounded(13, .heavy)).foregroundStyle(Color.text2)
+                        .frame(maxWidth: .infinity).padding(.vertical, 10)
+                }
+                .buttonStyle(.plain)
+                Divider().padding(.vertical, 12)
+                restEditor
+            }
+            .padding(20)
+        }
+        .scrollDismissesKeyboard(.immediately)
+        .presentationDetents([.medium, .large])
+        .presentationDragIndicator(.visible)
+        .presentationBackground(Color.bg)
+    }
+
+    private var header: some View {
+        HStack(spacing: 12) {
+            ExerciseThumbnail(resourceName: exercise?.imageResourceNames.first, size: 54, cornerRadius: 14)
+            VStack(alignment: .leading, spacing: 3) {
+                Text(exercise?.name ?? item.exId).font(.rounded(19, .heavy))
+                    .foregroundStyle(Color.textPrimary).lineLimit(2)
+                Text("\(item.sets.count) sets · \(exercise?.primaryMuscles.first?.displayName ?? "—")")
+                    .font(.rounded(12, .semibold)).foregroundStyle(Color.text3)
+            }
+            Spacer(minLength: 6)
+        }
     }
 
     private var restEditor: some View {
@@ -326,15 +344,6 @@ private struct ExerciseEditRow: View {
     private func setRest(_ seconds: Int) {
         item.restSeconds = max(5, seconds)
         onChange()
-    }
-
-    private func iconButton(_ symbol: String, tint: Color = .text2, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            Image(systemName: symbol).font(.system(size: 13, weight: .bold)).foregroundStyle(tint)
-                .frame(width: 30, height: 30)
-                .background(Circle().fill(Color.surface2))
-        }
-        .buttonStyle(.plain)
     }
 }
 
