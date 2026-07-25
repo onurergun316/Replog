@@ -254,7 +254,9 @@ struct ActiveWorkoutView: View {
 
     private func addSet(to exercise: SessionExercise) {
         let last = exercise.orderedSets.last
-        let set = LoggedSet(weightKg: last?.weightKg ?? 20, reps: last?.reps ?? 10, rpe: last?.rpe ?? 8,
+        // Bodyweight moves store *added* load, so a fresh set is 0 (pure bodyweight).
+        let isBodyweight = catalog.exercise(id: exercise.exId).map { BodyweightLoad.isBodyweightLoaded($0) } ?? false
+        let set = LoggedSet(weightKg: last?.weightKg ?? (isBodyweight ? 0 : 20), reps: last?.reps ?? 10, rpe: last?.rpe ?? 8,
                             prevWeight: last?.prevWeight, prevReps: last?.prevReps,
                             order: Reordering.nextOrder(after: exercise.sets))
         set.exercise = exercise
