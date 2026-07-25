@@ -244,46 +244,81 @@ private struct ExerciseEditRow: View {
     let onRemoveSet: (SetTemplate) -> Void
     let onChange: () -> Void
 
+    /// Natural height of the revealed set editors, measured continuously *behind* the clip.
+    /// The row always starts collapsed (the frame below is 0 high regardless of this value),
+    /// so the first 0 → measured update is invisible; adding/removing a set re-measures and the
+    /// height animates on the same curve. See `body` for why this keeps the `List` row smooth.
+    @State private var revealHeight: CGFloat = 0
+
     private var effectiveRest: Int { item.restSeconds ?? defaultRest }
 
     var body: some View {
         VStack(spacing: 0) {
-            HStack(spacing: 12) {
-                ExerciseThumbnail(resourceName: exercise?.imageResourceNames.first, size: 52, cornerRadius: 12)
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(exercise?.name ?? item.exId).font(.rounded(15, .heavy))
-                        .foregroundStyle(Color.textPrimary).lineLimit(2)
-                    Text("\(item.sets.count) sets · \(exercise?.primaryMuscles.first?.displayName ?? "—")")
-                        .font(.rounded(12, .semibold)).foregroundStyle(Color.text3)
-                }
-                Spacer(minLength: 6)
-                HStack(spacing: 8) {
-                    iconButton("info.circle", action: onInfo)
-                    iconButton("minus", tint: .down, action: onRemove)
-                }
-            }
-            .contentShape(Rectangle())
-            .onTapGesture { onToggle() }
+            header
+                .contentShape(Rectangle())
+                .onTapGesture { onToggle() }
 
-            if isExpanded {
-                Divider().padding(.vertical, 10)
-                ForEach(Array(item.orderedSets.enumerated()), id: \.element.id) { index, set in
-                    SetEditorRow(index: index + 1, template: set,
-                                 canRemove: item.sets.count > 1,
-                                 onRemove: { onRemoveSet(set) }, onChange: onChange)
-                }
-                Button(action: onAddSet) {
-                    HStack(spacing: 5) { Image(systemName: "plus"); Text("Add set") }
-                        .font(.rounded(13, .heavy)).foregroundStyle(Color.text2)
-                        .frame(maxWidth: .infinity).padding(.vertical, 8)
-                }
-                .buttonStyle(.plain)
-                Divider().padding(.vertical, 10)
-                restEditor
-            }
+            // Measured-height clipped reveal. The old `if isExpanded { … }` handed the `List`
+            // a *discrete* height jump: UIKit drew the new content at full size at once and
+            // animated the cell frame on a separate timeline, so mid-transition the sets
+            // overlapped the header (expand) or bled past the card onto the next row (collapse).
+            // Instead the content is *always* in the tree at its natural height (`.fixedSize`,
+            // so it can never be compressed), we measure that height, and reveal it through a
+            // window we animate 0 ⇄ height — top-anchored so the header stays pinned, `.clipped()`
+            // so nothing ever escapes the card. The row's reported height now changes
+            // continuously on one `.snappy` curve, so the `List` self-sizes in lockstep.
+            revealContent
+                .fixedSize(horizontal: false, vertical: true)
+                .onGeometryChange(for: CGFloat.self, of: { $0.size.height },
+                                  action: { revealHeight = $0 })
+                .frame(height: isExpanded ? revealHeight : 0, alignment: .top)
+                .clipped()
+                .allowsHitTesting(isExpanded)
+                .accessibilityHidden(!isExpanded)
+                .animation(.snappy, value: isExpanded)
+                .animation(.snappy, value: revealHeight)
         }
         .padding(14)
         .cardSurface()
+    }
+
+    private var header: some View {
+        HStack(spacing: 12) {
+            ExerciseThumbnail(resourceName: exercise?.imageResourceNames.first, size: 52, cornerRadius: 12)
+            VStack(alignment: .leading, spacing: 3) {
+                Text(exercise?.name ?? item.exId).font(.rounded(15, .heavy))
+                    .foregroundStyle(Color.textPrimary).lineLimit(2)
+                Text("\(item.sets.count) sets · \(exercise?.primaryMuscles.first?.displayName ?? "—")")
+                    .font(.rounded(12, .semibold)).foregroundStyle(Color.text3)
+            }
+            Spacer(minLength: 6)
+            HStack(spacing: 8) {
+                iconButton("info.circle", action: onInfo)
+                iconButton("minus", tint: .down, action: onRemove)
+            }
+        }
+    }
+
+    /// Everything revealed under the header, in one container so the reveal is a single
+    /// view with a single measured height — never a pile of individually-transitioning rows.
+    private var revealContent: some View {
+        VStack(spacing: 0) {
+            Divider().padding(.vertical, 10)
+            ForEach(Array(item.orderedSets.enumerated()), id: \.element.id) { index, set in
+                SetEditorRow(index: index + 1, template: set,
+                             canRemove: item.sets.count > 1,
+                             onRemove: { onRemoveSet(set) }, onChange: onChange)
+            }
+            Button(action: onAddSet) {
+                HStack(spacing: 5) { Image(systemName: "plus"); Text("Add set") }
+                    .font(.rounded(13, .heavy)).foregroundStyle(Color.text2)
+                    .frame(maxWidth: .infinity).padding(.vertical, 8)
+            }
+            .buttonStyle(.plain)
+            Divider().padding(.vertical, 10)
+            restEditor
+        }
+        .frame(maxWidth: .infinity)
     }
 
     private var restEditor: some View {
