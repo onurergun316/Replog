@@ -53,7 +53,7 @@ struct ActiveWorkoutView: View {
                             exercise: exercise,
                             name: entry?.name ?? exercise.exId,
                             muscle: entry?.primaryMuscles.first?.displayName ?? "",
-                            imageName: entry?.imageResourceNames.first,
+                            photo: entry?.photos.first,
                             units: settings.units,
                             isBodyweight: entry.map { BodyweightLoad.isBodyweightLoaded($0) } ?? false,
                             isTimedHold: entry.map { BodyweightLoad.isTimedHold($0) } ?? false,

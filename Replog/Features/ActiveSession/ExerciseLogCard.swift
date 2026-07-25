@@ -13,7 +13,7 @@ struct ExerciseLogCard: View {
     @Bindable var exercise: SessionExercise
     let name: String
     let muscle: String
-    let imageName: String?
+    let photo: ExercisePhoto?
     let units: Units
     /// True when the movement is loaded by the athlete's own bodyweight. The weight
     /// column becomes a "BW" chip and typing a load is optional — the stepper in the
@@ -73,7 +73,7 @@ struct ExerciseLogCard: View {
 
     private var header: some View {
         HStack(spacing: 14) {
-            ExerciseThumbnail(resourceName: imageName, size: 46, cornerRadius: 12)
+            ExerciseThumbnail(photo: photo, size: 46, cornerRadius: 12)
             VStack(alignment: .leading, spacing: 3) {
                 Text(name).font(.rounded(15, .heavy)).foregroundStyle(Color.textPrimary).lineLimit(1)
                 Text("\(exercise.sets.count) sets · \(muscle)").font(.rounded(12, .semibold)).foregroundStyle(Color.text2)

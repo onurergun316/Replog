@@ -109,7 +109,7 @@ struct TrainingDayView: View {
                     NavigationLink(value: ExerciseRef(id: entry.exId)) {
                         HStack(spacing: 10) {
                             ExerciseThumbnail(
-                                resourceName: catalog.exercise(id: entry.exId)?.imageResourceNames.first,
+                                exercise: catalog.exercise(id: entry.exId),
                                 size: 40, cornerRadius: 9)
                             VStack(alignment: .leading, spacing: 1) {
                                 Text(catalog.exercise(id: entry.exId)?.name ?? entry.exId)

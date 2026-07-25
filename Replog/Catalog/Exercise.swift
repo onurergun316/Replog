@@ -23,9 +23,12 @@ struct Exercise: Identifiable, Hashable, Sendable {
     /// Relative image paths from the source DB, e.g. "Battling_Ropes/0.jpg".
     /// The bundled assets are HEIC; `imageNames` resolves the shipped filenames.
     let images: [String]
-    /// A user-supplied photo, for custom exercises only (bundled entries use `images`).
+    /// User-supplied photos, for custom exercises only (bundled entries use `images`).
     /// Defaulted so JSON decoding and every existing call site are unaffected.
-    var imageData: Data? = nil
+    var imageDatas: [Data] = []
+
+    /// The first custom photo, if any — for single-image thumbnails.
+    var imageData: Data? { imageDatas.first }
 
     /// All muscles worked (primary first), de-duplicated — handy for chips & filters.
     var allMuscles: [Muscle] {
@@ -40,6 +43,27 @@ struct Exercise: Identifiable, Hashable, Sendable {
         images.map { path in
             let noExt = (path as NSString).deletingPathExtension
             return noExt.replacingOccurrences(of: "/", with: "__")
+        }
+    }
+
+    /// Every photo to display, source-agnostic: a custom exercise's own photos, else the
+    /// bundled ones. The single source of truth for carousels, film strips, and thumbnails.
+    var photos: [ExercisePhoto] {
+        imageDatas.isEmpty ? imageResourceNames.map(ExercisePhoto.bundled)
+                           : imageDatas.map(ExercisePhoto.data)
+    }
+}
+
+/// One displayable exercise photo — a bundled HEIC resource or user-supplied image data.
+/// Lets every image view and carousel treat catalog and custom exercises identically.
+enum ExercisePhoto: Hashable, Sendable, Identifiable {
+    case bundled(String)
+    case data(Data)
+
+    var id: String {
+        switch self {
+        case .bundled(let name): return "bundled:\(name)"
+        case .data(let data):    return "data:\(data.hashValue)"
         }
     }
 }

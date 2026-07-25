@@ -86,7 +86,7 @@ private struct EntryRow: View {
 
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
-            ExerciseThumbnail(resourceName: catalog.exercise(id: entry.exId)?.imageResourceNames.first,
+            ExerciseThumbnail(exercise: catalog.exercise(id: entry.exId),
                               size: 44, cornerRadius: 10)
             VStack(alignment: .leading, spacing: 3) {
                 Text(catalog.exercise(id: entry.exId)?.name ?? entry.exId)

@@ -37,7 +37,7 @@ struct GeneratedWorkoutPreview: View {
                         let ex = catalog.exercise(id: item.exId)
                         NavigationLink(value: ExerciseRef(id: item.exId)) {
                             HStack(spacing: 14) {
-                                ExerciseThumbnail(resourceName: ex?.imageResourceNames.first, size: 52, cornerRadius: 12)
+                                ExerciseThumbnail(exercise: ex, size: 52, cornerRadius: 12)
                                 VStack(alignment: .leading, spacing: 3) {
                                     Text(ex?.name ?? item.exId)
                                         .font(.rounded(15, .heavy)).foregroundStyle(Color.textPrimary).lineLimit(2)

@@ -344,12 +344,11 @@ struct ContributionRow: View {
     let detail: String
     let value: String
 
-    private var thumbnail: String? { catalog.exercise(id: exId)?.imageResourceNames.first }
 
     var body: some View {
         NavigationLink(value: ExerciseRef(id: exId)) {
             HStack(spacing: 10) {
-                ExerciseThumbnail(resourceName: thumbnail, size: 40, cornerRadius: 9)
+                ExerciseThumbnail(exercise: catalog.exercise(id: exId), size: 40, cornerRadius: 9)
                 VStack(alignment: .leading, spacing: 1) {
                     Text(name).font(.rounded(14, .heavy)).foregroundStyle(Color.textPrimary)
                         .lineLimit(1)

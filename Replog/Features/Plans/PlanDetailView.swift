@@ -237,7 +237,7 @@ struct ExerciseFilmStrip: View {
         HStack(spacing: 4) {
             ForEach(Array(shown.enumerated()), id: \.element.id) { idx, item in
                 let isLast = idx == shown.count - 1
-                ExerciseImageView(resourceName: catalog.exercise(id: item.exId)?.imageResourceNames.first,
+                ExerciseImageView(photo: catalog.exercise(id: item.exId)?.photos.first,
                                   cornerRadius: cornerRadius)
                     .frame(maxWidth: .infinity)
                     .frame(height: height)

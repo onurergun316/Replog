@@ -47,7 +47,7 @@ struct AddToWorkoutSheet: View {
     private var exerciseHeader: some View {
         HStack(spacing: 12) {
             if let ex = singleExercise {
-                ExerciseThumbnail(resourceName: ex.imageResourceNames.first, size: 48, cornerRadius: 12)
+                ExerciseThumbnail(exercise: ex, size: 48, cornerRadius: 12)
             } else {
                 RoundedRectangle(cornerRadius: 12, style: .continuous).fill(Color.accentSoft)
                     .frame(width: 48, height: 48)

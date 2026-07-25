@@ -99,6 +99,18 @@ extension ExerciseImageView {
         self.init(resourceName: exercise.imageResourceNames.first,
                   imageData: exercise.imageData, cornerRadius: cornerRadius)
     }
+
+    /// Render a single source-agnostic photo (bundled resource or custom data).
+    init(photo: ExercisePhoto?, cornerRadius: CGFloat = 0, contentMode: ContentMode = .fill) {
+        switch photo {
+        case .bundled(let name):
+            self.init(resourceName: name, cornerRadius: cornerRadius, contentMode: contentMode)
+        case .data(let data):
+            self.init(resourceName: nil, imageData: data, cornerRadius: cornerRadius, contentMode: contentMode)
+        case nil:
+            self.init(resourceName: nil, cornerRadius: cornerRadius, contentMode: contentMode)
+        }
+    }
 }
 
 /// A uniform square exercise thumbnail. Used everywhere a small photo appears in a
@@ -128,5 +140,17 @@ extension ExerciseThumbnail {
     init(exercise: Exercise?, size: CGFloat = 52, cornerRadius: CGFloat = 12) {
         self.init(resourceName: exercise?.imageResourceNames.first,
                   imageData: exercise?.imageData, size: size, cornerRadius: cornerRadius)
+    }
+
+    /// A single source-agnostic photo (bundled resource or custom data).
+    init(photo: ExercisePhoto?, size: CGFloat = 52, cornerRadius: CGFloat = 12) {
+        switch photo {
+        case .bundled(let name):
+            self.init(resourceName: name, size: size, cornerRadius: cornerRadius)
+        case .data(let data):
+            self.init(resourceName: nil, imageData: data, size: size, cornerRadius: cornerRadius)
+        case nil:
+            self.init(resourceName: nil, size: size, cornerRadius: cornerRadius)
+        }
     }
 }

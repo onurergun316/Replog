@@ -240,8 +240,7 @@ struct MuscleDetailView: View {
                             NavigationLink(value: ExerciseRef(id: item.exId)) {
                                 HStack(spacing: 10) {
                                     ExerciseThumbnail(
-                                        resourceName: catalog.exercise(id: item.exId)?
-                                            .imageResourceNames.first,
+                                        exercise: catalog.exercise(id: item.exId),
                                         size: 40, cornerRadius: 9)
                                     Text(catalog.exercise(id: item.exId)?.name ?? item.exId)
                                         .font(.rounded(14, .heavy)).foregroundStyle(Color.textPrimary)

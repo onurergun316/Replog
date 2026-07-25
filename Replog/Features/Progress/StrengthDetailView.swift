@@ -270,7 +270,7 @@ struct StrengthDetailView: View {
             NavigationLink(value: ExerciseRef(id: progress.exId)) {
                 HStack(spacing: 10) {
                     ExerciseThumbnail(
-                        resourceName: catalog.exercise(id: progress.exId)?.imageResourceNames.first,
+                        exercise: catalog.exercise(id: progress.exId),
                         size: 40, cornerRadius: 9)
                     VStack(alignment: .leading, spacing: 1) {
                         Text(name(of: progress.exId))
