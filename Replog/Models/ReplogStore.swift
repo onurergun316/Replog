@@ -136,6 +136,23 @@ extension ModelContext {
         customExercises().first { $0.id == id }
     }
 
+    /// Delete a custom exercise and purge every reference to it from plans and any
+    /// in-progress session (each cascades to its own sets), so no workout is left pointing
+    /// at a ghost id. Finished-session history is deliberately preserved — it's a factual
+    /// record of training the athlete actually did.
+    func deleteCustomExercise(_ exercise: CustomExercise) {
+        let id = exercise.id
+        for item in (try? fetch(FetchDescriptor<PlanItem>(predicate: #Predicate { $0.exId == id }))) ?? [] {
+            delete(item)
+        }
+        for sessionExercise in (try? fetch(FetchDescriptor<SessionExercise>(predicate: #Predicate { $0.exId == id }))) ?? [] {
+            delete(sessionExercise)
+        }
+        delete(exercise)
+        try? save()
+        syncCustomExercises()
+    }
+
     /// Merge the user's custom exercises into the shared catalog so they resolve by `exId`
     /// everywhere the bundled catalog does. Call once at launch and after any create/delete.
     func syncCustomExercises(into catalog: ExerciseCatalog = .shared) {

@@ -80,6 +80,7 @@ struct ExerciseDetailView: View {
                         Image(systemName: "ellipsis.circle")
                             .font(.system(size: 17, weight: .semibold)).foregroundStyle(Color.accent)
                     }
+                    .accessibilityLabel("Exercise options")
                 }
             }
         }
@@ -93,9 +94,7 @@ struct ExerciseDetailView: View {
 
     private func deleteCustom() {
         if let custom = context.customExercise(id: exId) {
-            context.delete(custom)
-            try? context.save()
-            context.syncCustomExercises()
+            context.deleteCustomExercise(custom)   // also removes it from every workout
         }
         dismiss()
     }
