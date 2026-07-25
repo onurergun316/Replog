@@ -18,6 +18,7 @@ struct AddExercisePicker: View {
 
     @State private var query = ""
     @State private var added: Set<String> = []
+    @State private var showCustomForm = false
 
     private var results: [Exercise] {
         catalog.search(query)
@@ -28,6 +29,10 @@ struct AddExercisePicker: View {
             VStack(spacing: 0) {
                 searchField
                 List {
+                    createCustomRow
+                        .listRowBackground(Color.surface)
+                        .listRowSeparatorTint(Color.border)
+                        .listRowInsets(EdgeInsets(top: 8, leading: 20, bottom: 8, trailing: 16))
                     ForEach(results) { ex in
                         row(ex)
                             .listRowBackground(Color.surface)
@@ -47,6 +52,33 @@ struct AddExercisePicker: View {
             }
         }
         .presentationDetents([.large])
+        .sheet(isPresented: $showCustomForm) {
+            CustomExerciseForm { newID in
+                added.insert(newID)
+                onAdd(newID)   // add the new movement straight into the workout
+            }
+        }
+    }
+
+    /// Entry point to build your own movement when the catalog doesn't have it.
+    private var createCustomRow: some View {
+        Button { showCustomForm = true } label: {
+            HStack(spacing: 14) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 12, style: .continuous).fill(Color.accentSoft)
+                    Image(systemName: "plus").font(.system(size: 20, weight: .black)).foregroundStyle(Color.accent)
+                }
+                .frame(width: 52, height: 52)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Create custom exercise").font(.rounded(15, .heavy)).foregroundStyle(Color.textPrimary)
+                    Text("Add your own movement").font(.rounded(12, .semibold)).foregroundStyle(Color.text2)
+                }
+                Spacer(minLength: 8)
+                Image(systemName: "chevron.right").font(.system(size: 13, weight: .bold)).foregroundStyle(Color.text3)
+            }
+            .padding(.vertical, 6)
+        }
+        .buttonStyle(.plain)
     }
 
     private var searchField: some View {
