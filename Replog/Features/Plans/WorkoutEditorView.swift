@@ -43,15 +43,17 @@ struct WorkoutEditorView: View {
                         TextField("Workout name", text: $workout.name)
                             .font(.screenTitle).foregroundStyle(Color.textPrimary)
                             .onChange(of: workout.name) { try? context.save() }
-                        // Optional description, styled like the "N exercises · … " line below,
-                        // but editable. Grows with the text; empty shows the placeholder.
-                        TextField("Add a description (optional)", text: $workout.notes, axis: .vertical)
-                            .font(.rounded(13, .semibold)).foregroundStyle(Color.text2)
-                            .lineLimit(1...6)
-                            .onChange(of: workout.notes) { try? context.save() }
                     }
 
                     dayPicker
+
+                    // Optional description — below the day pills, above the count line,
+                    // styled like the count line but editable. Selectable/copyable like any
+                    // text field (tap in, long-press for Select All / Copy).
+                    TextField("Add a description (optional)", text: $workout.notes, axis: .vertical)
+                        .font(.rounded(13, .semibold)).foregroundStyle(Color.text2)
+                        .lineLimit(1...6)
+                        .onChange(of: workout.notes) { try? context.save() }
 
                     Text("\(workout.items.count) exercises · \(workout.setCount) sets · hold to reorder")
                         .font(.rounded(13, .semibold)).foregroundStyle(Color.text2)
@@ -249,7 +251,7 @@ private struct ExerciseEditRow: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            ExerciseThumbnail(resourceName: exercise?.imageResourceNames.first, size: 52, cornerRadius: 12)
+            ExerciseThumbnail(exercise: exercise, size: 52, cornerRadius: 12)
             VStack(alignment: .leading, spacing: 3) {
                 Text(exercise?.name ?? item.exId).font(.rounded(15, .heavy))
                     .foregroundStyle(Color.textPrimary).lineLimit(2)
@@ -334,7 +336,7 @@ private struct ExerciseSetSheet: View {
 
     private var header: some View {
         HStack(spacing: 12) {
-            ExerciseThumbnail(resourceName: exercise?.imageResourceNames.first, size: 54, cornerRadius: 14)
+            ExerciseThumbnail(exercise: exercise, size: 54, cornerRadius: 14)
             VStack(alignment: .leading, spacing: 3) {
                 Text(exercise?.name ?? item.exId).font(.rounded(19, .heavy))
                     .foregroundStyle(Color.textPrimary).lineLimit(2)
