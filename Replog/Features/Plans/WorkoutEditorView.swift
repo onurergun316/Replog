@@ -179,11 +179,11 @@ struct WorkoutEditorView: View {
     // MARK: Actions
 
     private func toggle(_ item: PlanItem) {
-        // `.smooth` = a spring with ZERO bounce: a gentle glide with no overshoot/wobble.
-        // `.snappy` (the app's usual curve) overshoots, which read as the "snappy/shaky" feel
-        // on this large reveal. The row's own `.animation(.smooth, …)` matches this curve, so
-        // the card and the rows it pushes below move as one.
-        withAnimation(.smooth) { expandedItemID = expandedItemID == item.id ? nil : item.id }
+        // Instant open/close — deliberately no `withAnimation`. Animating this reveal inside the
+        // reorder `List` (a spring height change that re-lays-out the row every frame) read as
+        // shaky/snappy on device across `.snappy` and `.smooth`; the instant toggle is clean
+        // (verified frame-by-frame in the simulator).
+        expandedItemID = expandedItemID == item.id ? nil : item.id
     }
 
     /// Drag-to-reorder. Collapsing after a real move closes any set editor that just
@@ -248,12 +248,6 @@ private struct ExerciseEditRow: View {
     let onRemoveSet: (SetTemplate) -> Void
     let onChange: () -> Void
 
-    /// Natural height of the revealed set editors, measured continuously *behind* the clip.
-    /// The row always starts collapsed (the frame below is 0 high regardless of this value),
-    /// so the first 0 → measured update is invisible; adding/removing a set re-measures and the
-    /// height animates on the same curve. See `body` for why this keeps the `List` row smooth.
-    @State private var revealHeight: CGFloat = 0
-
     private var effectiveRest: Int { item.restSeconds ?? defaultRest }
 
     var body: some View {
@@ -262,27 +256,13 @@ private struct ExerciseEditRow: View {
                 .contentShape(Rectangle())
                 .onTapGesture { onToggle() }
 
-            // Measured-height clipped reveal. The old `if isExpanded { … }` handed the `List`
-            // a *discrete* height jump: UIKit drew the new content at full size at once and
-            // animated the cell frame on a separate timeline, so mid-transition the sets
-            // overlapped the header (expand) or bled past the card onto the next row (collapse).
-            // Instead the content is *always* in the tree at its natural height (`.fixedSize`,
-            // so it can never be compressed), we measure that height, and reveal it through a
-            // window we animate 0 ⇄ height — top-anchored so the header stays pinned, `.clipped()`
-            // so nothing ever escapes the card. The row's reported height now changes
-            // continuously on one `.smooth` curve, so the `List` self-sizes in lockstep.
-            revealContent
-                .fixedSize(horizontal: false, vertical: true)
-                .onGeometryChange(for: CGFloat.self, of: { $0.size.height },
-                                  action: { revealHeight = $0 })
-                .frame(height: isExpanded ? revealHeight : 0, alignment: .top)
-                .clipped()
-                .allowsHitTesting(isExpanded)
-                .accessibilityHidden(!isExpanded)
-                // `.smooth` (spring, zero bounce) not `.snappy` (overshoots): a gentle glide,
-                // no wobble at the end — the "smooth, not snappy" feel the reveal should have.
-                .animation(.smooth, value: isExpanded)
-                .animation(.smooth, value: revealHeight)
+            // The set editors show/hide instantly on tap — intentionally unanimated. See
+            // `toggle`: an animated reveal inside this reorder `List` felt shaky/snappy, so it
+            // is a plain conditional (no measured-height/clip machinery, which only existed to
+            // make the animation smooth).
+            if isExpanded {
+                revealContent
+            }
         }
         .padding(14)
         .cardSurface()
