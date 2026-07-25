@@ -20,19 +20,24 @@ struct ExerciseDetailView: View {
     let exId: String
     var showProgress: Bool = false
 
+    @Environment(\.dismiss) private var dismiss
     @State private var tab: DetailTab = .progress
     @State private var showAddToWorkout = false
+    @State private var showEditCustom = false
+    @State private var confirmDeleteCustom = false
 
     enum DetailTab: Hashable { case guide, progress }
 
     private var exercise: Exercise? { catalog.exercise(id: exId) }
     private var membership: [PlanWorkouts] { WorkoutMembership.grouped(containing: exId, in: plans) }
+    /// User-created exercises carry a "custom-" id and are the only ones the user can edit/delete.
+    private var isCustom: Bool { exId.hasPrefix("custom-") }
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
                 if let exercise {
-                    PhotoCarousel(resourceNames: exercise.imageResourceNames)
+                    PhotoCarousel(photos: exercise.photos)
                     Text(exercise.name).font(.rounded(24, .black)).foregroundStyle(Color.textPrimary)
 
                     if showProgress {
@@ -60,6 +65,39 @@ struct ExerciseDetailView: View {
         .sheet(isPresented: $showAddToWorkout) {
             AddToWorkoutSheet(exIds: [exId])
         }
+        .sheet(isPresented: $showEditCustom) {
+            CustomExerciseForm(editing: context.customExercise(id: exId))
+        }
+        .toolbar {
+            if isCustom, exercise != nil {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Menu {
+                        Button { showEditCustom = true } label: { Label("Edit", systemImage: "pencil") }
+                        Button(role: .destructive) { confirmDeleteCustom = true } label: {
+                            Label("Delete", systemImage: "trash")
+                        }
+                    } label: {
+                        Image(systemName: "ellipsis.circle")
+                            .font(.system(size: 17, weight: .semibold)).foregroundStyle(Color.accent)
+                    }
+                }
+            }
+        }
+        .confirmationDialog("Delete this exercise?", isPresented: $confirmDeleteCustom, titleVisibility: .visible) {
+            Button("Delete", role: .destructive) { deleteCustom() }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Removes your custom exercise. Any workout still using it will show it as unavailable.")
+        }
+    }
+
+    private func deleteCustom() {
+        if let custom = context.customExercise(id: exId) {
+            context.delete(custom)
+            try? context.save()
+            context.syncCustomExercises()
+        }
+        dismiss()
     }
 
     /// "In your workouts" chips + an Add button. Hidden when the user has no plans yet
@@ -104,16 +142,23 @@ struct ExerciseDetailView: View {
 // MARK: - Photo carousel
 
 private struct PhotoCarousel: View {
-    let resourceNames: [String]
+    let photos: [ExercisePhoto]
     @State private var index = 0
 
     var body: some View {
-        TabView(selection: $index) {
-            ForEach(Array(resourceNames.enumerated()), id: \.offset) { i, name in
-                ZoomablePhoto(resourceName: name).tag(i)
+        Group {
+            if photos.isEmpty {
+                // Custom exercise with no photo: a graceful placeholder, not a blank box.
+                ExerciseImageView(photo: nil, cornerRadius: Radius.card, contentMode: .fill)
+            } else {
+                TabView(selection: $index) {
+                    ForEach(Array(photos.enumerated()), id: \.offset) { i, photo in
+                        ZoomablePhoto(photo: photo).tag(i)
+                    }
+                }
+                .tabViewStyle(.page(indexDisplayMode: photos.count > 1 ? .always : .never))
             }
         }
-        .tabViewStyle(.page(indexDisplayMode: resourceNames.count > 1 ? .always : .never))
         .frame(height: 320)
         .background(RoundedRectangle(cornerRadius: Radius.card, style: .continuous).fill(Color.surface2))
         .clipShape(RoundedRectangle(cornerRadius: Radius.card, style: .continuous))
@@ -123,12 +168,12 @@ private struct PhotoCarousel: View {
 /// A single photo shown in full (aspect-fit, never cropped) with pinch- and
 /// double-tap-to-zoom for close inspection of the movement.
 private struct ZoomablePhoto: View {
-    let resourceName: String
+    let photo: ExercisePhoto
     @State private var scale: CGFloat = 1
     @GestureState private var pinch: CGFloat = 1
 
     var body: some View {
-        ExerciseImageView(resourceName: resourceName, cornerRadius: Radius.card, contentMode: .fit)
+        ExerciseImageView(photo: photo, cornerRadius: Radius.card, contentMode: .fit)
             .scaleEffect(scale * pinch)
             .gesture(
                 MagnifyGesture()

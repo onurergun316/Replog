@@ -2,9 +2,9 @@
 //  CustomExerciseForm.swift
 //  Replog
 //
-//  Create a user-defined exercise with the same facets the bundled catalog carries.
-//  Everything is required except the photo. On save it persists a `CustomExercise`,
-//  merges it into the catalog, and hands the new id back to add it to the workout.
+//  Create or edit a user-defined exercise with the same facets the bundled catalog
+//  carries. Everything is required except the photos (up to 5, reorderable). On save it
+//  persists the `CustomExercise`, merges it into the catalog, and hands the id back.
 //
 
 import SwiftUI
@@ -15,8 +15,13 @@ struct CustomExerciseForm: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var context
 
-    /// Called with the new exercise's id once it's saved.
-    let onCreate: (String) -> Void
+    /// The exercise being edited, or `nil` to create a new one.
+    var editing: CustomExercise? = nil
+    /// Called with the saved exercise's id.
+    var onSave: (String) -> Void = { _ in }
+
+    /// A photo with a stable identity so the list reorders cleanly.
+    private struct Photo: Identifiable { let id = UUID(); var data: Data }
 
     @State private var name = ""
     @State private var category: ExerciseCategory = .strength
@@ -27,30 +32,31 @@ struct CustomExerciseForm: View {
     @State private var primary: Set<Muscle> = []
     @State private var secondary: Set<Muscle> = []
     @State private var instructions = ""
-    @State private var photoItem: PhotosPickerItem?
-    @State private var imageData: Data?
+    @State private var photos: [Photo] = []
+    @State private var pickedItems: [PhotosPickerItem] = []
+    @State private var loaded = false
+
+    private let maxPhotos = 5
 
     private var trimmedName: String { name.trimmingCharacters(in: .whitespacesAndNewlines) }
-    /// Everything except the photo is required; a movement needs a name and at least one
-    /// primary muscle to be worth anything in the log and the stats.
     private var isValid: Bool { !trimmedName.isEmpty && !primary.isEmpty }
+    private var isEditing: Bool { editing != nil }
 
     var body: some View {
         NavigationStack {
             Form {
                 Section("Name") {
-                    TextField("Exercise name", text: $name)
-                        .font(.bodyText)
+                    TextField("Exercise name", text: $name).font(.bodyText)
                 }
 
-                Section("Photo (optional)") { photoRow }
+                photoSection
 
                 Section("Details") {
-                    picker("Category", $category, ExerciseCategory.allCases) { $0.displayName }
-                    picker("Equipment", $equipment, Equipment.allCases) { $0.displayName }
-                    picker("Force", $force, Force.allCases) { $0.displayName }
-                    picker("Mechanic", $mechanic, Mechanic.allCases) { $0.displayName }
-                    picker("Level", $level, Level.allCases) { $0.displayName }
+                    facetPicker("Category", $category, ExerciseCategory.allCases) { $0.displayName }
+                    facetPicker("Equipment", $equipment, Equipment.allCases) { $0.displayName }
+                    facetPicker("Force", $force, Force.allCases) { $0.displayName }
+                    facetPicker("Mechanic", $mechanic, Mechanic.allCases) { $0.displayName }
+                    facetPicker("Level", $level, Level.allCases) { $0.displayName }
                 }
 
                 Section("Primary muscles") { muscleChips($primary, other: $secondary) }
@@ -64,7 +70,7 @@ struct CustomExerciseForm: View {
             .scrollContentBackground(.hidden)
             .background(Color.bg.ignoresSafeArea())
             .tint(Color.accent)
-            .navigationTitle("New Exercise")
+            .navigationTitle(isEditing ? "Edit Exercise" : "New Exercise")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -76,48 +82,51 @@ struct CustomExerciseForm: View {
                         .disabled(!isValid)
                 }
             }
-            .onChange(of: photoItem) { loadPhoto() }
+            .onAppear(perform: prefillIfNeeded)
+            .onChange(of: pickedItems) { loadPicked() }
         }
     }
 
-    // MARK: Rows
+    // MARK: Photos
 
-    @ViewBuilder private var photoRow: some View {
-        PhotosPicker(selection: $photoItem, matching: .images) {
-            HStack(spacing: 12) {
-                if let imageData, let ui = UIImage(data: imageData) {
-                    Image(uiImage: ui).resizable().aspectRatio(contentMode: .fill)
-                        .frame(width: 52, height: 52)
-                        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-                } else {
-                    ZStack {
-                        RoundedRectangle(cornerRadius: 12, style: .continuous).fill(Color.surface2)
-                        Image(systemName: "photo.badge.plus").foregroundStyle(Color.text3)
+    @ViewBuilder private var photoSection: some View {
+        Section {
+            // Reorder (long-press drag) and swipe-to-delete — SwiftUI's native list editing.
+            ForEach(photos) { photo in
+                HStack(spacing: 12) {
+                    if let ui = UIImage(data: photo.data) {
+                        Image(uiImage: ui).resizable().aspectRatio(contentMode: .fill)
+                            .frame(width: 54, height: 54)
+                            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
                     }
-                    .frame(width: 52, height: 52)
+                    Text("Photo \((photos.firstIndex(where: { $0.id == photo.id }) ?? 0) + 1)")
+                        .font(.rounded(14, .semibold)).foregroundStyle(Color.textPrimary)
+                    Spacer()
+                    Image(systemName: "line.3.horizontal").foregroundStyle(Color.text3)
                 }
-                Text(imageData == nil ? "Add a photo" : "Change photo")
-                    .font(.rounded(15, .semibold)).foregroundStyle(Color.accent)
-                Spacer()
             }
-        }
-        if imageData != nil {
-            Button(role: .destructive) { imageData = nil; photoItem = nil } label: {
-                Text("Remove photo").font(.rounded(14, .semibold))
+            .onMove { photos.move(fromOffsets: $0, toOffset: $1) }
+            .onDelete { photos.remove(atOffsets: $0) }
+
+            if photos.count < maxPhotos {
+                PhotosPicker(selection: $pickedItems, maxSelectionCount: maxPhotos - photos.count, matching: .images) {
+                    Label(photos.isEmpty ? "Add photos" : "Add more", systemImage: "photo.badge.plus")
+                        .font(.rounded(15, .semibold)).foregroundStyle(Color.accent)
+                }
             }
+        } header: {
+            Text("Photos (optional, up to \(maxPhotos)) — drag to reorder")
         }
     }
 
-    private func picker<T: Hashable>(_ title: String, _ selection: Binding<T>,
-                                     _ options: [T], _ label: @escaping (T) -> String) -> some View {
+    private func facetPicker<T: Hashable>(_ title: String, _ selection: Binding<T>,
+                                          _ options: [T], _ label: @escaping (T) -> String) -> some View {
         Picker(title, selection: selection) {
             ForEach(options, id: \.self) { Text(label($0)).tag($0) }
         }
         .font(.bodyText)
     }
 
-    /// Tappable muscle chips. Selecting a muscle here removes it from the other set so a
-    /// muscle is never both primary and secondary.
     private func muscleChips(_ selection: Binding<Set<Muscle>>, other: Binding<Set<Muscle>>) -> some View {
         FlowLayout(spacing: 8) {
             ForEach(Muscle.allCases) { muscle in
@@ -140,27 +149,66 @@ struct CustomExerciseForm: View {
 
     // MARK: Actions
 
+    private func prefillIfNeeded() {
+        guard let editing, !loaded else { return }
+        loaded = true
+        name = editing.name
+        category = editing.category
+        equipment = editing.equipment ?? .bodyOnly
+        force = editing.force ?? .push
+        mechanic = editing.mechanic ?? .compound
+        level = editing.level
+        primary = Set(editing.primaryMuscles)
+        secondary = Set(editing.secondaryMuscles)
+        instructions = editing.instructions.joined(separator: "\n")
+        photos = editing.imagesData.map { Photo(data: $0) }
+    }
+
     private func save() {
         let steps = instructions
             .split(whereSeparator: \.isNewline)
             .map { $0.trimmingCharacters(in: .whitespaces) }
             .filter { !$0.isEmpty }
-        let exercise = CustomExercise(
-            name: trimmedName, force: force, level: level, mechanic: mechanic,
-            equipment: equipment, primaryMuscles: Array(primary), secondaryMuscles: Array(secondary),
-            category: category, instructions: steps, imageData: imageData)
-        context.insert(exercise)
+        let images = photos.map(\.data)
+
+        let exercise: CustomExercise
+        if let editing {
+            exercise = editing
+            exercise.name = trimmedName
+            exercise.forceRaw = force.rawValue
+            exercise.levelRaw = level.rawValue
+            exercise.mechanicRaw = mechanic.rawValue
+            exercise.equipmentRaw = equipment.rawValue
+            exercise.primaryMusclesRaw = primary.map(\.rawValue)
+            exercise.secondaryMusclesRaw = secondary.map(\.rawValue)
+            exercise.categoryRaw = category.rawValue
+            exercise.instructions = steps
+            exercise.imagesData = images
+        } else {
+            exercise = CustomExercise(
+                name: trimmedName, force: force, level: level, mechanic: mechanic,
+                equipment: equipment, primaryMuscles: Array(primary), secondaryMuscles: Array(secondary),
+                category: category, instructions: steps, imagesData: images)
+            context.insert(exercise)
+        }
         try? context.save()
-        context.syncCustomExercises()   // merge into the catalog so it's usable immediately
-        onCreate(exercise.id)
+        context.syncCustomExercises()   // re-merge so the change is visible immediately
+        onSave(exercise.id)
         dismiss()
     }
 
-    private func loadPhoto() {
-        guard let photoItem else { return }
+    private func loadPicked() {
+        let items = pickedItems
+        pickedItems = []
+        guard !items.isEmpty else { return }
         Task {
-            guard let data = try? await photoItem.loadTransferable(type: Data.self) else { return }
-            imageData = Self.downscaled(data) ?? data
+            var added: [Photo] = []
+            for item in items where photos.count + added.count < maxPhotos {
+                if let data = try? await item.loadTransferable(type: Data.self) {
+                    added.append(Photo(data: Self.downscaled(data) ?? data))
+                }
+            }
+            photos.append(contentsOf: added)
         }
     }
 

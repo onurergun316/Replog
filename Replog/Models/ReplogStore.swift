@@ -131,6 +131,11 @@ extension ModelContext {
         return (try? fetch(descriptor)) ?? []
     }
 
+    /// A single custom exercise by id, or nil (a bundled id or a deleted one).
+    func customExercise(id: String) -> CustomExercise? {
+        customExercises().first { $0.id == id }
+    }
+
     /// Merge the user's custom exercises into the shared catalog so they resolve by `exId`
     /// everywhere the bundled catalog does. Call once at launch and after any create/delete.
     func syncCustomExercises(into catalog: ExerciseCatalog = .shared) {
