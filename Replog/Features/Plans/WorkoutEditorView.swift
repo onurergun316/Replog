@@ -43,6 +43,12 @@ struct WorkoutEditorView: View {
                         TextField("Workout name", text: $workout.name)
                             .font(.screenTitle).foregroundStyle(Color.textPrimary)
                             .onChange(of: workout.name) { try? context.save() }
+                        // Optional description, styled like the "N exercises · … " line below,
+                        // but editable. Grows with the text; empty shows the placeholder.
+                        TextField("Add a description (optional)", text: $workout.notes, axis: .vertical)
+                            .font(.rounded(13, .semibold)).foregroundStyle(Color.text2)
+                            .lineLimit(1...6)
+                            .onChange(of: workout.notes) { try? context.save() }
                     }
 
                     dayPicker

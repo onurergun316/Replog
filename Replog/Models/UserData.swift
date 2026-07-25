@@ -64,6 +64,8 @@ final class Plan {
 final class Workout {
     var id: UUID = UUID()
     var name: String = ""
+    /// Optional free-text description, shown under the title in the editor. Empty = none.
+    var notes: String = ""
     /// Stored as `Weekday.rawValue`; use `day` for typed access.
     var dayRaw: String = Weekday.mon.rawValue
     /// True when this workout isn't tied to a weekday — an "Extra" the user can run on
