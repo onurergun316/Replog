@@ -27,8 +27,6 @@ struct ReplogApp: App {
         TemplateBackfill.run(context: context)
         // …and for sessions finished before history recorded which workout they were.
         SessionAttributionBackfill.run(context: context)
-        // Register the best-effort background report refresh (no-ops if not permitted).
-        ReportScheduler.registerBackgroundTask(container: container)
     }
 
     var body: some Scene {
@@ -44,8 +42,6 @@ struct ReplogApp: App {
                 // re-plan notifications from the fresh state.
                 ReportScheduler.runOnActivation(context: container.mainContext)
                 NotificationCoordinator.refresh(context: container.mainContext)
-            case .background:
-                ReportScheduler.scheduleBackgroundRefresh()
             default:
                 break
             }
