@@ -38,6 +38,8 @@ nonisolated final class ExerciseImageStore: Sendable {
 /// Displays a single exercise photo by resource name, loading off the main thread.
 struct ExerciseImageView: View {
     let resourceName: String?
+    /// A user photo for custom exercises. Takes precedence over `resourceName` when set.
+    var imageData: Data? = nil
     var cornerRadius: CGFloat = 0
     /// `.fill` crops to fill the frame (thumbnails); `.fit` shows the whole photo
     /// letterboxed (detail hero, so no part of the movement is cropped away).
@@ -63,6 +65,7 @@ struct ExerciseImageView: View {
             }
             .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
             .task(id: resourceName) { await load() }
+            .task(id: imageData) { await load() }
     }
 
     private var placeholder: some View {
@@ -75,6 +78,8 @@ struct ExerciseImageView: View {
     }
 
     private func load() async {
+        // A custom exercise's own photo wins over any bundled resource.
+        if let imageData, let custom = UIImage(data: imageData) { image = custom; return }
         guard let resourceName else { image = nil; return }
         // Synchronous cache hit stays instant; cold loads hop off-main.
         if let cached = ExerciseImageStore.shared.image(forResourceName: resourceName) {
@@ -91,7 +96,8 @@ struct ExerciseImageView: View {
 /// Convenience: the first/primary photo of an exercise.
 extension ExerciseImageView {
     init(exercise: Exercise, cornerRadius: CGFloat = 0) {
-        self.init(resourceName: exercise.imageResourceNames.first, cornerRadius: cornerRadius)
+        self.init(resourceName: exercise.imageResourceNames.first,
+                  imageData: exercise.imageData, cornerRadius: cornerRadius)
     }
 }
 
@@ -100,6 +106,7 @@ extension ExerciseImageView {
 /// fill-cropped to a square regardless of the source photo's orientation.
 struct ExerciseThumbnail: View {
     let resourceName: String?
+    var imageData: Data? = nil
     var size: CGFloat = 52
     var cornerRadius: CGFloat = 12
 
@@ -107,7 +114,8 @@ struct ExerciseThumbnail: View {
         // Frame → fill-cropped image (clipped to the same rounded rect inside
         // ExerciseImageView) → one hairline on the exact same edge. Everything shares the
         // frame, so nothing is inset or mismatched.
-        ExerciseImageView(resourceName: resourceName, cornerRadius: cornerRadius, contentMode: .fill)
+        ExerciseImageView(resourceName: resourceName, imageData: imageData,
+                          cornerRadius: cornerRadius, contentMode: .fill)
             .frame(width: size, height: size)
             .overlay(
                 RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
@@ -118,6 +126,7 @@ struct ExerciseThumbnail: View {
 
 extension ExerciseThumbnail {
     init(exercise: Exercise?, size: CGFloat = 52, cornerRadius: CGFloat = 12) {
-        self.init(resourceName: exercise?.imageResourceNames.first, size: size, cornerRadius: cornerRadius)
+        self.init(resourceName: exercise?.imageResourceNames.first,
+                  imageData: exercise?.imageData, size: size, cornerRadius: cornerRadius)
     }
 }

@@ -15,7 +15,8 @@ enum ReplogSchema {
         Plan.self, Workout.self, PlanItem.self, SetTemplate.self,
         ActiveSession.self, SessionExercise.self, LoggedSet.self,
         HistoryEntry.self, UserProfile.self, AppSettings.self,
-        CoachingLog.self, BodyweightEntry.self, ReadinessEntry.self
+        CoachingLog.self, BodyweightEntry.self, ReadinessEntry.self,
+        CustomExercise.self
     ]
 
     /// The app's on-disk container.
@@ -120,6 +121,20 @@ extension ModelContext {
             sortBy: [SortDescriptor(\.date, order: .reverse)])
         descriptor.fetchLimit = 1
         return ((try? fetch(descriptor)) ?? []).first
+    }
+
+    // MARK: - Custom exercises
+
+    /// All user-created exercises, name-sorted.
+    func customExercises() -> [CustomExercise] {
+        let descriptor = FetchDescriptor<CustomExercise>(sortBy: [SortDescriptor(\.name)])
+        return (try? fetch(descriptor)) ?? []
+    }
+
+    /// Merge the user's custom exercises into the shared catalog so they resolve by `exId`
+    /// everywhere the bundled catalog does. Call once at launch and after any create/delete.
+    func syncCustomExercises(into catalog: ExerciseCatalog = .shared) {
+        catalog.setCustom(customExercises().map(\.asExercise))
     }
 
     /// Records a readiness check-in for a session start. One entry per calendar day: a second

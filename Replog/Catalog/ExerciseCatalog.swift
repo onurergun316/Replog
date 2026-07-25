@@ -13,10 +13,16 @@ import Foundation
 /// `nonisolated` + immutable, so it is freely usable from any actor.
 nonisolated final class ExerciseCatalog: Sendable {
 
-    /// All exercises, sorted by name (stable, case-insensitive).
+    /// All bundled exercises, sorted by name (stable, case-insensitive).
     let all: [Exercise]
-    /// Exercises keyed by their stable `id`.
+    /// Bundled exercises keyed by their stable `id`.
     let byID: [String: Exercise]
+
+    /// User-created exercises, merged in at launch and whenever they change (`setCustom`).
+    /// Guarded by a lock so the otherwise-immutable, nonisolated catalog stays Sendable —
+    /// same technique as `ExerciseImageStore`'s cache.
+    private nonisolated(unsafe) var customByID: [String: Exercise] = [:]
+    private let customLock = NSLock()
 
     /// The app-wide instance, loaded from the main bundle.
     static let shared = ExerciseCatalog()
@@ -35,9 +41,32 @@ nonisolated final class ExerciseCatalog: Sendable {
         self.byID = Dictionary(exercises.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
     }
 
+    // MARK: Custom exercises
+
+    /// Replace the user-created layer. Call at launch and after any create/delete so the
+    /// catalog resolves custom exercises everywhere it resolves bundled ones.
+    func setCustom(_ exercises: [Exercise]) {
+        customLock.lock(); defer { customLock.unlock() }
+        customByID = Dictionary(exercises.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+    }
+
+    private var customValues: [Exercise] {
+        customLock.lock(); defer { customLock.unlock() }
+        return Array(customByID.values)
+    }
+
+    /// Bundled + custom, name-sorted — the full set the user browses and searches.
+    var everything: [Exercise] {
+        (all + customValues).sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+    }
+
     // MARK: Lookups
 
-    func exercise(id: String) -> Exercise? { byID[id] }
+    func exercise(id: String) -> Exercise? {
+        if let bundled = byID[id] { return bundled }
+        customLock.lock(); defer { customLock.unlock() }
+        return customByID[id]
+    }
 
     /// Exercises whose primary OR secondary muscles include `muscle`.
     func exercises(forMuscle muscle: Muscle) -> [Exercise] {
@@ -56,7 +85,7 @@ nonisolated final class ExerciseCatalog: Sendable {
     /// `equipment == nil` means "All".
     func search(_ query: String, equipment: Equipment? = nil) -> [Exercise] {
         let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
-        return all.filter { ex in
+        return everything.filter { ex in
             let matchesEquip = equipment == nil || ex.equipment == equipment
             guard matchesEquip else { return false }
             guard !trimmed.isEmpty else { return true }
@@ -67,7 +96,7 @@ nonisolated final class ExerciseCatalog: Sendable {
     /// Library search/filter: free-text name match AND a structured multi-facet filter.
     func search(_ query: String, filter: LibraryFilter) -> [Exercise] {
         let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
-        return all.filter { ex in
+        return everything.filter { ex in
             guard filter.matches(ex) else { return false }
             guard !trimmed.isEmpty else { return true }
             return ex.name.localizedCaseInsensitiveContains(trimmed)

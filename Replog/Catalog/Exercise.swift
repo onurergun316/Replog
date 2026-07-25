@@ -23,6 +23,9 @@ struct Exercise: Identifiable, Hashable, Sendable {
     /// Relative image paths from the source DB, e.g. "Battling_Ropes/0.jpg".
     /// The bundled assets are HEIC; `imageNames` resolves the shipped filenames.
     let images: [String]
+    /// A user-supplied photo, for custom exercises only (bundled entries use `images`).
+    /// Defaulted so JSON decoding and every existing call site are unaffected.
+    var imageData: Data? = nil
 
     /// All muscles worked (primary first), de-duplicated — handy for chips & filters.
     var allMuscles: [Muscle] {

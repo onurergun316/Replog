@@ -27,6 +27,8 @@ struct ReplogApp: App {
         TemplateBackfill.run(context: context)
         // …and for sessions finished before history recorded which workout they were.
         SessionAttributionBackfill.run(context: context)
+        // Merge any user-created exercises into the catalog so they resolve by exId everywhere.
+        context.syncCustomExercises()
     }
 
     var body: some Scene {
