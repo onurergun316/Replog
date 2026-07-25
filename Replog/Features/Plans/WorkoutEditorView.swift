@@ -179,7 +179,11 @@ struct WorkoutEditorView: View {
     // MARK: Actions
 
     private func toggle(_ item: PlanItem) {
-        withAnimation(.snappy) { expandedItemID = expandedItemID == item.id ? nil : item.id }
+        // `.smooth` = a spring with ZERO bounce: a gentle glide with no overshoot/wobble.
+        // `.snappy` (the app's usual curve) overshoots, which read as the "snappy/shaky" feel
+        // on this large reveal. The row's own `.animation(.smooth, …)` matches this curve, so
+        // the card and the rows it pushes below move as one.
+        withAnimation(.smooth) { expandedItemID = expandedItemID == item.id ? nil : item.id }
     }
 
     /// Drag-to-reorder. Collapsing after a real move closes any set editor that just
@@ -266,7 +270,7 @@ private struct ExerciseEditRow: View {
             // so it can never be compressed), we measure that height, and reveal it through a
             // window we animate 0 ⇄ height — top-anchored so the header stays pinned, `.clipped()`
             // so nothing ever escapes the card. The row's reported height now changes
-            // continuously on one `.snappy` curve, so the `List` self-sizes in lockstep.
+            // continuously on one `.smooth` curve, so the `List` self-sizes in lockstep.
             revealContent
                 .fixedSize(horizontal: false, vertical: true)
                 .onGeometryChange(for: CGFloat.self, of: { $0.size.height },
@@ -275,8 +279,10 @@ private struct ExerciseEditRow: View {
                 .clipped()
                 .allowsHitTesting(isExpanded)
                 .accessibilityHidden(!isExpanded)
-                .animation(.snappy, value: isExpanded)
-                .animation(.snappy, value: revealHeight)
+                // `.smooth` (spring, zero bounce) not `.snappy` (overshoots): a gentle glide,
+                // no wobble at the end — the "smooth, not snappy" feel the reveal should have.
+                .animation(.smooth, value: isExpanded)
+                .animation(.smooth, value: revealHeight)
         }
         .padding(14)
         .cardSurface()
