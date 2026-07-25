@@ -60,6 +60,31 @@ struct BodyweightLoadTests {
         #expect(BodyweightLoad.factor(for: bench) == nil)
     }
 
+    @Test func apparatusBodyweightMovesAreCredited() throws {
+        // Dips on bars, rings, muscle-ups, suspension work: catalogued `.other` because
+        // they need apparatus, but loaded by the athlete's own body. Before `.other` was
+        // admitted these counted as zero — the exact bug this file exists to prevent.
+        for id in ["Parallel_Bar_Dip", "Ring_Dips", "Dips_-_Chest_Version",
+                   "Muscle_Up", "Suspended_Push-Up", "Weighted_Pull_Ups", "Ab_Roller"] {
+            let ex = try exercise(id)
+            #expect(BodyweightLoad.isBodyweightLoaded(ex), "\(id) should be bodyweight-loaded")
+            let f = try #require(BodyweightLoad.factor(for: ex), "no factor for \(id)")
+            #expect(f >= 0.05 && f <= 1.0, "implausible factor \(f) for \(id)")
+        }
+    }
+
+    @Test func implementLoadedOtherMovesEarnNoBodyweightCredit() throws {
+        // `.other` also holds genuinely external-loaded work: the sled, plate raises, the
+        // trap-bar deadlift. Their stored weight is the whole load — no bodyweight share,
+        // so `effectiveKg` must return exactly what was logged.
+        for id in ["Sled_Row", "Trap_Bar_Deadlift", "Front_Plate_Raise"] {
+            let ex = try exercise(id)
+            #expect(!BodyweightLoad.isBodyweightLoaded(ex), "\(id) should not be bodyweight-loaded")
+            #expect(BodyweightLoad.factor(for: ex) == nil)
+            #expect(BodyweightLoad.effectiveKg(addedKg: 120, exercise: ex, bodyweightKg: 80) == 120)
+        }
+    }
+
     // MARK: - Timed holds
 
     @Test func holdsAreExactlyTheStaticBodyweightMovements() throws {

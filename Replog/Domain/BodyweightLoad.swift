@@ -32,14 +32,40 @@ enum BodyweightLoad {
     /// uses. Stretching and cardio are excluded: a hamstring stretch is not tonnage,
     /// and crediting it would inflate every total in the app. (That exclusion is not a
     /// rounding detail — it covers 85 of the catalog's 188 equipment-free entries.)
+    ///
+    /// `.other` is a grab-bag that holds two very different things: apparatus bodyweight
+    /// movements — dips on bars, pull-up/chin variants, muscle-ups, rings, TRX/suspension,
+    /// rope climbs, and the plyometric jumps/hops/sprints — sit right next to genuinely
+    /// externally-loaded work (sled drags, plate raises, the trap-bar deadlift, sledgehammer
+    /// swings). Without crediting the first group a parallel-bar dip or a pull-up counts as
+    /// zero — exactly the calisthenics-is-worthless bug this file exists to fix — so `.other`
+    /// is treated as bodyweight *unless* its name marks it as implement-loaded. A "weighted
+    /// dip"/"weighted pull-up" stays bodyweight: its stored weight is added load on top of
+    /// the bodyweight share, which is precisely what `effectiveKg` layers.
     static func isBodyweightLoaded(_ exercise: Exercise) -> Bool {
-        let equipment = exercise.equipment ?? .bodyOnly
-        guard equipment == .bodyOnly else { return false }
         switch exercise.category {
-        case .strength, .plyometrics: return true
+        case .strength, .plyometrics: break
         default: return false
         }
+        switch exercise.equipment ?? .bodyOnly {
+        case .bodyOnly:
+            return true
+        case .other:
+            let name = exercise.name.lowercased()
+            return !externalLoadOtherKeywords.contains(where: name.contains)
+        default:
+            return false
+        }
     }
+
+    /// `.other`-equipment movements whose resistance is an external implement, not the
+    /// athlete's body — excluded from bodyweight credit so their stored weight is read as
+    /// the whole load. "band hamstring"/"head harness" are worded to spare the genuinely
+    /// bodyweight "band assisted pull-up".
+    private static let externalLoadOtherKeywords: [String] = [
+        "sled", "plate", "trap bar", "sledgehammer", "heavy bag", "battling",
+        "wrist roller", "balance board", "head harness", "band hamstring",
+    ]
 
     /// A hold measured in seconds rather than reps (plank, side bridge, the isometrics).
     /// Read from the catalog's own `static` force facet rather than a hand-kept list, so
