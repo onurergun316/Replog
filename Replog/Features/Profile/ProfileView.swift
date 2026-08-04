@@ -16,8 +16,11 @@ struct ProfileView: View {
     @Query private var settingsList: [AppSettings]
     @Query private var plans: [Plan]
     @Query private var history: [HistoryEntry]
+    @Query(sort: \BadgeAward.earnedAt, order: .reverse) private var awards: [BadgeAward]
     @State private var showResetConfirm = false
     @State private var selectedStat: StatKind?
+    /// Built once when the screen appears — walking the whole history is not view-body work.
+    @State private var badgeSnapshot = BadgeSnapshot()
 
     private var profile: UserProfile { profiles.first ?? context.userProfile() }
     private var settings: AppSettings { settingsList.first ?? context.appSettings() }
@@ -47,6 +50,7 @@ struct ProfileView: View {
                     Text("Profile").font(.screenTitle).foregroundStyle(Color.textPrimary)
                     profileHeader
                     statsRow
+                    badgesSection
                     if !plansWithReports.isEmpty { coachReports }
                     if !trainingReports.isEmpty { trainingReportsSection }
                     if !recentInsights.isEmpty { coachInsightsSection }
@@ -60,6 +64,9 @@ struct ProfileView: View {
             .hideKeyboardOnTap()
             .background(Color.bg.ignoresSafeArea())
             .toolbar(.hidden, for: .navigationBar)
+            .onAppear {
+                badgeSnapshot = BadgeAwarding.snapshot(context: context, catalog: catalog)
+            }
             .confirmationDialog("Reset all data?", isPresented: $showResetConfirm, titleVisibility: .visible) {
                 Button("Reset everything", role: .destructive) { resetAll() }
                 Button("Cancel", role: .cancel) {}
@@ -132,6 +139,18 @@ struct ProfileView: View {
 
     private var coachInsightsSection: some View {
         CoachInsightsListView(logs: recentInsights)
+    }
+
+    /// The trophy cabinet. Built lazily on appear rather than on every render: the snapshot
+    /// walks the whole history, which is not something to do inside a view body.
+    private var badgesSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            SectionHeader(title: "Badges")
+            NavigationLink { BadgesView() } label: {
+                BadgeSummaryCard(awards: awards, snapshot: badgeSnapshot)
+            }
+            .buttonStyle(.plain)
+        }
     }
 
     private var coachReports: some View {

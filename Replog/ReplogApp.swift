@@ -31,6 +31,11 @@ struct ReplogApp: App {
         TemplateBackfill.run(context: context)
         // Merge any user-created exercises into the catalog so they resolve by exId everywhere.
         context.syncCustomExercises()
+        // Recognise training that already happened. An athlete with two years of history
+        // must not open this update to an empty trophy cabinet. Idempotent, so it is also
+        // the safety net if a badge is ever missed at the end of a session.
+        BadgeAwarding.award(context: context)
+        try? context.save()
     }
 
     var body: some Scene {

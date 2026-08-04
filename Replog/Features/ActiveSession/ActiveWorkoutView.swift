@@ -27,6 +27,8 @@ struct ActiveWorkoutView: View {
     @State private var debriefInsights: [CoachInsight] = []
     @State private var showDebrief = false
     @State private var showAddExercise = false
+    @State private var unlockedBadges: [Badge] = []
+    @State private var showBadgeUnlock = false
     /// What this session added beyond the plan, held while the athlete decides whether to
     /// keep it. Non-nil means the "save to the plan?" dialog is up.
     @State private var pendingAdditions: TemplateWriteBack.Additions?
@@ -94,8 +96,14 @@ struct ActiveWorkoutView: View {
         } message: {
             Text(additionsPromptMessage)
         }
-        .sheet(isPresented: $showDebrief, onDismiss: { dismiss() }) {
+        // The debrief hands over to the badge sheet when something was earned, so the two
+        // never fight over the screen and the workout is only dismissed once.
+        .sheet(isPresented: $showDebrief,
+               onDismiss: { if unlockedBadges.isEmpty { dismiss() } else { showBadgeUnlock = true } }) {
             NavigationStack { CoachDebriefView(insights: debriefInsights) }
+        }
+        .sheet(isPresented: $showBadgeUnlock, onDismiss: { dismiss() }) {
+            BadgeUnlockSheet(badges: unlockedBadges)
         }
         .confirmationDialog("Finish workout?", isPresented: $showFinishConfirm, titleVisibility: .visible) {
             Button("Finish anyway", role: .destructive) { requestFinish() }
@@ -372,6 +380,10 @@ struct ActiveWorkoutView: View {
         // Capture the outcome (PRs judged vs prior best) BEFORE history is written.
         let outcome = CoachContextBuilder.sessionOutcome(from: session, context: context, catalog: catalog)
         let deloadRule = sourceProgramDeloadRule()
+        // Finishing deletes the session, so anything a badge wants to remember about what
+        // was being trained has to be read off it first.
+        let planName = session.planName.isEmpty ? nil : session.planName
+        let workoutName = session.name.isEmpty ? nil : session.name
 
         SessionFinisher.finish(session, profile: profile, context: context,
                                saveAdditions: saveAdditions)
@@ -387,8 +399,13 @@ struct ActiveWorkoutView: View {
         // Today's session is done — re-plan notifications (clears today's streak-risk nudge).
         NotificationCoordinator.refresh(context: context)
 
+        // Anything this session just earned, stamped with what was being trained.
+        unlockedBadges = BadgeAwarding.award(context: context, catalog: catalog,
+                                             planName: planName, workoutName: workoutName)
+        try? context.save()
+
         if insights.isEmpty {
-            dismiss()
+            if unlockedBadges.isEmpty { dismiss() } else { showBadgeUnlock = true }
         } else {
             debriefInsights = insights
             showDebrief = true   // dismissing the debrief dismisses the workout
