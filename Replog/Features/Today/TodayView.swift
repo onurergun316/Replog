@@ -12,6 +12,7 @@ import SwiftData
 struct TodayView: View {
     @Environment(\.modelContext) private var context
     @Environment(\.exerciseCatalog) private var catalog
+    @Environment(\.scenePhase) private var scenePhase
     @Query(sort: \Plan.order) private var plans: [Plan]
     @Query private var profiles: [UserProfile]
     @Query private var history: [HistoryEntry]
@@ -27,6 +28,12 @@ struct TodayView: View {
     /// The day the hero card is showing. Nil = follow today, so the screen re-anchors
     /// itself when the app is left open past midnight.
     @State private var browsedDay: Weekday?
+    /// Which week the strip is showing, relative to the current one. 0 = this week.
+    @State private var weekOffset = 0
+    /// The calendar day the strip was last built for. When the date rolls over while the
+    /// app sits open, the strip re-anchors to the new current week instead of silently
+    /// showing a week that is no longer "this" one.
+    @State private var anchoredDay = Calendar.current.startOfDay(for: Date())
     /// Which calendar day the Today coach card was dismissed on (max one card per day).
     @AppStorage("coachCardDismissedDay") private var coachCardDismissedDay = ""
 
@@ -77,6 +84,10 @@ struct TodayView: View {
 
     private var isShowingToday: Bool { shownDay == today }
 
+    /// Fully home: today's day *and* this week. The "Today" chip shows whenever either
+    /// has been browsed away from, since a swiped strip is just as easy to lose track of.
+    private var isAnchoredToToday: Bool { isShowingToday && weekOffset == 0 }
+
     /// The workout scheduled for the shown weekday (if any). Extras are day-less, so
     /// they never claim the hero — they live in the "Add another" scroller instead.
     private var shownWorkout: Workout? {
@@ -103,9 +114,12 @@ struct TodayView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 22) {
                     header
-                    WeekStripView(cells: StreakCalendar.weekStrip(doneDates: profile.doneDates),
+                    WeekStripView(weekOffsets: Array(weekWindow),
+                                  cells: { StreakCalendar.weekStrip(doneDates: profile.doneDates,
+                                                                    weekOffset: $0) },
                                   scheduled: scheduledDays,
-                                  selected: shownDay) { select($0) }
+                                  selected: shownDay,
+                                  weekOffset: $weekOffset) { select($0) }
 
                     if let insight = coachInsight {
                         CoachCardView(insight: insight) { coachCardDismissedDay = todayKey }
@@ -160,6 +174,10 @@ struct TodayView: View {
             }
             .background(Color.bg.ignoresSafeArea())
             .toolbar(.hidden, for: .navigationBar)
+            .onAppear { reanchorIfNeeded() }
+            .onChange(of: scenePhase) { _, phase in
+                if phase == .active { reanchorIfNeeded() }
+            }
             .planNavigationDestinations()
             .sheet(item: $pendingWorkout) { workout in
                 ReadinessCheckInSheet { readiness in
@@ -196,8 +214,8 @@ struct TodayView: View {
             SectionHeader(title: isShowingToday
                           ? (shownWorkout == nil ? "Today" : "Today's Workout")
                           : "\(shownDay.displayName)\(shownWorkout == nil ? "" : "'s Workout")")
-            if !isShowingToday {
-                Button { select(today) } label: {
+            if !isAnchoredToToday {
+                Button { returnToToday() } label: {
                     HStack(spacing: 4) {
                         Image(systemName: "arrow.uturn.backward")
                             .font(.system(size: 10, weight: .black))
@@ -213,8 +231,34 @@ struct TodayView: View {
         }
     }
 
+    /// How far the strip may be swiped, from the training there is to look back on.
+    private var weekWindow: ClosedRange<Int> {
+        StreakCalendar.weekWindow(doneDates: profile.doneDates)
+    }
+
     private func select(_ day: Weekday) {
         withAnimation(.snappy) { browsedDay = day == today ? nil : day }
+    }
+
+    /// Back to today: the day *and* the week, so one tap always lands home.
+    private func returnToToday() {
+        withAnimation(.snappy) {
+            browsedDay = nil
+            weekOffset = 0
+        }
+    }
+
+    /// Re-anchors the strip when the calendar day changes under an app left open, and
+    /// keeps the offset inside a window that shrinks as history is deleted.
+    private func reanchorIfNeeded() {
+        let startOfToday = Calendar.current.startOfDay(for: Date())
+        if startOfToday != anchoredDay {
+            anchoredDay = startOfToday
+            weekOffset = 0
+            browsedDay = nil
+        } else if !weekWindow.contains(weekOffset) {
+            weekOffset = min(max(weekOffset, weekWindow.lowerBound), weekWindow.upperBound)
+        }
     }
 
     /// Swipe the hero left/right to walk the week's workouts. A horizontal-only
