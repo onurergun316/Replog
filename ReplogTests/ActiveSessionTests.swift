@@ -51,10 +51,12 @@ struct ActiveSessionTests {
     @Test func startPrefillsPreviousFromHistory() throws {
         let ctx = makeContext()
         let workout = seedWorkout(ctx)
-        // Seed prior history for "Bench" with two sets.
+        // Seed prior history for "Bench" with two sets, trained under this plan — history
+        // only seeds the plan it belongs to (see `history(forExercise:inPlan:)`).
         let entry = HistoryEntry(exId: "Bench", date: Date().addingTimeInterval(-86_400),
                                  topW: 65, topR: 9, e1rm: 84,
-                                 sets: [RecordedSet(w: 65, r: 9), RecordedSet(w: 75, r: 7)])
+                                 sets: [RecordedSet(w: 65, r: 9), RecordedSet(w: 75, r: 7)],
+                                 workoutId: workout.id, planId: workout.plan?.id)
         ctx.insert(entry); try ctx.save()
 
         let session = SessionBuilder.start(workout: workout, into: ctx)
@@ -295,13 +297,15 @@ struct ActiveSessionTests {
 
     // MARK: - Progression suggestions (B2)
 
-    /// Three sessions of rising e1RM, mid rep range.
-    private func seedProgressingHistory(_ ctx: ModelContext, exId: String, topR: Int = 9) {
+    /// Three sessions of rising e1RM, mid rep range, trained under `workout`'s plan.
+    private func seedProgressingHistory(_ ctx: ModelContext, exId: String, topR: Int = 9,
+                                        in workout: Workout? = nil) {
         for (i, w) in [56.0, 58.0, 60.0].enumerated() {
             let entry = HistoryEntry(
                 exId: exId, date: Date().addingTimeInterval(Double(i - 3) * 86_400),
                 topW: w, topR: topR, e1rm: Formulas.e1rmRounded(kg: w, reps: topR),
-                sets: [RecordedSet(w: w, r: topR)])
+                sets: [RecordedSet(w: w, r: topR)],
+                workoutId: workout?.id, planId: workout?.plan?.id)
             ctx.insert(entry)
         }
         try? ctx.save()
@@ -310,7 +314,7 @@ struct ActiveSessionTests {
     @Test func startAttachesEngineSuggestionFromHistory() throws {
         let ctx = makeContext()
         let workout = seedWorkout(ctx)
-        seedProgressingHistory(ctx, exId: "Bench")
+        seedProgressingHistory(ctx, exId: "Bench", in: workout)
 
         let session = SessionBuilder.start(workout: workout, into: ctx)
         let bench = session.orderedExercises.first { $0.exId == "Bench" }!
@@ -337,7 +341,7 @@ struct ActiveSessionTests {
         let ctx = makeContext()
         let workout = seedWorkout(ctx)
         ctx.userProfile().goal = .loseWeight            // rep range 12...15
-        seedProgressingHistory(ctx, exId: "Bench", topR: 15)
+        seedProgressingHistory(ctx, exId: "Bench", topR: 15, in: workout)
 
         let session = SessionBuilder.start(workout: workout, into: ctx)
         let bench = session.orderedExercises.first { $0.exId == "Bench" }!
@@ -350,7 +354,7 @@ struct ActiveSessionTests {
     @Test func suggestionSurvivesPersistenceRoundTrip() throws {
         let ctx = makeContext()
         let workout = seedWorkout(ctx)
-        seedProgressingHistory(ctx, exId: "Bench")
+        seedProgressingHistory(ctx, exId: "Bench", in: workout)
         let built = SessionBuilder.start(workout: workout, into: ctx)
         let suggestion = built.orderedExercises.first { $0.exId == "Bench" }!.suggestion
         try ctx.save()
@@ -364,7 +368,7 @@ struct ActiveSessionTests {
     @Test func applySuggestionUpdatesOnlyUndoneSets() throws {
         let ctx = makeContext()
         let workout = seedWorkout(ctx)
-        seedProgressingHistory(ctx, exId: "Bench")
+        seedProgressingHistory(ctx, exId: "Bench", in: workout)
         let session = SessionBuilder.start(workout: workout, into: ctx)
         let bench = session.orderedExercises.first { $0.exId == "Bench" }!
 
@@ -401,7 +405,7 @@ struct ActiveSessionTests {
     @Test func dismissedSuggestionPersists() throws {
         let ctx = makeContext()
         let workout = seedWorkout(ctx)
-        seedProgressingHistory(ctx, exId: "Bench")
+        seedProgressingHistory(ctx, exId: "Bench", in: workout)
         let session = SessionBuilder.start(workout: workout, into: ctx)
         let bench = session.orderedExercises.first { $0.exId == "Bench" }!
 

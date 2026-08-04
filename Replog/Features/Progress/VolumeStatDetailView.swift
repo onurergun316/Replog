@@ -143,10 +143,38 @@ struct VolumeStatDetailView: View {
             Text(stat.definition)
                 .font(.rounded(12, .semibold)).foregroundStyle(Color.text2)
                 .fixedSize(horizontal: false, vertical: true)
+            if let picture = comparisonLine(rows: rows, sessions: sessions, volume: volume) {
+                HStack(alignment: .top, spacing: 6) {
+                    Image(systemName: "scalemass.fill")
+                        .font(.system(size: 11, weight: .bold)).foregroundStyle(Color.accent)
+                    Text(picture)
+                        .font(.rounded(12, .heavy)).foregroundStyle(Color.accent)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .padding(.top, 2)
+            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(16)
         .cardSurface()
+    }
+
+    /// A picture of the tonnage. Kilograms are exact and hard to feel; "that is three
+    /// Smart cars" lands. Only for the readings that are a mass — a set count is already
+    /// a number anyone can picture. Seeded by the window so it doesn't churn on redraw.
+    private func comparisonLine(rows: [ExerciseContribution],
+                                sessions: [ProgressAnalytics.SessionGroup],
+                                volume: Double) -> String? {
+        guard stat != .sets else { return nil }
+        let kg: Double
+        switch stat {
+        case .total: kg = volume
+        case .average: kg = volume / Double(max(1, sessions.count))
+        case .weeklyAverage: kg = volume / Double(max(1, trainedWeeks))
+        case .sets: return nil
+        }
+        return VolumeNarrator.tonnageSentence(kg: kg, catalog: .shared,
+                                              seed: days ?? RangeSelection.allTimeDays)
     }
 
     // MARK: Charts — a different question per stat, not the same bars three times

@@ -264,7 +264,13 @@ enum MonthlyReportComposer {
             out += "- **\(stats.daysTrained)** training day\(stats.daysTrained == 1 ? "" : "s") logged\n"
         }
         out += "- **\(stats.totalSets) set\(stats.totalSets == 1 ? "" : "s")** · " +
-               "**\(formatVolume(kg: stats.totalVolumeKg, units: units))** total volume\n\n"
+               "**\(formatVolume(kg: stats.totalVolumeKg, units: units))** total volume\n"
+        // A tonnage nobody can picture is a tonnage nobody remembers.
+        if let picture = VolumeNarrator.tonnageSentence(kg: stats.totalVolumeKg, catalog: .shared,
+                                                        seed: VolumeNarrator.seed(for: monthEnd)) {
+            out += "- \(picture)\n"
+        }
+        out += "\n"
 
         if !movers.isEmpty {
             out += "## Biggest movers\n"

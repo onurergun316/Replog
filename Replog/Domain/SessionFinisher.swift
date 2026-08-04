@@ -29,9 +29,14 @@ enum SessionFinisher {
     /// weights/reps back onto the plan's templates (`TemplateWriteBack`), so the next
     /// session starts from what was actually lifted. Always recomputes both streaks, then
     /// deletes the session.
+    ///
+    /// `saveAdditions` carries the athlete's answer to "save what you added to the plan?" —
+    /// movements and sets the workout never prescribed. Defaulting to false keeps the plan
+    /// exactly as it was unless they said otherwise.
     @discardableResult
     static func finish(_ session: ActiveSession, profile: UserProfile,
-                       context: ModelContext, date: Date = Date()) -> Summary {
+                       context: ModelContext, date: Date = Date(),
+                       saveAdditions: Bool = false) -> Summary {
         let isComplete = session.isComplete
         // A workout is logged on the day it STARTED, even when it's finished after midnight —
         // a session begun at 23:00 and finished at 00:15 counts for the 23:00 day. `date`
@@ -53,7 +58,10 @@ enum SessionFinisher {
                 let b = Formulas.e1rm(kg: $1.weightKg, reps: $1.reps)
                 return a == b ? $0.reps < $1.reps : a < b
             }!
-            let prior = context.history(forExercise: exercise.exId)
+            // Scoped to this session's plan: a stall is a stall *within a program*, and
+            // mixing a second plan's loads into the trail invents plateaus and regressions
+            // that never happened (see `history(forExercise:inPlan:)`).
+            let prior = context.history(forExercise: exercise.exId, inPlan: session.planId)
             let entry = HistoryEntry(
                 exId: exercise.exId,
                 date: loggedDate,
@@ -64,6 +72,7 @@ enum SessionFinisher {
                 topRPE: top.rpe,
                 sessionId: session.id,
                 workoutId: session.workoutId,
+                planId: session.planId,
                 workoutName: session.name.isEmpty ? nil : session.name,
                 planName: session.planName.isEmpty ? nil : session.planName,
                 durationSeconds: duration
@@ -80,7 +89,8 @@ enum SessionFinisher {
         if isComplete {
             // The plan's templates are the athlete's current working numbers, not a frozen
             // prescription: what was just lifted is what the next session starts from.
-            TemplateWriteBack.applyIfComplete(session: session, context: context, date: date)
+            TemplateWriteBack.applyIfComplete(session: session, context: context, date: date,
+                                              saveAdditions: saveAdditions)
             profile.totalWorkouts += 1
             profile.doneDates = StreakCalendar.recordingCompletion(loggedDate, into: profile.doneDates)
         }

@@ -7,40 +7,97 @@
 //  is supplied the cells become buttons that pick which day Today is showing — the
 //  selected day gets a soft accent chip so it reads independently of the today ring.
 //
+//  The strip pages horizontally through weeks. One page is exactly seven days wide, so
+//  a swipe always lands on a whole week rather than scrolling days past the edge, and
+//  the window it can reach comes from `StreakCalendar.weekWindow`.
+//
 
 import SwiftUI
 
 struct WeekStripView: View {
-    let cells: [DayCell]
+    /// The weeks the strip can reach, as offsets from the current week (0 = this week).
+    let weekOffsets: [Int]
+    /// The seven cells for a given week offset.
+    let cells: (Int) -> [DayCell]
     /// Days that have a workout scheduled — marked with a dot so the strip shows the
     /// week's shape, not just what's been done.
     var scheduled: Set<Weekday> = []
     /// The day Today is currently showing. Nil leaves the strip purely informational.
     var selected: Weekday?
+    /// Which week is on screen. Two-way so the caller can snap back to this week.
+    @Binding var weekOffset: Int
     var onSelect: ((Weekday) -> Void)?
 
+    /// `scrollPosition` needs an optional binding; kept in sync with `weekOffset` so a
+    /// programmatic jump (the "Today" chip) scrolls, and a swipe reports back.
+    @State private var visiblePage: Int?
+
     var body: some View {
-        HStack(spacing: 0) {
-            ForEach(cells) { cell in
-                if let onSelect {
-                    Button { onSelect(cell.weekday) } label: { cellBody(cell) }
-                        .buttonStyle(.plain)
-                        .accessibilityLabel(accessibilityLabel(for: cell))
-                        .accessibilityAddTraits(cell.weekday == selected ? [.isButton, .isSelected] : .isButton)
-                } else {
-                    cellBody(cell)
+        ScrollView(.horizontal, showsIndicators: false) {
+            LazyHStack(spacing: 0) {
+                ForEach(weekOffsets, id: \.self) { offset in
+                    week(offset)
+                        .containerRelativeFrame(.horizontal)
+                        .id(offset)
                 }
             }
+            .scrollTargetLayout()
         }
+        .scrollTargetBehavior(.viewAligned)
+        .scrollPosition(id: $visiblePage, anchor: .center)
+        .scrollIndicators(.hidden)
+        // The chips already read as one row; clipping would cut their soft background.
+        .scrollClipDisabled()
+        .frame(height: stripHeight)
+        .onAppear { visiblePage = weekOffset }
+        .onChange(of: weekOffset) { _, new in
+            guard visiblePage != new else { return }
+            withAnimation(.snappy) { visiblePage = new }
+        }
+        .onChange(of: visiblePage) { _, new in
+            guard let new, new != weekOffset else { return }
+            weekOffset = new
+        }
+        .sensoryFeedback(.selection, trigger: weekOffset)
         .sensoryFeedback(.selection, trigger: selected)
     }
 
+    /// Seven cells plus the week caption. Fixed so paging never resizes the row.
+    private var stripHeight: CGFloat { 92 }
+
+    private func week(_ offset: Int) -> some View {
+        VStack(spacing: 2) {
+            HStack(spacing: 0) {
+                ForEach(cells(offset)) { cell in
+                    if let onSelect {
+                        Button { onSelect(cell.weekday) } label: { cellBody(cell) }
+                            .buttonStyle(.plain)
+                            .accessibilityLabel(accessibilityLabel(for: cell))
+                            .accessibilityAddTraits(isSelected(cell, in: offset) ? [.isButton, .isSelected] : .isButton)
+                    } else {
+                        cellBody(cell)
+                    }
+                }
+            }
+            // Only when browsing: on this week the strip's today ring says it already.
+            Text(offset == 0 ? " " : StreakCalendar.weekLabel(offset: offset))
+                .font(.rounded(11, .heavy))
+                .foregroundStyle(Color.text3)
+        }
+    }
+
+    /// The selection chip belongs to the week actually being browsed — otherwise every
+    /// page would highlight the same weekday and the pager would look stuck.
+    private func isSelected(_ cell: DayCell, in offset: Int) -> Bool {
+        offset == weekOffset && cell.weekday == selected
+    }
+
     private func cellBody(_ cell: DayCell) -> some View {
-        let isSelected = cell.weekday == selected
+        let selectedCell = isSelected(cell, in: weekOffset)
         return VStack(spacing: 6) {
             Text(String(cell.weekday.short.prefix(1)))
                 .font(.rounded(11, .heavy))
-                .foregroundStyle(isSelected ? Color.accent : Color.text3)
+                .foregroundStyle(selectedCell ? Color.accent : Color.text3)
             circle(for: cell)
             Circle()
                 .fill(scheduled.contains(cell.weekday) ? Color.accent.opacity(0.55) : .clear)
@@ -50,7 +107,7 @@ struct WeekStripView: View {
         .frame(maxWidth: .infinity)
         .background(
             RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .fill(isSelected ? Color.accentSoft : .clear)
+                .fill(selectedCell ? Color.accentSoft : .clear)
         )
         .contentShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
     }

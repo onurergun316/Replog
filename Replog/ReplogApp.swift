@@ -23,12 +23,19 @@ struct ReplogApp: App {
         _ = context.userProfile()
         _ = context.appSettings()
         try? context.save()
+        // Order matters. Attribution first: it stamps each history entry with the workout
+        // and plan it came from, and the template repair below reads history *per plan*.
+        // Run the other way round and every plan looks like it has no history at all.
+        SessionAttributionBackfill.run(context: context)
         // One-time repair for plans logged before finishing wrote its numbers back.
         TemplateBackfill.run(context: context)
-        // …and for sessions finished before history recorded which workout they were.
-        SessionAttributionBackfill.run(context: context)
         // Merge any user-created exercises into the catalog so they resolve by exId everywhere.
         context.syncCustomExercises()
+        // Recognise training that already happened. An athlete with two years of history
+        // must not open this update to an empty trophy cabinet. Idempotent, so it is also
+        // the safety net if a badge is ever missed at the end of a session.
+        BadgeAwarding.award(context: context)
+        try? context.save()
     }
 
     var body: some Scene {

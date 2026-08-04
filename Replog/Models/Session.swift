@@ -13,6 +13,10 @@ import SwiftData
 final class ActiveSession {
     var id: UUID = UUID()
     var workoutId: UUID?
+    /// The plan the source workout belongs to. Carried so the finished session can stamp
+    /// its history with the plan that produced it, which is what keeps one plan's logged
+    /// numbers out of another's (see `HistoryEntry.planId`).
+    var planId: UUID?
     var name: String = ""
     var planName: String = ""
     var startedAt: Date = Date()
@@ -27,8 +31,10 @@ final class ActiveSession {
     @Relationship(deleteRule: .cascade, inverse: \SessionExercise.session)
     var exercises: [SessionExercise] = []
 
-    init(workoutId: UUID?, name: String, planName: String, startedAt: Date = Date()) {
+    init(workoutId: UUID?, name: String, planName: String, planId: UUID? = nil,
+         startedAt: Date = Date()) {
         self.workoutId = workoutId
+        self.planId = planId
         self.name = name
         self.planName = planName
         self.startedAt = startedAt

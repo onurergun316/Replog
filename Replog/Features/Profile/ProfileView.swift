@@ -16,15 +16,20 @@ struct ProfileView: View {
     @Query private var settingsList: [AppSettings]
     @Query private var plans: [Plan]
     @Query private var history: [HistoryEntry]
+    @Query(sort: \BadgeAward.earnedAt, order: .reverse) private var awards: [BadgeAward]
     @State private var showResetConfirm = false
     @State private var selectedStat: StatKind?
+    /// Built once when the screen appears — walking the whole history is not view-body work.
+    @State private var badgeSnapshot = BadgeSnapshot()
 
     private var profile: UserProfile { profiles.first ?? context.userProfile() }
     private var settings: AppSettings { settingsList.first ?? context.appSettings() }
     private var scheduledDays: Set<Weekday> { StreakEngine.scheduledDays(in: plans) }
     private var plansWithReports: [Plan] { plans.filter(\.hasReport) }
-    /// Recent surfaced coach insights (debriefs, milestones, Today cards), newest first.
-    private var recentInsights: [CoachingLog] { context.coachingLogs(kind: .coachInsight, limit: 15) }
+    /// Surfaced coach insights (debriefs, milestones, Today cards), newest first. The list
+    /// scrolls inside a fixed height and groups itself, so it can hold a real history rather
+    /// than the handful a flat list could show without stretching the screen.
+    private var recentInsights: [CoachingLog] { context.coachingLogs(kind: .coachInsight, limit: 200) }
     /// Published weekly + monthly narrative reports, newest first.
     private var trainingReports: [CoachingLog] {
         (context.coachingLogs(kind: .weeklyReport) + context.coachingLogs(kind: .monthlyReport))
@@ -45,6 +50,7 @@ struct ProfileView: View {
                     Text("Profile").font(.screenTitle).foregroundStyle(Color.textPrimary)
                     profileHeader
                     statsRow
+                    badgesSection
                     if !plansWithReports.isEmpty { coachReports }
                     if !trainingReports.isEmpty { trainingReportsSection }
                     if !recentInsights.isEmpty { coachInsightsSection }
@@ -58,6 +64,9 @@ struct ProfileView: View {
             .hideKeyboardOnTap()
             .background(Color.bg.ignoresSafeArea())
             .toolbar(.hidden, for: .navigationBar)
+            .onAppear {
+                badgeSnapshot = BadgeAwarding.snapshot(context: context, catalog: catalog)
+            }
             .confirmationDialog("Reset all data?", isPresented: $showResetConfirm, titleVisibility: .visible) {
                 Button("Reset everything", role: .destructive) { resetAll() }
                 Button("Cancel", role: .cancel) {}
@@ -129,29 +138,18 @@ struct ProfileView: View {
     }
 
     private var coachInsightsSection: some View {
+        CoachInsightsListView(logs: recentInsights)
+    }
+
+    /// The trophy cabinet. Built lazily on appear rather than on every render: the snapshot
+    /// walks the whole history, which is not something to do inside a view body.
+    private var badgesSection: some View {
         VStack(alignment: .leading, spacing: 10) {
-            SectionHeader(title: "Coach Insights")
-            ForEach(recentInsights) { log in
-                HStack(alignment: .top, spacing: 12) {
-                    Image(systemName: log.insightKind.symbol)
-                        .font(.system(size: 16, weight: .bold))
-                        .foregroundStyle(log.insightKind.tint)
-                        .frame(width: 24)
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text(log.summary)
-                            .font(.rounded(15, .heavy)).foregroundStyle(Color.textPrimary)
-                        if let body = log.bodyMarkdown, !body.isEmpty {
-                            Text(body).font(.rounded(13, .semibold)).foregroundStyle(Color.text2)
-                                .fixedSize(horizontal: false, vertical: true)
-                        }
-                        Text(log.date.formatted(.relative(presentation: .named)))
-                            .font(.rounded(11, .semibold)).foregroundStyle(Color.text3)
-                    }
-                    Spacer(minLength: 0)
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(14).cardSurface()
+            SectionHeader(title: "Badges")
+            NavigationLink { BadgesView() } label: {
+                BadgeSummaryCard(awards: awards, snapshot: badgeSnapshot)
             }
+            .buttonStyle(.plain)
         }
     }
 

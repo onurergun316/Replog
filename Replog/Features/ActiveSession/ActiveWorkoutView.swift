@@ -26,6 +26,12 @@ struct ActiveWorkoutView: View {
     @State private var didCelebrate = false
     @State private var debriefInsights: [CoachInsight] = []
     @State private var showDebrief = false
+    @State private var showAddExercise = false
+    @State private var unlockedBadges: [Badge] = []
+    @State private var showBadgeUnlock = false
+    /// What this session added beyond the plan, held while the athlete decides whether to
+    /// keep it. Non-nil means the "save to the plan?" dialog is up.
+    @State private var pendingAdditions: TemplateWriteBack.Additions?
 
     private var profile: UserProfile { profiles.first ?? context.userProfile() }
     private var settings: AppSettings { settingsList.first ?? context.appSettings() }
@@ -66,6 +72,7 @@ struct ActiveWorkoutView: View {
                         )
                         .id(exercise.id)
                     }
+                    addExerciseButton
                 }
                 .padding(16)
                 .animation(.spring(response: 0.5, dampingFraction: 0.8), value: session.orderedExercises.map(\.id))
@@ -77,11 +84,29 @@ struct ActiveWorkoutView: View {
         .sheet(item: $detailRef) { ref in
             NavigationStack { ExerciseDetailView(exId: ref.id, showProgress: true) }
         }
-        .sheet(isPresented: $showDebrief, onDismiss: { dismiss() }) {
+        .sheet(isPresented: $showAddExercise) {
+            AddExercisePicker(existingIDs: Set(session.exercises.map(\.exId))) { exId in
+                addExercise(exId)
+            }
+        }
+        .confirmationDialog("Save to your plan?", isPresented: showingAdditionsPrompt,
+                            titleVisibility: .visible) {
+            Button("Save to plan") { finish(saveAdditions: true) }
+            Button("Just this time") { finish(saveAdditions: false) }
+        } message: {
+            Text(additionsPromptMessage)
+        }
+        // The debrief hands over to the badge sheet when something was earned, so the two
+        // never fight over the screen and the workout is only dismissed once.
+        .sheet(isPresented: $showDebrief,
+               onDismiss: { if unlockedBadges.isEmpty { dismiss() } else { showBadgeUnlock = true } }) {
             NavigationStack { CoachDebriefView(insights: debriefInsights) }
         }
+        .sheet(isPresented: $showBadgeUnlock, onDismiss: { dismiss() }) {
+            BadgeUnlockSheet(badges: unlockedBadges)
+        }
         .confirmationDialog("Finish workout?", isPresented: $showFinishConfirm, titleVisibility: .visible) {
-            Button("Finish anyway", role: .destructive) { finish() }
+            Button("Finish anyway", role: .destructive) { requestFinish() }
             Button("Save for later") { close() }
             Button("Keep training", role: .cancel) {}
         } message: {
@@ -92,7 +117,7 @@ struct ActiveWorkoutView: View {
                 CelebrationOverlay(
                     sets: session.completedSets,
                     exercises: session.exercises.count,
-                    onFinish: { showCelebration = false; finish() },
+                    onFinish: { showCelebration = false; requestFinish() },
                     onKeepGoing: { withAnimation(.snappy) { showCelebration = false } }
                 )
                 .transition(.opacity)
@@ -114,6 +139,38 @@ struct ActiveWorkoutView: View {
                 showCelebration = true
             }
         }
+    }
+
+    /// Adding a movement the plan never prescribed is a normal thing to do at a gym: a rack
+    /// is busy, or there is time for one more. It stays a fact about this session unless the
+    /// athlete says otherwise at Finish.
+    private var addExerciseButton: some View {
+        Button { showAddExercise = true } label: {
+            HStack(spacing: 8) {
+                Image(systemName: "plus").font(.system(size: 13, weight: .black))
+                Text("Add exercise").font(.rounded(15, .heavy))
+            }
+            .foregroundStyle(Color.accent)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 16)
+            .background(
+                RoundedRectangle(cornerRadius: Radius.card, style: .continuous)
+                    .strokeBorder(style: StrokeStyle(lineWidth: 1.5, dash: [6]))
+                    .foregroundStyle(Color.border)
+            )
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var showingAdditionsPrompt: Binding<Bool> {
+        Binding(get: { pendingAdditions != nil },
+                set: { if !$0 { pendingAdditions = nil } })
+    }
+
+    private var additionsPromptMessage: String {
+        guard let additions = pendingAdditions else { return "" }
+        return "You did \(additions.summary) more than \(session.name) prescribes. "
+            + "Save that to the plan for next time, or keep the plan as it is?"
     }
 
     private var finishWarningMessage: String {
@@ -252,6 +309,26 @@ struct ActiveWorkoutView: View {
         try? context.save()
     }
 
+    /// Adds a movement to the live session only. It becomes part of the plan only if the
+    /// athlete opts in at Finish. The opening set starts from what this plan last saw for
+    /// the movement, so it is not a blank 20 kg guess.
+    private func addExercise(_ exId: String) {
+        guard !session.exercises.contains(where: { $0.exId == exId }) else { return }
+        let exercise = SessionExercise(exId: exId,
+                                       order: Reordering.nextOrder(after: session.exercises))
+        exercise.session = session
+        context.insert(exercise)
+
+        let previous = context.history(forExercise: exId, inPlan: session.planId).last?.sets.first
+        let isBodyweight = catalog.exercise(id: exId).map { BodyweightLoad.isBodyweightLoaded($0) } ?? false
+        let set = LoggedSet(weightKg: previous?.w ?? (isBodyweight ? 0 : 20),
+                            reps: previous?.r ?? 10, rpe: 8,
+                            prevWeight: previous?.w, prevReps: previous?.r, order: 0)
+        set.exercise = exercise
+        context.insert(set)
+        try? context.save()
+    }
+
     private func addSet(to exercise: SessionExercise) {
         let last = exercise.orderedSets.last
         // Bodyweight moves store *added* load, so a fresh set is 0 (pure bodyweight).
@@ -284,12 +361,32 @@ struct ActiveWorkoutView: View {
         }
     }
 
-    private func finish() {
+    /// Finishing, gated on one question: did this session do more than the plan asked?
+    /// Only a fully complete workout writes back at all, so only that can have additions
+    /// worth keeping.
+    private func requestFinish() {
+        let additions = session.isComplete
+            ? TemplateWriteBack.additions(for: session, context: context)
+            : TemplateWriteBack.Additions()
+        if additions.isEmpty {
+            finish(saveAdditions: false)
+        } else {
+            pendingAdditions = additions
+        }
+    }
+
+    private func finish(saveAdditions: Bool) {
+        pendingAdditions = nil
         // Capture the outcome (PRs judged vs prior best) BEFORE history is written.
         let outcome = CoachContextBuilder.sessionOutcome(from: session, context: context, catalog: catalog)
         let deloadRule = sourceProgramDeloadRule()
+        // Finishing deletes the session, so anything a badge wants to remember about what
+        // was being trained has to be read off it first.
+        let planName = session.planName.isEmpty ? nil : session.planName
+        let workoutName = session.name.isEmpty ? nil : session.name
 
-        SessionFinisher.finish(session, profile: profile, context: context)
+        SessionFinisher.finish(session, profile: profile, context: context,
+                               saveAdditions: saveAdditions)
 
         // Build the debrief from the now-updated store and record its durable insights.
         let ctx = CoachContextBuilder.debriefContext(
@@ -302,8 +399,13 @@ struct ActiveWorkoutView: View {
         // Today's session is done — re-plan notifications (clears today's streak-risk nudge).
         NotificationCoordinator.refresh(context: context)
 
+        // Anything this session just earned, stamped with what was being trained.
+        unlockedBadges = BadgeAwarding.award(context: context, catalog: catalog,
+                                             planName: planName, workoutName: workoutName)
+        try? context.save()
+
         if insights.isEmpty {
-            dismiss()
+            if unlockedBadges.isEmpty { dismiss() } else { showBadgeUnlock = true }
         } else {
             debriefInsights = insights
             showDebrief = true   // dismissing the debrief dismisses the workout

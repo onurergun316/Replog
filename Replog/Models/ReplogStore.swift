@@ -16,7 +16,7 @@ enum ReplogSchema {
         ActiveSession.self, SessionExercise.self, LoggedSet.self,
         HistoryEntry.self, UserProfile.self, AppSettings.self,
         CoachingLog.self, BodyweightEntry.self, ReadinessEntry.self,
-        CustomExercise.self
+        CustomExercise.self, BadgeAward.self
     ]
 
     /// The app's on-disk container.
@@ -98,13 +98,36 @@ extension ModelContext {
             scheduledDays: scheduled, doneDates: profile.doneDates, today: today)
     }
 
-    /// History entries for one exercise, oldest first.
+    /// History entries for one exercise, oldest first, across every plan. This is the whole
+    /// factual trail — what Progress charts and lifetime records are built from.
     func history(forExercise exId: String) -> [HistoryEntry] {
         let descriptor = FetchDescriptor<HistoryEntry>(
             predicate: #Predicate { $0.exId == exId },
             sortBy: [SortDescriptor(\.date)]
         )
         return (try? fetch(descriptor)) ?? []
+    }
+
+    /// History for one exercise *as trained under one plan*, oldest first.
+    ///
+    /// This is the trail that may change a plan's numbers. A movement trained in two plans
+    /// has two independent working loads: bench press at 100 kg in a strength block must not
+    /// rewrite the 70 kg the same movement is prescribed at in a hypertrophy plan. Carry
+    /// forward, the progression suggestion, and stall detection all read *this*, never the
+    /// global trail.
+    ///
+    /// Rows that cannot be attributed to a plan (`planId == nil` — the plan was deleted, or
+    /// the row predates the field and the backfill couldn't resolve it) are excluded: an
+    /// unattributable number is not evidence about any particular plan. Passing `nil` for
+    /// `planId` (a session with no plan behind it) falls back to the global trail, since
+    /// there is no scope to respect.
+    ///
+    /// Filtering happens in memory on purpose: this is one exercise's entries, at most one
+    /// row per session, and an optional-UUID comparison inside `#Predicate` is a trap.
+    func history(forExercise exId: String, inPlan planId: UUID?) -> [HistoryEntry] {
+        let all = history(forExercise: exId)
+        guard let planId else { return all }
+        return all.filter { $0.planId == planId }
     }
 
     // MARK: - Bodyweight

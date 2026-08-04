@@ -176,7 +176,9 @@ struct TemplateWriteBackTests {
 
     // MARK: - Set-count mismatches
 
-    @Test func extraLoggedSetsAppendNewTemplates() throws {
+    /// One extra set on a good day is not a decision to re-prescribe the workout, so the
+    /// plan keeps its two sets unless the athlete opts in at Finish.
+    @Test func extraLoggedSetsDoNotChangeThePlanByDefault() throws {
         let ctx = makeContext()
         let workout = seedWorkout(ctx, sets: 2)
         let session = SessionBuilder.start(workout: workout, into: ctx)
@@ -187,7 +189,26 @@ struct TemplateWriteBackTests {
         log(session, exId: "Bench", [(60, 8), (60, 8), (55, 6)])
         try ctx.save()
 
-        let written = TemplateWriteBack.apply(session: session, to: workout, context: ctx)
+        TemplateWriteBack.apply(session: session, to: workout, context: ctx)
+        try ctx.save()
+
+        let templates = workout.orderedItems[0].orderedSets
+        #expect(templates.count == 2)
+        #expect(templates.map(\.weightKg) == [60, 60])   // the two prescribed sets still update
+    }
+
+    @Test func extraLoggedSetsAppendNewTemplatesWhenSaved() throws {
+        let ctx = makeContext()
+        let workout = seedWorkout(ctx, sets: 2)
+        let session = SessionBuilder.start(workout: workout, into: ctx)
+        let bench = session.exercises.first!
+        let extra = LoggedSet(weightKg: 55, reps: 6, rpe: 9, order: 2)
+        extra.exercise = bench; ctx.insert(extra)
+        log(session, exId: "Bench", [(60, 8), (60, 8), (55, 6)])
+        try ctx.save()
+
+        let written = TemplateWriteBack.apply(session: session, to: workout, context: ctx,
+                                              saveAdditions: true)
         try ctx.save()
 
         #expect(written == 3)
@@ -195,6 +216,101 @@ struct TemplateWriteBackTests {
         #expect(templates.count == 3)
         #expect(templates.map(\.weightKg) == [60, 60, 55])
         #expect(templates.map(\.order) == [0, 1, 2])   // contiguous, no collision
+    }
+
+    // MARK: - Additions the athlete may keep
+
+    @Test func additionsReportWhatTheSessionDidBeyondThePlan() throws {
+        let ctx = makeContext()
+        let workout = seedWorkout(ctx, exIds: ["Bench"], sets: 2)
+        let session = SessionBuilder.start(workout: workout, into: ctx)
+        let bench = session.exercises.first!
+        let extra = LoggedSet(weightKg: 55, reps: 6, rpe: 9, order: 2)
+        extra.exercise = bench; ctx.insert(extra)
+        log(session, exId: "Bench", [(60, 8), (60, 8), (55, 6)])
+        // Plus a movement the plan never prescribed.
+        let adHoc = SessionExercise(exId: "Curl", order: 5)
+        adHoc.session = session; ctx.insert(adHoc)
+        let curlSet = LoggedSet(weightKg: 20, reps: 12, rpe: 8, order: 0)
+        curlSet.done = true; curlSet.exercise = adHoc; ctx.insert(curlSet)
+        try ctx.save()
+
+        let additions = TemplateWriteBack.additions(session: session, workout: workout)
+
+        #expect(additions.exerciseIds == ["Curl"])
+        #expect(additions.extraSets == 1)
+        #expect(!additions.isEmpty)
+        #expect(additions.summary == "1 exercise and 1 set")
+    }
+
+    @Test func anUnloggedExtraSetIsNotAnAddition() throws {
+        let ctx = makeContext()
+        let workout = seedWorkout(ctx, exIds: ["Bench"], sets: 2)
+        let session = SessionBuilder.start(workout: workout, into: ctx)
+        let bench = session.exercises.first!
+        // Added, then never completed — an abandoned intention, not a change.
+        let extra = LoggedSet(weightKg: 55, reps: 6, rpe: 9, order: 2)
+        extra.exercise = bench; ctx.insert(extra)
+        log(session, exId: "Bench", [(60, 8), (60, 8)])
+        try ctx.save()
+
+        #expect(TemplateWriteBack.additions(session: session, workout: workout).isEmpty)
+    }
+
+    @Test func aPlanExactlyFollowedHasNoAdditions() throws {
+        let ctx = makeContext()
+        let workout = seedWorkout(ctx, exIds: ["Bench"], sets: 2)
+        let session = SessionBuilder.start(workout: workout, into: ctx)
+        log(session, exId: "Bench", [(60, 8), (60, 8)])
+        try ctx.save()
+
+        #expect(TemplateWriteBack.additions(session: session, workout: workout).isEmpty)
+    }
+
+    @Test func savingAdoptsAnAdHocExerciseIntoTheWorkout() throws {
+        let ctx = makeContext()
+        let workout = seedWorkout(ctx, exIds: ["Bench"], sets: 1)
+        let session = SessionBuilder.start(workout: workout, into: ctx)
+        log(session, exId: "Bench", [(60, 8)])
+        let adHoc = SessionExercise(exId: "Curl", order: 5)
+        adHoc.session = session; ctx.insert(adHoc)
+        for (order, value) in [(0, 20.0), (1, 22.5)] {
+            let set = LoggedSet(weightKg: value, reps: 12, rpe: 8, order: order)
+            set.done = true; set.exercise = adHoc; ctx.insert(set)
+        }
+        try ctx.save()
+
+        TemplateWriteBack.apply(session: session, to: workout, context: ctx, saveAdditions: true)
+        try ctx.save()
+
+        #expect(workout.orderedItems.map(\.exId) == ["Bench", "Curl"])
+        let curl = workout.orderedItems[1]
+        #expect(curl.orderedSets.map(\.weightKg) == [20, 22.5])
+        #expect(curl.orderedSets.map(\.reps) == [12, 12])
+        #expect(curl.orderedSets.allSatisfy { !$0.estimated })
+    }
+
+    @Test func anAdoptedExerciseIsNotDuplicatedOnASecondSession() throws {
+        let ctx = makeContext()
+        let workout = seedWorkout(ctx, exIds: ["Bench"], sets: 1)
+        let first = SessionBuilder.start(workout: workout, into: ctx)
+        log(first, exId: "Bench", [(60, 8)])
+        let adHoc = SessionExercise(exId: "Curl", order: 5)
+        adHoc.session = first; ctx.insert(adHoc)
+        let set = LoggedSet(weightKg: 20, reps: 12, rpe: 8, order: 0)
+        set.done = true; set.exercise = adHoc; ctx.insert(set)
+        try ctx.save()
+        TemplateWriteBack.apply(session: first, to: workout, context: ctx, saveAdditions: true)
+        ctx.delete(first); try ctx.save()
+
+        // Curl is now prescribed, so the next session matches it as a normal plan item.
+        let second = SessionBuilder.start(workout: workout, into: ctx)
+        #expect(TemplateWriteBack.additions(session: second, workout: workout).isEmpty)
+        for exercise in second.exercises { for s in exercise.orderedSets { s.done = true } }
+        try ctx.save()
+        TemplateWriteBack.apply(session: second, to: workout, context: ctx, saveAdditions: true)
+
+        #expect(workout.orderedItems.map(\.exId) == ["Bench", "Curl"])
     }
 
     @Test func trimmedSessionLeavesSurplusTemplatesIntact() throws {

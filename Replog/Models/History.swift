@@ -44,6 +44,13 @@ final class HistoryEntry {
     var sessionId: UUID?
     /// The `Workout` this session was built from, if it still exists.
     var workoutId: UUID?
+    /// The `Plan` that workout belonged to. This is what scopes a logged number to its
+    /// program: carry-forward, the progression suggestion, and stall detection all read
+    /// history *within one plan*, so the same movement trained under two different plans
+    /// keeps two independent trails. `nil` means unattributable (the plan is gone, or the
+    /// row predates this field and `SessionAttributionBackfill` couldn't resolve it), and
+    /// such a row deliberately influences no plan.
+    var planId: UUID?
     /// Names captured at finish time, so a later rename or deletion can't orphan history.
     var workoutName: String?
     var planName: String?
@@ -51,7 +58,7 @@ final class HistoryEntry {
     var durationSeconds: Int?
 
     init(exId: String, date: Date, topW: Double, topR: Int, e1rm: Int, sets: [RecordedSet],
-         topRPE: Int = 8, sessionId: UUID? = nil, workoutId: UUID? = nil,
+         topRPE: Int = 8, sessionId: UUID? = nil, workoutId: UUID? = nil, planId: UUID? = nil,
          workoutName: String? = nil, planName: String? = nil, durationSeconds: Int? = nil) {
         self.exId = exId
         self.date = date
@@ -62,6 +69,7 @@ final class HistoryEntry {
         self.sets = sets
         self.sessionId = sessionId
         self.workoutId = workoutId
+        self.planId = planId
         self.workoutName = workoutName
         self.planName = planName
         self.durationSeconds = durationSeconds

@@ -21,7 +21,9 @@ enum SessionBuilder {
     static func start(workout: Workout, into context: ModelContext,
                       readiness: ReadinessCheckIn? = nil) -> ActiveSession {
         let planName = workout.plan?.name ?? ""
-        let session = ActiveSession(workoutId: workout.id, name: workout.name, planName: planName)
+        let planId = workout.plan?.id
+        let session = ActiveSession(workoutId: workout.id, name: workout.name,
+                                    planName: planName, planId: planId)
         context.insert(session)
 
         let goal = context.userProfile().goal
@@ -33,7 +35,10 @@ enum SessionBuilder {
             sessionExercise.session = session
             context.insert(sessionExercise)
 
-            let history = context.history(forExercise: item.exId)
+            // Scoped to THIS plan. The same movement trained under another plan is a
+            // different working load with a different prescription, and letting it seed
+            // here is how one plan's numbers used to silently overwrite another's.
+            let history = context.history(forExercise: item.exId, inPlan: planId)
             let previous = history.last
             // Pass the plan's prescribed RPE so a first-session estimate calibrates to the
             // athlete's real logged effort (see ProgressionEngine + LoadCalibrator).
