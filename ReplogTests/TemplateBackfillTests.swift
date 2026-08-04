@@ -37,12 +37,14 @@ struct TemplateBackfillTests {
     }
 
     /// A session finished yesterday, before write-back existed: history was recorded,
-    /// the plan was not updated.
-    private func seedYesterdaysHistory(_ ctx: ModelContext) {
+    /// the plan was not updated. Attributed to `workout`'s plan, because history only
+    /// speaks for the plan it was trained under (see `history(forExercise:inPlan:)`).
+    private func seedYesterdaysHistory(_ ctx: ModelContext, in workout: Workout? = nil) {
         let entry = HistoryEntry(
             exId: "Bench", date: Date().addingTimeInterval(-86_400),
             topW: 60, topR: 8, e1rm: Formulas.e1rmRounded(kg: 60, reps: 8),
-            sets: [RecordedSet(w: 60, r: 8), RecordedSet(w: 60, r: 8), RecordedSet(w: 57.5, r: 7)])
+            sets: [RecordedSet(w: 60, r: 8), RecordedSet(w: 60, r: 8), RecordedSet(w: 57.5, r: 7)],
+            workoutId: workout?.id, planId: workout?.plan?.id)
         ctx.insert(entry); try? ctx.save()
     }
 
@@ -51,7 +53,7 @@ struct TemplateBackfillTests {
     @Test func theLiveLogStartsFromLastSessionEvenWithoutAWriteBack() throws {
         let ctx = makeContext()
         let workout = seedWorkout(ctx)
-        seedYesterdaysHistory(ctx)
+        seedYesterdaysHistory(ctx, in: workout)
 
         let session = SessionBuilder.start(workout: workout, into: ctx)
         let bench = session.exercises.first { $0.exId == "Bench" }!
@@ -66,7 +68,7 @@ struct TemplateBackfillTests {
     @Test func backfillUpdatesThePlanItself() throws {
         let ctx = makeContext()
         let workout = seedWorkout(ctx)
-        seedYesterdaysHistory(ctx)
+        seedYesterdaysHistory(ctx, in: workout)
 
         let updated = TemplateBackfill.run(context: ctx)
 
@@ -79,8 +81,8 @@ struct TemplateBackfillTests {
 
     @Test func backfillRunsOnlyOnce() throws {
         let ctx = makeContext()
-        seedWorkout(ctx)
-        seedYesterdaysHistory(ctx)
+        let workout = seedWorkout(ctx)
+        seedYesterdaysHistory(ctx, in: workout)
 
         #expect(TemplateBackfill.run(context: ctx) == 3)
         #expect(TemplateBackfill.run(context: ctx) == 0)   // version recorded, never repeats
@@ -92,7 +94,7 @@ struct TemplateBackfillTests {
     @Test func aHandEditedTemplateIsNeverRewrittenFromHistory() throws {
         let ctx = makeContext()
         let workout = seedWorkout(ctx, sets: 1)
-        seedYesterdaysHistory(ctx)
+        seedYesterdaysHistory(ctx, in: workout)
         // The athlete deliberately set 80 kg in the Workout Editor *today* — newer
         // information than yesterday's session.
         let template = workout.orderedItems[0].orderedSets[0]
@@ -112,7 +114,7 @@ struct TemplateBackfillTests {
         let ctx = makeContext()
         let workout = seedWorkout(ctx, sets: 1)
         // Two sessions: an older one at 60, and a newer one whose write-back set 70.
-        seedYesterdaysHistory(ctx)
+        seedYesterdaysHistory(ctx, in: workout)
         let template = workout.orderedItems[0].orderedSets[0]
         template.weightKg = 70
         template.markEdited()               // a newer session already wrote this
@@ -137,7 +139,7 @@ struct TemplateBackfillTests {
     @Test func moreTemplatesThanLoggedSetsKeepsTheSurplusAsASeed() throws {
         let ctx = makeContext()
         let workout = seedWorkout(ctx, sets: 4)     // plan prescribes four
-        seedYesterdaysHistory(ctx)                  // only three were logged
+        seedYesterdaysHistory(ctx, in: workout)     // only three were logged
 
         #expect(TemplateBackfill.run(context: ctx) == 3)
         let templates = workout.orderedItems[0].orderedSets

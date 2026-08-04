@@ -53,7 +53,10 @@ enum SessionFinisher {
                 let b = Formulas.e1rm(kg: $1.weightKg, reps: $1.reps)
                 return a == b ? $0.reps < $1.reps : a < b
             }!
-            let prior = context.history(forExercise: exercise.exId)
+            // Scoped to this session's plan: a stall is a stall *within a program*, and
+            // mixing a second plan's loads into the trail invents plateaus and regressions
+            // that never happened (see `history(forExercise:inPlan:)`).
+            let prior = context.history(forExercise: exercise.exId, inPlan: session.planId)
             let entry = HistoryEntry(
                 exId: exercise.exId,
                 date: loggedDate,
@@ -64,6 +67,7 @@ enum SessionFinisher {
                 topRPE: top.rpe,
                 sessionId: session.id,
                 workoutId: session.workoutId,
+                planId: session.planId,
                 workoutName: session.name.isEmpty ? nil : session.name,
                 planName: session.planName.isEmpty ? nil : session.planName,
                 durationSeconds: duration

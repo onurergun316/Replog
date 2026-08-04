@@ -82,17 +82,22 @@ enum SessionAttribution {
 enum SessionAttributionBackfill {
 
     /// Bump to re-run the repair on devices that already ran an earlier version.
-    static let version = 1
+    ///
+    /// v2 additionally stamps `HistoryEntry.planId`, which scopes a logged number to the plan
+    /// it was trained under. Without it every pre-existing row is unattributable, and an
+    /// upgrading athlete would lose carry-forward on every lift they have ever logged.
+    static let version = 2
 
-    /// Names every unattributed session it can. Returns the number of history entries
-    /// updated.
+    /// Names every unattributed session it can, then resolves each entry's plan from its
+    /// workout. Returns the number of history entries updated.
     @discardableResult
     static func run(context: ModelContext) -> Int {
         let settings = context.appSettings()
         guard settings.sessionAttributionVersion < Self.version else { return 0 }
         settings.sessionAttributionVersion = Self.version
 
-        let candidates = context.allPlans().flatMap { plan in
+        let plans = context.allPlans()
+        let candidates = plans.flatMap { plan in
             plan.orderedWorkouts.map {
                 SessionAttribution.Candidate(id: $0.id, workoutName: $0.name,
                                              planName: plan.name,
@@ -114,7 +119,28 @@ enum SessionAttributionBackfill {
                 updated += 1
             }
         }
+        updated += backfillPlanIds(history: history, plans: plans)
         try? context.save()
+        return updated
+    }
+
+    /// Resolves `planId` for every entry that knows its workout but not its plan — which is
+    /// every row written before plan scoping existed, plus the ones the pass above just
+    /// named. An entry whose workout is gone stays `nil` on purpose: it is real training that
+    /// happened, but it can no longer speak for any plan's prescription.
+    private static func backfillPlanIds(history: [HistoryEntry], plans: [Plan]) -> Int {
+        var planIdByWorkout: [UUID: UUID] = [:]
+        for plan in plans {
+            for workout in plan.workouts { planIdByWorkout[workout.id] = plan.id }
+        }
+        guard !planIdByWorkout.isEmpty else { return 0 }
+
+        var updated = 0
+        for entry in history where entry.planId == nil {
+            guard let workoutId = entry.workoutId, let planId = planIdByWorkout[workoutId] else { continue }
+            entry.planId = planId
+            updated += 1
+        }
         return updated
     }
 }

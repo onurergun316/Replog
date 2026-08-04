@@ -38,7 +38,10 @@ enum TemplateBackfill {
         for plan in context.allPlans() {
             for workout in plan.workouts {
                 for item in workout.items {
-                    let history = context.history(forExercise: item.exId)
+                    // Scoped to this plan: repairing a hypertrophy plan's prescription from
+                    // a strength block's numbers is exactly the cross-plan bleed this repair
+                    // is not allowed to cause.
+                    let history = context.history(forExercise: item.exId, inPlan: plan.id)
                     guard let latest = history.last else { continue }
                     updated += apply(latest: latest, to: item)
                 }

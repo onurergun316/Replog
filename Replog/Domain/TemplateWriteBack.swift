@@ -11,6 +11,17 @@
 //  templates are left alone, so a readiness-trimmed session can't permanently shrink
 //  the plan.
 //
+//  SCOPE: a plan. The numbers propagate to every workout *in the same plan* that prescribes
+//  the same movement, so a plan stays internally consistent — train bench on Monday and the
+//  Thursday workout that also benches starts from what you just lifted. They never cross into
+//  another plan: that plan is a different program with its own working loads, and
+//  `history(forExercise:inPlan:)` keeps its trail separate too.
+//
+//  A caveat worth knowing: a plan that deliberately prescribes the same lift at two
+//  intensities (a heavy day at 100x5 and a volume day at 70x12) will have the volume day
+//  overwritten by the heavy day's numbers, because within a plan the last log wins. Split
+//  those across two plans, or use different variations, if you want them to diverge.
+//
 
 import Foundation
 import SwiftData
@@ -82,15 +93,74 @@ enum TemplateWriteBack {
         return written
     }
 
-    /// Resolves the workout a session was built from and writes its logged values back.
-    /// No-op when the workout is incomplete, when the session has no source workout
-    /// (or it has since been deleted), so callers can invoke this unconditionally.
+    /// Mirrors the session's logged numbers onto the *other* workouts of the same plan that
+    /// prescribe the same movement, so one plan holds one working load per movement.
+    ///
+    /// Occurrence-matched, exactly like `matches`: the second "Bench Press" of the session
+    /// writes to the second "Bench Press" of a sibling workout, not to both. Only session
+    /// exercises that were part of the source prescription propagate — an exercise added ad
+    /// hoc mid-workout was never in the plan and must not silently appear in another workout.
+    ///
+    /// Unlike the source workout, a sibling never *grows*: extra sets logged beyond the
+    /// prescription append there but not here, because "I did a fifth set on Monday" is not
+    /// a statement about Thursday's prescription. Sibling templates edited more recently than
+    /// this session are left alone (`supersededBy`), so a deliberate edit always outranks a
+    /// mirrored number.
+    @discardableResult
+    static func propagateWithinPlan(session: ActiveSession, source: Workout,
+                                    context: ModelContext, date: Date = Date()) -> Int {
+        guard let plan = source.plan else { return 0 }
+        // Only what the source workout actually prescribed, grouped in occurrence order.
+        var byExercise: [String: [SessionExercise]] = [:]
+        for pair in matches(sessionExercises: session.exercises, items: source.items) {
+            byExercise[pair.exercise.exId, default: []].append(pair.exercise)
+        }
+        guard !byExercise.isEmpty else { return 0 }
+
+        var written = 0
+        for sibling in plan.workouts where sibling.id != source.id {
+            let itemsByExercise = Dictionary(grouping: sibling.orderedItems, by: \.exId)
+            for (exId, exercises) in byExercise {
+                guard let items = itemsByExercise[exId] else { continue }
+                for (occurrence, item) in items.enumerated() {
+                    guard let exercise = exercises[safe: occurrence] else { break }
+                    written += mirror(exercise, onto: item, date: date)
+                }
+            }
+        }
+        return written
+    }
+
+    /// Copies one session exercise's completed sets onto an existing template at the same
+    /// set order. Never inserts, never deletes. Returns how many templates it wrote.
+    private static func mirror(_ exercise: SessionExercise, onto item: PlanItem, date: Date) -> Int {
+        let templatesByOrder = Dictionary(item.orderedSets.map { ($0.order, $0) },
+                                          uniquingKeysWith: { first, _ in first })
+        var written = 0
+        for logged in exercise.orderedSets where logged.done {
+            guard let template = templatesByOrder[logged.order],
+                  template.supersededBy(date) else { continue }
+            template.weightKg = logged.weightKg
+            template.reps = logged.reps
+            template.estimated = false
+            template.updatedAt = date
+            written += 1
+        }
+        return written
+    }
+
+    /// Resolves the workout a session was built from, writes its logged values back, and
+    /// mirrors them across the rest of that plan. No-op when the workout is incomplete, or
+    /// when the session has no source workout (or it has since been deleted), so callers can
+    /// invoke this unconditionally.
     @discardableResult
     static func applyIfComplete(session: ActiveSession, context: ModelContext,
                                 date: Date = Date()) -> Int {
         guard session.isComplete, let workoutId = session.workoutId else { return 0 }
         let descriptor = FetchDescriptor<Workout>(predicate: #Predicate { $0.id == workoutId })
         guard let workout = try? context.fetch(descriptor).first else { return 0 }
-        return apply(session: session, to: workout, context: context, date: date)
+        let written = apply(session: session, to: workout, context: context, date: date)
+        propagateWithinPlan(session: session, source: workout, context: context, date: date)
+        return written
     }
 }
