@@ -102,9 +102,6 @@ struct ActiveWorkoutView: View {
                onDismiss: { if unlockedBadges.isEmpty { dismiss() } else { showBadgeUnlock = true } }) {
             NavigationStack { CoachDebriefView(insights: debriefInsights) }
         }
-        .sheet(isPresented: $showBadgeUnlock, onDismiss: { dismiss() }) {
-            BadgeUnlockSheet(badges: unlockedBadges)
-        }
         .confirmationDialog("Finish workout?", isPresented: $showFinishConfirm, titleVisibility: .visible) {
             Button("Finish anyway", role: .destructive) { requestFinish() }
             Button("Save for later") { close() }
@@ -120,6 +117,17 @@ struct ActiveWorkoutView: View {
                     onFinish: { showCelebration = false; requestFinish() },
                     onKeepGoing: { withAnimation(.snappy) { showCelebration = false } }
                 )
+                .transition(.opacity)
+            }
+        }
+        // A badge is rarer than a finished session, so it gets the louder moment — and it
+        // comes last, after the debrief, so the two never compete for the screen.
+        .overlay {
+            if showBadgeUnlock {
+                BadgeCelebrationOverlay(badges: unlockedBadges) {
+                    withAnimation(.snappy) { showBadgeUnlock = false }
+                    dismiss()
+                }
                 .transition(.opacity)
             }
         }
