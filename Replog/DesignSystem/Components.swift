@@ -68,10 +68,8 @@ struct LevelBadge: View {
 
 // MARK: - Trend arrow (finance-style)
 
-/// Direction of a logged value vs the same set last session.
-enum Trend: Equatable {
-    case up, down, flat, none
-
+/// How a `Trend` (defined in `Domain/TrendCalculator`) renders.
+extension Trend {
     var symbol: String {
         switch self {
         case .up: return "arrow.up"

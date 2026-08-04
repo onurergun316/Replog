@@ -8,6 +8,15 @@
 
 import Foundation
 
+/// Direction of a logged value vs the same set last session.
+///
+/// A pure domain value: it says which way a number moved, and nothing about how that looks.
+/// The arrow glyph and colour it renders as live in an extension in `DesignSystem/Components`,
+/// so the comparison logic stays testable without SwiftUI.
+enum Trend: Equatable, Sendable {
+    case up, down, flat, none
+}
+
 enum TrendCalculator {
     /// Compares a current value to a previous one.
     /// `nil` previous (no prior session) yields `.none` (no arrow shown).
