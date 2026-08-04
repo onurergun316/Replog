@@ -285,7 +285,13 @@ enum WeeklyReportComposer {
         if let previous = stats.previousWeekSets {
             out += " (last week: \(previous) set\(previous == 1 ? "" : "s"))"
         }
-        out += "\n\n"
+        out += "\n"
+        // A tonnage nobody can picture is a tonnage nobody remembers.
+        if let picture = VolumeNarrator.tonnageSentence(kg: stats.totalVolumeKg, catalog: .shared,
+                                                        seed: VolumeNarrator.seed(for: weekEnd)) {
+            out += "- \(picture)\n"
+        }
+        out += "\n"
 
         if !records.isEmpty {
             out += "## New records\n"

@@ -128,6 +128,9 @@ struct CoachContext: Sendable {
     var readinessPattern: ReadinessPattern?
     /// True when the athlete has no logged history at all.
     var isFreshUser: Bool
+    /// Reference masses used to turn a tonnage into a picture. Injectable so tests can
+    /// pin the comparison, and empty in a test simply means no picture is added.
+    var comparisons: ComparisonCatalog
 
     init(goal: Goal = .buildMuscle, units: Units = .kg, now: Date = Date(),
          justFinished: SessionOutcome? = nil,
@@ -138,7 +141,9 @@ struct CoachContext: Sendable {
          bodyweight: BodyweightSnapshot? = nil, bodyweightCheckInDue: Bool = false,
          programDeloadRule: String? = nil, programWeeksCompleted: Int? = nil,
          readinessPattern: ReadinessPattern? = nil,
-         isFreshUser: Bool = false) {
+         isFreshUser: Bool = false,
+         comparisons: ComparisonCatalog = .shared) {
+        self.comparisons = comparisons
         self.goal = goal
         self.units = units
         self.now = now
@@ -211,7 +216,8 @@ enum CoachEngine {
         }
 
         // The debrief itself: volume vs last time + the next-session recommendation & its reason.
-        let volumeLine = volumeSentence(outcome, units: ctx.units)
+        let volumeLine = volumeSentence(outcome, units: ctx.units, comparisons: ctx.comparisons,
+                                        seed: VolumeNarrator.seed(for: ctx.now))
         let nextLine = nextSessionSentence(ctx, outcome: outcome)
         let title = outcome.isFullyComplete ? "Session complete" : "Progress saved"
         var body = "\(volumeLine)"
@@ -225,18 +231,26 @@ enum CoachEngine {
         return out
     }
 
-    private static func volumeSentence(_ outcome: SessionOutcome, units: Units) -> String {
+    /// The session's tonnage, then a picture of it. A kilogram total is accurate and
+    /// forgettable; "that is three Smart cars" is the same fact with a handle on it. The
+    /// comparison is dropped silently when nothing in the library fits the total.
+    private static func volumeSentence(_ outcome: SessionOutcome, units: Units,
+                                       comparisons: ComparisonCatalog, seed: Int) -> String {
         let total = Formulas.formatWeight(kg: outcome.totalVolumeKg, units: units)
+        let picture = VolumeNarrator.tonnageSentence(kg: outcome.totalVolumeKg,
+                                                     catalog: comparisons, seed: seed)
+            .map { " \($0)" } ?? ""
+
         guard let prev = outcome.previousTotalVolumeKg, prev > 0 else {
-            return "You moved \(total) of total volume across \(outcome.lifts.count) exercises."
+            return "You moved \(total) of total volume across \(outcome.lifts.count) exercises.\(picture)"
         }
         let pct = (outcome.totalVolumeKg - prev) / prev * 100
         if pct >= 1 {
-            return "Total volume \(total) — up \(Int(pct.rounded()))% on your last time through this workout."
+            return "Total volume \(total) — up \(Int(pct.rounded()))% on your last time through this workout.\(picture)"
         } else if pct <= -1 {
-            return "Total volume \(total) — down \(Int((-pct).rounded()))% vs last time (an easier day is fine; recovery counts)."
+            return "Total volume \(total) — down \(Int((-pct).rounded()))% vs last time (an easier day is fine; recovery counts).\(picture)"
         }
-        return "Total volume \(total) — right in line with last time."
+        return "Total volume \(total) — right in line with last time.\(picture)"
     }
 
     /// The next-session recommendation for the session's key lift, with the engine's reason.

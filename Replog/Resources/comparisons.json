@@ -1,0 +1,637 @@
+{
+ "schemaVersion": 1,
+ "note": "Reference masses and animal force figures used to translate a lifted tonnage into a picture. Every figure carries its source. Animal strength is largely folklore: entries say how well attested they are, and the app hedges accordingly.",
+ "objects": [
+  {
+   "id": "beerKeg",
+   "singular": "a full beer keg",
+   "plural": "full beer kegs",
+   "kg": 72.0,
+   "note": "a full half barrel beer keg weighs about 72 kilograms",
+   "source": "https://draftmag.com/keg-weight/",
+   "confidence": "measured"
+  },
+  {
+   "id": "washingMachine",
+   "singular": "a washing machine",
+   "plural": "washing machines",
+   "kg": 90.0,
+   "note": "a large capacity front loading washing machine weighs about 90 kilograms",
+   "source": "https://laveries-speed-queen.fr/en/blog/washing-machine-load-weight/",
+   "confidence": "measured"
+  },
+  {
+   "id": "uprightPiano",
+   "singular": "an upright piano",
+   "plural": "upright pianos",
+   "kg": 228.0,
+   "note": "a Yamaha U1 upright piano weighs 228 kilograms",
+   "source": "https://markgoodwinpianos.co.uk/yamaha/yamaha-u1-piano-weight",
+   "confidence": "measured"
+  },
+  {
+   "id": "touringMotorcycle",
+   "singular": "a touring motorcycle",
+   "plural": "touring motorcycles",
+   "kg": 388.0,
+   "note": "a Harley-Davidson Road Glide weighs 388 kilograms in running order",
+   "source": "https://h-dmediakit.com/assets/documents/my21-spec/7q2RV2pyM7a7bDmM/road-glide.pdf",
+   "confidence": "measured"
+  },
+  {
+   "id": "vendingMachine",
+   "singular": "a vending machine",
+   "plural": "vending machines",
+   "kg": 390.0,
+   "note": "an empty Dixie Narco 501E soda vending machine weighs about 390 kilograms",
+   "source": "https://www.vendingmix.com/w/product/dixie-narco-501e-bottle-can-soda-vending-machine/",
+   "confidence": "measured"
+  },
+  {
+   "id": "concertGrandPiano",
+   "singular": "a concert grand piano",
+   "plural": "concert grand pianos",
+   "kg": 483.0,
+   "note": "a Steinway Model D concert grand weighs 483 kilograms",
+   "source": "https://www.steinway.com/pianos/steinway/grand/model-d",
+   "confidence": "measured"
+  },
+  {
+   "id": "formulaOneCar",
+   "singular": "a Formula 1 car",
+   "plural": "Formula 1 cars",
+   "kg": 768.0,
+   "note": "a 2026 Formula 1 car must weigh at least 768 kilograms with the driver aboard",
+   "source": "https://f1chronicle.com/f1-minimum-weigh-2026/",
+   "confidence": "measured"
+  },
+  {
+   "id": "smartCar",
+   "singular": "a Smart Fortwo",
+   "plural": "Smart Fortwos",
+   "kg": 880.0,
+   "note": "a Smart Fortwo city car weighs about 880 kilograms",
+   "source": "https://www.autopadre.com/vehicle-weight/smart-fortwo",
+   "confidence": "measured"
+  },
+  {
+   "id": "teslaModel3",
+   "singular": "a Tesla Model 3",
+   "plural": "Tesla Model 3s",
+   "kg": 1752.0,
+   "note": "a Tesla Model 3 weighs about 1.75 tonnes",
+   "source": "https://www.evspecifications.com/en/model/937b29b",
+   "confidence": "measured"
+  },
+  {
+   "id": "filledHotTub",
+   "singular": "a hot tub full of water",
+   "plural": "hot tubs full of water",
+   "kg": 2040.0,
+   "note": "a six person hot tub filled with water weighs over 2 tonnes",
+   "source": "https://www.bullfrogspas.com/hot-tub-weight/",
+   "confidence": "measured"
+  },
+  {
+   "id": "pickupTruck",
+   "singular": "a pickup truck",
+   "plural": "pickup trucks",
+   "kg": 2400.0,
+   "note": "a Ford F-150 crew cab weighs about 2.4 tonnes",
+   "source": "https://www.autopadre.com/vehicle-weight/ford-f-150",
+   "confidence": "measured"
+  },
+  {
+   "id": "humvee",
+   "singular": "a Humvee",
+   "plural": "Humvees",
+   "kg": 3856.0,
+   "note": "an unarmored Humvee weighs up to 3.9 tonnes at gross vehicle weight",
+   "source": "https://en.wikipedia.org/wiki/Humvee",
+   "confidence": "measured"
+  },
+  {
+   "id": "monsterTruck",
+   "singular": "a monster truck",
+   "plural": "monster trucks",
+   "kg": 5443.0,
+   "note": "a Monster Jam truck weighs about 5.4 tonnes",
+   "source": "https://www.monsterjam.com/en-us/monster-jam-101/",
+   "confidence": "measured"
+  },
+  {
+   "id": "smallYacht",
+   "singular": "a small yacht",
+   "plural": "small yachts",
+   "kg": 8260.0,
+   "note": "a 40 foot cruising yacht displaces about 8.3 tonnes",
+   "source": "https://en.wikipedia.org/wiki/Beneteau_40",
+   "confidence": "measured"
+  },
+  {
+   "id": "hubbleTelescope",
+   "singular": "the Hubble Space Telescope",
+   "plural": "Hubble Space Telescopes",
+   "kg": 11110.0,
+   "note": "the Hubble Space Telescope weighed 11.1 tonnes at launch",
+   "source": "https://esahubble.org/about/general/fact_sheet/",
+   "confidence": "measured"
+  },
+  {
+   "id": "doubleDeckerBus",
+   "singular": "a London double-decker bus",
+   "plural": "London double-decker buses",
+   "kg": 12650.0,
+   "note": "a London New Routemaster weighs 12.65 tonnes unladen",
+   "source": "https://en.wikipedia.org/wiki/New_Routemaster",
+   "confidence": "measured"
+  },
+  {
+   "id": "bigBenBell",
+   "singular": "the Great Bell of Big Ben",
+   "plural": "Great Bells of Big Ben",
+   "kg": 13700.0,
+   "note": "the Great Bell known as Big Ben weighs 13.7 tonnes",
+   "source": "https://www.parliament.uk/about/living-heritage/building/palace/big-ben/facts-figures/great-bell/",
+   "confidence": "measured"
+  },
+  {
+   "id": "cruiseShipAnchor",
+   "singular": "a cruise ship anchor",
+   "plural": "cruise ship anchors",
+   "kg": 15000.0,
+   "note": "a cruise ship anchor weighs around 15 tonnes",
+   "source": "https://www.cruisehive.com/cruise-ship-anchor/103537",
+   "confidence": "measured"
+  },
+  {
+   "id": "fireEngine",
+   "singular": "a fire engine",
+   "plural": "fire engines",
+   "kg": 18000.0,
+   "note": "a pumper fire engine weighs about 18 tonnes loaded with water and gear",
+   "source": "https://engineerfix.com/how-heavy-are-fire-trucks-typical-weights-explained/",
+   "confidence": "measured"
+  },
+  {
+   "id": "bankVaultDoor",
+   "singular": "a bank vault door",
+   "plural": "bank vault doors",
+   "kg": 18144.0,
+   "note": "the vault door at Fort Knox weighs about 18 tonnes",
+   "source": "https://en.wikipedia.org/wiki/United_States_Bullion_Depository",
+   "confidence": "measured"
+  },
+  {
+   "id": "cityBus",
+   "singular": "an articulated city bus",
+   "plural": "articulated city buses",
+   "kg": 19000.0,
+   "note": "a 60-foot articulated transit bus weighs about 19 tonnes",
+   "source": "https://en.wikipedia.org/wiki/New_Flyer_Xcelsior",
+   "confidence": "measured"
+  },
+  {
+   "id": "combineHarvester",
+   "singular": "a combine harvester",
+   "plural": "combine harvesters",
+   "kg": 22286.0,
+   "note": "a large John Deere combine harvester weighs about 22 tonnes",
+   "source": "https://www.allmachines.com/combine-harvesters/john-deere-s7-800",
+   "confidence": "measured"
+  },
+  {
+   "id": "stonehengeSarsen",
+   "singular": "a Stonehenge sarsen stone",
+   "plural": "Stonehenge sarsen stones",
+   "kg": 25000.0,
+   "note": "an average sarsen stone at Stonehenge weighs about 25 tonnes",
+   "source": "https://www.english-heritage.org.uk/visit/places/stonehenge/things-to-do/stone-circle/stones-of-stonehenge/",
+   "confidence": "measured"
+  },
+  {
+   "id": "loadedShippingContainer",
+   "singular": "a loaded shipping container",
+   "plural": "loaded shipping containers",
+   "kg": 30480.0,
+   "note": "a 20 foot shipping container is rated to 30.48 tonnes fully loaded",
+   "source": "https://www.conexwest.com/blog/how-much-does-20ft-shipping-container-weigh-empty-loaded",
+   "confidence": "measured"
+  },
+  {
+   "id": "garbageTruck",
+   "singular": "a garbage truck",
+   "plural": "garbage trucks",
+   "kg": 32660.0,
+   "note": "a Mack LR refuse truck is rated to 32.7 tonnes fully loaded",
+   "source": "https://en.wikipedia.org/wiki/Mack_LR",
+   "confidence": "measured"
+  },
+  {
+   "id": "semiTruck",
+   "singular": "a loaded semi truck",
+   "plural": "loaded semi trucks",
+   "kg": 36287.0,
+   "note": "a semi truck at the US federal interstate limit weighs 36.3 tonnes",
+   "source": "https://www.fhwa.dot.gov/fastact/factsheets/trucksizeweightfs.cfm",
+   "confidence": "measured"
+  },
+  {
+   "id": "abramsTank",
+   "singular": "an Abrams tank",
+   "plural": "Abrams tanks",
+   "kg": 66800.0,
+   "note": "an M1A2 SEPv2 Abrams tank weighs about 66.8 tonnes",
+   "source": "https://en.wikipedia.org/wiki/M1_Abrams",
+   "confidence": "measured"
+  },
+  {
+   "id": "boeing737",
+   "singular": "a Boeing 737",
+   "plural": "Boeing 737s",
+   "kg": 79016.0,
+   "note": "a Boeing 737-800 weighs 79 tonnes fully loaded for takeoff",
+   "source": "https://www.airliners.net/aircraft-data/boeing-737-800900/96",
+   "confidence": "measured"
+  },
+  {
+   "id": "dieselLocomotive",
+   "singular": "a freight locomotive",
+   "plural": "freight locomotives",
+   "kg": 190509.0,
+   "note": "an EMD SD70ACe freight locomotive weighs about 190 tonnes",
+   "source": "https://en.wikipedia.org/wiki/EMD_SD70_series",
+   "confidence": "measured"
+  },
+  {
+   "id": "statueOfLiberty",
+   "singular": "the Statue of Liberty",
+   "plural": "Statues of Liberty",
+   "kg": 279400.0,
+   "note": "the copper skin and iron framework of the Statue of Liberty weigh about 280 tonnes together",
+   "source": "https://www.nps.gov/stli/learn/historyculture/statue-statistics.htm",
+   "confidence": "measured"
+  },
+  {
+   "id": "boeing747",
+   "singular": "a Boeing 747",
+   "plural": "Boeing 747s",
+   "kg": 396890.0,
+   "note": "a Boeing 747-400 can take off weighing 397 tonnes",
+   "source": "https://www.airliners.net/aircraft-data/boeing-747-400/100",
+   "confidence": "measured"
+  },
+  {
+   "id": "spaceStation",
+   "singular": "the International Space Station",
+   "plural": "International Space Stations",
+   "kg": 419725.0,
+   "note": "the International Space Station masses about 420 tonnes",
+   "source": "https://www.nasa.gov/international-space-station/space-station-facts-and-figures/",
+   "confidence": "measured"
+  },
+  {
+   "id": "airbusA380",
+   "singular": "an Airbus A380",
+   "plural": "Airbus A380s",
+   "kg": 575000.0,
+   "note": "an Airbus A380 can take off weighing 575 tonnes",
+   "source": "https://www.airbus.com/sites/g/files/jlcbta136/files/2021-12/EN-Airbus-A380-Facts-and-Figures-December-2021_0.pdf",
+   "confidence": "measured"
+  },
+  {
+   "id": "antonovAn225",
+   "singular": "an Antonov An-225",
+   "plural": "Antonov An-225s",
+   "kg": 640000.0,
+   "note": "the Antonov An-225, the heaviest aircraft ever built, took off at up to 640 tonnes",
+   "source": "https://en.wikipedia.org/wiki/Antonov_An-225_Mriya",
+   "confidence": "measured"
+  },
+  {
+   "id": "spaceShuttleAtLiftoff",
+   "singular": "a Space Shuttle at liftoff",
+   "plural": "Space Shuttles at liftoff",
+   "kg": 2000000.0,
+   "note": "a Space Shuttle with its tank and boosters weighed about 2,000 tonnes on the pad",
+   "source": "https://www.esa.int/Science_Exploration/Human_and_Robotic_Exploration/Space_Shuttle/Shuttle_technical_facts",
+   "confidence": "measured"
+  },
+  {
+   "id": "eiffelTower",
+   "singular": "the Eiffel Tower",
+   "plural": "Eiffel Towers",
+   "kg": 10100000.0,
+   "note": "the Eiffel Tower weighs 10,100 tonnes, of which 7,300 tonnes is the iron frame",
+   "source": "https://www.toureiffel.paris/en/the-monument/key-figures",
+   "confidence": "measured"
+  }
+ ],
+ "animals": [
+  {
+   "id": "house-cat",
+   "singular": "a house cat",
+   "plural": "house cats",
+   "kg": 4.5,
+   "note": "Animal Diversity Web (Univ. of Michigan Museum of Zoology) gives a range mass of 4.1 to 5.4 kg for the domestic cat. 4.5 kg sits in that range and matches the common vet-clinic reference for a healthy adult. Smallest anchor in the set, so early-session totals still land on a real comparison.",
+   "source": "https://animaldiversity.org/accounts/Felis_catus/",
+   "confidence": "measured"
+  },
+  {
+   "id": "bulldog",
+   "singular": "a bulldog",
+   "plural": "bulldogs",
+   "kg": 22.0,
+   "note": "AKC official Bulldog breed standard: \"The size for mature dogs is about 50 pounds; for mature bitches about 40 pounds.\" 50 lb converts to 22.7 kg; 22 kg is used as the representative adult, sitting just above the male standard's metric equivalent and comfortably above the 18 kg female figure.",
+   "source": "https://images.akc.org/pdf/breeds/standards/Bulldog.pdf",
+   "confidence": "measured"
+  },
+  {
+   "id": "adult-human",
+   "singular": "an adult human",
+   "plural": "adult humans",
+   "kg": 62.0,
+   "note": "Walpole et al., \"The weight of nations: an estimation of adult human biomass,\" BMC Public Health 2012: global average adult body mass was 62 kg (North America highest at 80.7 kg). Global figure chosen so the comparison reads the same for every user regardless of region.",
+   "source": "https://www.sciencedaily.com/releases/2012/06/120618095057.htm",
+   "confidence": "measured"
+  },
+  {
+   "id": "giant-panda",
+   "singular": "a giant panda",
+   "plural": "giant pandas",
+   "kg": 100.0,
+   "note": "Smithsonian's National Zoo states wild males weigh up to 250 pounds (113 kg) and females rarely reach 220 pounds (104 kg). 100 kg is a round representative adult that sits below both stated ceilings.",
+   "source": "https://nationalzoo.si.edu/animals/giant-panda",
+   "confidence": "measured"
+  },
+  {
+   "id": "ostrich",
+   "singular": "an ostrich",
+   "plural": "ostriches",
+   "kg": 110.0,
+   "note": "Animal Diversity Web gives a range mass of 90 to 130 kg for the common ostrich. 110 kg is the midpoint. Useful mid-low anchor between the panda and the gorilla.",
+   "source": "https://animaldiversity.org/accounts/Struthio_camelus/",
+   "confidence": "measured"
+  },
+  {
+   "id": "gorilla",
+   "singular": "a silverback gorilla",
+   "plural": "silverback gorillas",
+   "kg": 180.0,
+   "note": "Animal Diversity Web: \"In the wild, male gorillas average 180 kg, with females often almost half that weight.\" The wild male average is used directly rather than the 275 kg captive maximum, which is not representative.",
+   "source": "https://animaldiversity.org/accounts/Gorilla_gorilla/",
+   "confidence": "measured"
+  },
+  {
+   "id": "grizzly-bear",
+   "singular": "a grizzly bear",
+   "plural": "grizzly bears",
+   "kg": 250.0,
+   "note": "National Wildlife Federation: males average 200 to 300 kilograms (about 400 to 600 pounds); a large female in the lower 48 states weighs 110 to 160 kg. 250 kg is the midpoint of the stated male average range.",
+   "source": "https://www.nwf.org/Educational-Resources/Wildlife-Guide/Mammals/Grizzly-Bear",
+   "confidence": "measured"
+  },
+  {
+   "id": "polar-bear",
+   "singular": "a polar bear",
+   "plural": "polar bears",
+   "kg": 450.0,
+   "note": "Animal Diversity Web: adult males weigh 300 to 800 kg (660 to 1760 lbs); females are smaller at 150 to 300 kg. 450 kg is a representative adult male, in the lower-middle of the male range rather than at the extreme.",
+   "source": "https://animaldiversity.org/accounts/Ursus_maritimus/",
+   "confidence": "measured"
+  },
+  {
+   "id": "moose",
+   "singular": "a moose",
+   "plural": "moose",
+   "kg": 500.0,
+   "note": "Animal Diversity Web: live weights of males range from 360 to 600 kg, females 270 to 400 kg. 500 kg is a representative adult bull inside the stated male range. Note the plural is unchanged, so any pluralisation logic needs an exception for this entry.",
+   "source": "https://animaldiversity.org/accounts/Alces_alces/",
+   "confidence": "measured"
+  },
+  {
+   "id": "horse",
+   "singular": "a draft horse",
+   "plural": "draft horses",
+   "kg": 700.0,
+   "note": "a draft horse weighs about 700 kilograms",
+   "source": "https://animaldiversity.org/accounts/Equus_caballus/",
+   "confidence": "measured"
+  },
+  {
+   "id": "bison",
+   "singular": "an American bison",
+   "plural": "American bison",
+   "kg": 900.0,
+   "note": "National Park Service (Yellowstone): a male (bull) weighs up to 2,000 pounds and a female (cow) up to 1,000 pounds. 900 kg is the metric equivalent of the 2,000 lb bull figure, and matches the top of the 318 to 900 kg range Animal Diversity Web lists for the species. Plural is unchanged.",
+   "source": "https://www.nps.gov/yell/learn/nature/bison.htm",
+   "confidence": "measured"
+  },
+  {
+   "id": "walrus",
+   "singular": "a walrus",
+   "plural": "walruses",
+   "kg": 1000.0,
+   "note": "Animal Diversity Web lists an average mass of 1000 kg for the walrus, with males 1200 to 1500 kg and females 600 to 850 kg. The stated species average is used unchanged, which makes this a clean round anchor at one tonne.",
+   "source": "https://animaldiversity.org/accounts/Odobenus_rosmarus/",
+   "confidence": "measured"
+  },
+  {
+   "id": "giraffe",
+   "singular": "a giraffe",
+   "plural": "giraffes",
+   "kg": 1200.0,
+   "note": "Animal Diversity Web gives a range mass of 1180 to 1930 kg, with females up to 1180 kg and males up to 1930 kg. 1200 kg is a representative adult near the female figure and the bottom of the species range.",
+   "source": "https://animaldiversity.org/accounts/Giraffa_camelopardalis/",
+   "confidence": "measured"
+  },
+  {
+   "id": "hippopotamus",
+   "singular": "a hippopotamus",
+   "plural": "hippopotamuses",
+   "kg": 1500.0,
+   "note": "Animal Diversity Web gives a range mass of 1300 to 4500 kg, noting males average roughly 200 kg more than females at maturity and that 4500 kg is the largest recorded specimen. 1500 kg is a representative adult near the low end, not the record.",
+   "source": "https://animaldiversity.org/accounts/Hippopotamus_amphibius/",
+   "confidence": "measured"
+  },
+  {
+   "id": "white-rhinoceros",
+   "singular": "a white rhinoceros",
+   "plural": "white rhinoceroses",
+   "kg": 2300.0,
+   "note": "Animal Diversity Web: \"They weigh approximately 1000 to 3600 kg as adults,\" with females slightly smaller than males. 2300 kg is the midpoint of that stated adult range.",
+   "source": "https://animaldiversity.org/accounts/Ceratotherium_simum/",
+   "confidence": "measured"
+  },
+  {
+   "id": "orca",
+   "singular": "an orca",
+   "plural": "orcas",
+   "kg": 4500.0,
+   "note": "SeaWorld's killer whale physical characteristics page gives typical adult males as 3,600 to 5,400 kg (8,000 to 12,000 lb), with the largest recorded male at 10,000 kg. 4500 kg is the midpoint of the typical adult male range. Note Animal Diversity Web quotes a higher 7200 kg male average, so this is the conservative figure.",
+   "source": "https://seaworld.org/animals/all-about/killer-whale/characteristics/",
+   "confidence": "measured"
+  },
+  {
+   "id": "african-elephant",
+   "singular": "an African elephant",
+   "plural": "African elephants",
+   "kg": 6000.0,
+   "note": "Animal Diversity Web: males range from 4,500 to 6,100 kg, females 2,000 to 3,500 kg. 6000 kg is a representative adult bull at the top of the stated male range and is the round number most users already picture. This is the headline unit for the feature.",
+   "source": "https://animaldiversity.org/accounts/Loxodonta_africana/",
+   "confidence": "measured"
+  },
+  {
+   "id": "humpback-whale",
+   "singular": "a humpback whale",
+   "plural": "humpback whales",
+   "kg": 30000.0,
+   "note": "NOAA Fisheries quick facts list adult humpbacks at up to about 40 tons (roughly 36,000 kg). 30,000 kg is used as a representative adult below that ceiling. Included specifically to fill the gap between the elephant and the blue whale so very large lifetime tonnage totals still get a sensible match.",
+   "source": "https://www.fisheries.noaa.gov/species/humpback-whale",
+   "confidence": "measured"
+  },
+  {
+   "id": "blue-whale",
+   "singular": "a blue whale",
+   "plural": "blue whales",
+   "kg": 150000.0,
+   "note": "NOAA Fisheries quick facts list blue whales at up to 330,000 pounds (about 150,000 kg), noting North Atlantic and North Pacific animals typically exceed 100,000 pounds. Whale and Dolphin Conservation independently gives adult males at 150,000 kg and females at 190,000 kg. 150,000 kg is the male figure, corroborated by both sources. Largest anchor in the set.",
+   "source": "https://www.fisheries.noaa.gov/species/blue-whale",
+   "confidence": "measured"
+  }
+ ],
+ "strength": [
+  {
+   "id": "baldEagleCarry",
+   "singular": "a bald eagle's carrying load",
+   "plural": "bald eagles' carrying loads",
+   "forceKg": 2.3,
+   "mode": "carry",
+   "loadType": "lift",
+   "confidence": "estimated",
+   "note": "a bald eagle can carry about 2.3 kilograms in flight, roughly half its own body weight",
+   "source": "https://www.audubon.org/field-guide/bird/bald-eagle"
+  },
+  {
+   "id": "sledDogFreight",
+   "singular": "a sled dog's freight load",
+   "plural": "sled dogs' freight loads",
+   "forceKg": 91,
+   "mode": "pull",
+   "loadType": "sled",
+   "confidence": "estimated",
+   "note": "gold-rush freight teams were expected to move about 91 kilograms of load per dog",
+   "source": "https://www.nps.gov/klgo/learn/historyculture/sled-dogs.htm"
+  },
+  {
+   "id": "draftHorseSustained",
+   "singular": "a draft horse's steady pull",
+   "plural": "draft horses' steady pull",
+   "forceKg": 100,
+   "mode": "lift",
+   "loadType": "lift",
+   "confidence": "measured",
+   "note": "a working draft horse sustains a true pulling force of about 100 kilograms all day",
+   "source": "https://extension.psu.edu/draft-horse-power"
+  },
+  {
+   "id": "chimpanzeePull",
+   "singular": "a chimpanzee's pulling strength",
+   "plural": "chimpanzees' pulling strength",
+   "forceKg": 221,
+   "mode": "lift",
+   "loadType": "lift",
+   "confidence": "measured",
+   "note": "the strongest chimp in a controlled Yale study pulled 221 kilograms, about 4.6 times its own body weight",
+   "source": "Finch, G. (1943) Journal of Mammalogy 24(2):224-228"
+  },
+  {
+   "id": "elephantTrunkLift",
+   "singular": "an elephant's trunk lift",
+   "plural": "elephants' trunk lifts",
+   "forceKg": 300,
+   "mode": "lift",
+   "loadType": "lift",
+   "confidence": "popular-claim",
+   "note": "a large elephant is reckoned to lift around 300 kilograms with its trunk alone",
+   "source": "https://www.elephantsforafrica.org/elephant-facts/"
+  },
+  {
+   "id": "grizzlyDrag",
+   "singular": "a grizzly's dragged carcass",
+   "plural": "grizzlies' dragged carcasses",
+   "forceKg": 318,
+   "mode": "pull",
+   "loadType": "sled",
+   "confidence": "estimated",
+   "note": "a grizzly has been filmed hauling an adult bull elk of roughly 318 kilograms out of a mudhole",
+   "source": "https://www.nps.gov/yell/learn/nature/grizzlybear.htm"
+  },
+  {
+   "id": "gorillaLift",
+   "singular": "a gorilla's lifting strength",
+   "plural": "gorillas' lifting strength",
+   "forceKg": 530,
+   "mode": "lift",
+   "loadType": "lift",
+   "confidence": "estimated",
+   "note": "no gorilla has ever had its strength measured; scaling the only controlled great-ape measurement to gorilla size suggests roughly 530 kilograms",
+   "source": "Finch, G. (1943) J. Mammalogy 24(2):224-228 (chimp Bokar, 48.5 kg, 221 kg max pull), scaled by mass^0.67. The widely repeated 815 kg figure is an unverified extrapolation."
+  },
+  {
+   "id": "muleTeamHaul",
+   "singular": "a mule's share of the borax wagon",
+   "plural": "mules' shares of the borax wagon",
+   "forceKg": 1660,
+   "mode": "pull",
+   "loadType": "sled",
+   "confidence": "measured",
+   "note": "each animal in Death Valley's twenty-mule team hauled about 1,660 kilograms of the 33,200 kilogram train",
+   "source": "https://www.nps.gov/deva/learn/historyculture/twenty-mule-team.htm"
+  },
+  {
+   "id": "elephantLogDrag",
+   "singular": "an elephant's dragged log",
+   "plural": "elephants' dragged logs",
+   "forceKg": 2000,
+   "mode": "pull",
+   "loadType": "sled",
+   "confidence": "estimated",
+   "note": "a prime working elephant is rated to drag logs over 2,000 kilograms through forest",
+   "source": "https://www.fao.org/4/ac835e/ac835e00.htm"
+  },
+  {
+   "id": "weightPullDog",
+   "singular": "a record-setting Malamute's cart",
+   "plural": "record-setting Malamutes' carts",
+   "forceKg": 2449,
+   "mode": "pull",
+   "loadType": "sled",
+   "confidence": "measured",
+   "note": "a 68 kilogram Alaskan Malamute pulled a 2,449 kilogram cart sixteen feet to set the weight-pull record",
+   "source": "https://www.iwpa.net/records"
+  },
+  {
+   "id": "oxSledPull",
+   "singular": "an ox's sled load",
+   "plural": "oxen's sled loads",
+   "forceKg": 2801,
+   "mode": "pull",
+   "loadType": "sled",
+   "confidence": "measured",
+   "note": "a record-setting ox team moved 5,600 kilograms six feet, about 2,800 kilograms of load per animal",
+   "source": "https://www.oxdrovers.com/"
+  },
+  {
+   "id": "draftHorseCompetition",
+   "singular": "a champion draft horse's sled load",
+   "plural": "champion draft horses' sled loads",
+   "forceKg": 3062,
+   "mode": "pull",
+   "loadType": "sled",
+   "confidence": "measured",
+   "note": "a champion Belgian pair pulled a 6,120 kilogram sled, about 3,060 kilograms of load per horse",
+   "source": "https://www.iowastatefair.org/competition/livestock/draft-horses/"
+  }
+ ]
+}

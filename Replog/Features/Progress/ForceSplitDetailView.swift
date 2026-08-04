@@ -136,10 +136,38 @@ struct ForceSplitDetailView: View {
                     .font(.rounded(12, .semibold)).foregroundStyle(Color.text2)
                     .fixedSize(horizontal: false, vertical: true)
             }
+            strengthLines(push: push, pull: pull)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(16)
         .cardSurface()
+    }
+
+    /// What the pressing and pulling actually amount to, in animals. The figures behind
+    /// these are largely folklore, so `VolumeNarrator` hedges them; a sled load is never
+    /// described as something that was lifted.
+    @ViewBuilder
+    private func strengthLines(push: Double, pull: Double) -> some View {
+        let lines = [
+            VolumeNarrator.strengthSentence(kg: push, force: .push, catalog: .shared,
+                                            seed: days ?? RangeSelection.allTimeDays),
+            VolumeNarrator.strengthSentence(kg: pull, force: .pull, catalog: .shared,
+                                            seed: days ?? RangeSelection.allTimeDays),
+        ].compactMap { $0 }
+        if !lines.isEmpty {
+            VStack(alignment: .leading, spacing: 4) {
+                ForEach(lines, id: \.self) { line in
+                    HStack(alignment: .top, spacing: 6) {
+                        Image(systemName: "pawprint.fill")
+                            .font(.system(size: 11, weight: .bold)).foregroundStyle(Color.accent)
+                        Text(line)
+                            .font(.rounded(12, .heavy)).foregroundStyle(Color.accent)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+            }
+            .padding(.top, 6)
+        }
     }
 
     /// Deliberately plain-language and hedged. This is tonnage, not a diagnosis: a
