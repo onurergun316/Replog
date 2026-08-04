@@ -16,7 +16,7 @@ enum ReplogSchema {
         ActiveSession.self, SessionExercise.self, LoggedSet.self,
         HistoryEntry.self, UserProfile.self, AppSettings.self,
         CoachingLog.self, BodyweightEntry.self, ReadinessEntry.self,
-        CustomExercise.self
+        CustomExercise.self, BadgeAward.self
     ]
 
     /// The app's on-disk container.
