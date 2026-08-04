@@ -23,8 +23,10 @@ struct ProfileView: View {
     private var settings: AppSettings { settingsList.first ?? context.appSettings() }
     private var scheduledDays: Set<Weekday> { StreakEngine.scheduledDays(in: plans) }
     private var plansWithReports: [Plan] { plans.filter(\.hasReport) }
-    /// Recent surfaced coach insights (debriefs, milestones, Today cards), newest first.
-    private var recentInsights: [CoachingLog] { context.coachingLogs(kind: .coachInsight, limit: 15) }
+    /// Surfaced coach insights (debriefs, milestones, Today cards), newest first. The list
+    /// scrolls inside a fixed height and groups itself, so it can hold a real history rather
+    /// than the handful a flat list could show without stretching the screen.
+    private var recentInsights: [CoachingLog] { context.coachingLogs(kind: .coachInsight, limit: 200) }
     /// Published weekly + monthly narrative reports, newest first.
     private var trainingReports: [CoachingLog] {
         (context.coachingLogs(kind: .weeklyReport) + context.coachingLogs(kind: .monthlyReport))
@@ -129,30 +131,7 @@ struct ProfileView: View {
     }
 
     private var coachInsightsSection: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            SectionHeader(title: "Coach Insights")
-            ForEach(recentInsights) { log in
-                HStack(alignment: .top, spacing: 12) {
-                    Image(systemName: log.insightKind.symbol)
-                        .font(.system(size: 16, weight: .bold))
-                        .foregroundStyle(log.insightKind.tint)
-                        .frame(width: 24)
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text(log.summary)
-                            .font(.rounded(15, .heavy)).foregroundStyle(Color.textPrimary)
-                        if let body = log.bodyMarkdown, !body.isEmpty {
-                            Text(body).font(.rounded(13, .semibold)).foregroundStyle(Color.text2)
-                                .fixedSize(horizontal: false, vertical: true)
-                        }
-                        Text(log.date.formatted(.relative(presentation: .named)))
-                            .font(.rounded(11, .semibold)).foregroundStyle(Color.text3)
-                    }
-                    Spacer(minLength: 0)
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(14).cardSurface()
-            }
-        }
+        CoachInsightsListView(logs: recentInsights)
     }
 
     private var coachReports: some View {

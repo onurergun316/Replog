@@ -141,13 +141,23 @@ enum CoachContextBuilder {
     /// Records the debrief's durable insights (the session summary + any milestones/PRs) to the
     /// coaching memory. Stall alerts are intentionally skipped — `StallDetector` already records
     /// those once per stall during `SessionFinisher.finish`.
+    ///
+    /// Nothing repeats itself: two workouts finished on the same day used to write the same
+    /// debrief and the same streak milestone twice, and a milestone waits out a cooldown
+    /// before it is celebrated again (`CoachInsightFeed.shouldRecord`).
     @discardableResult
     static func recordDebrief(_ insights: [CoachInsight],
                               context: ModelContext,
                               now: Date = Date()) -> [CoachingLog] {
-        insights
-            .filter { $0.kind == .sessionDebrief || $0.kind == .milestone }
-            .map { record($0, into: context, date: now) }
+        var remembered = recentlyRecorded(context: context, now: now)
+        var written: [CoachingLog] = []
+        for insight in insights where insight.kind == .sessionDebrief || insight.kind == .milestone {
+            guard CoachInsightFeed.shouldRecord(insight, given: remembered, now: now) else { continue }
+            written.append(record(insight, into: context, date: now))
+            // Within one debrief too: the batch must not duplicate itself.
+            remembered.append(CoachInsightFeed.Recorded(kind: insight.kind, summary: insight.title, date: now))
+        }
+        return written
     }
 
     /// Records the Today card's single insight, but at most one coach-card note per day.
@@ -160,7 +170,20 @@ enum CoachContextBuilder {
         let alreadyToday = context.coachingLogs(kind: .coachInsight, limit: 1)
             .first.map { Calendar.current.isDate($0.date, inSameDayAs: now) } ?? false
         guard !alreadyToday else { return nil }
+        guard CoachInsightFeed.shouldRecord(insight, given: recentlyRecorded(context: context, now: now),
+                                            now: now) else { return nil }
         return record(insight, into: context, date: now)
+    }
+
+    /// The coaching memory reduced to what dedup needs, over the longest window any rule
+    /// looks back on.
+    private static func recentlyRecorded(context: ModelContext, now: Date) -> [CoachInsightFeed.Recorded] {
+        let cutoff = Calendar.current.date(byAdding: .day,
+                                           value: -CoachInsightFeed.milestoneCooldownDays - 1,
+                                           to: now) ?? now
+        return context.coachingLogs(kind: .coachInsight, limit: 60)
+            .filter { $0.date > cutoff }
+            .map { CoachInsightFeed.Recorded(kind: $0.insightKind, summary: $0.summary, date: $0.date) }
     }
 
     private static func record(_ insight: CoachInsight, into context: ModelContext, date: Date) -> CoachingLog {
