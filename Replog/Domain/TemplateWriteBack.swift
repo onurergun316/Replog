@@ -49,10 +49,60 @@ enum TemplateWriteBack {
         return result
     }
 
+    /// What a session did that its workout never prescribed: movements added on the day,
+    /// and sets logged past the prescription. Offered back to the athlete as "save this to
+    /// the plan?", never applied silently.
+    struct Additions: Equatable, Sendable {
+        /// Exercise ids logged that the workout does not prescribe at all.
+        var exerciseIds: [String] = []
+        /// Completed sets logged beyond the prescribed set count, across the whole session.
+        var extraSets: Int = 0
+
+        var isEmpty: Bool { exerciseIds.isEmpty && extraSets == 0 }
+
+        /// A short line for the prompt, e.g. "1 exercise and 2 sets".
+        var summary: String {
+            var parts: [String] = []
+            if !exerciseIds.isEmpty {
+                parts.append("\(exerciseIds.count) exercise\(exerciseIds.count == 1 ? "" : "s")")
+            }
+            if extraSets > 0 {
+                parts.append("\(extraSets) set\(extraSets == 1 ? "" : "s")")
+            }
+            return parts.joined(separator: " and ")
+        }
+    }
+
+    /// Everything this session added on top of `workout`'s prescription.
+    ///
+    /// Only *completed* sets count: a set that was added and then never logged is not a
+    /// change to the workout, it is an abandoned intention.
+    static func additions(session: ActiveSession, workout: Workout) -> Additions {
+        let paired = matches(sessionExercises: session.exercises, items: workout.items)
+        let prescribed = Set(paired.map(\.exercise.id))
+        var result = Additions()
+
+        for exercise in session.exercises.sorted(by: { $0.order < $1.order })
+        where !prescribed.contains(exercise.id) {
+            guard exercise.sets.contains(where: \.done) else { continue }
+            if !result.exerciseIds.contains(exercise.exId) { result.exerciseIds.append(exercise.exId) }
+        }
+        for pair in paired {
+            let prescribedOrders = Set(pair.item.sets.map(\.order))
+            result.extraSets += pair.exercise.sets.filter { $0.done && !prescribedOrders.contains($0.order) }.count
+        }
+        return result
+    }
+
     /// Copies every completed set's weight and reps onto the template at the same
     /// position, clearing the `estimated` flag because these are now real logged values.
-    /// Sets logged beyond the prescription (the athlete tapped "Add set") append new
-    /// templates; templates beyond the sets logged are left untouched.
+    /// Templates beyond the sets logged are left untouched.
+    ///
+    /// `saveAdditions` decides what happens to work the plan never prescribed. The default
+    /// is no: an extra set squeezed in on a good day, or a movement borrowed because a rack
+    /// was busy, is a fact about *that session*, not a decision to rewrite the programme.
+    /// The athlete is asked at Finish and opts in explicitly; only then do extra sets append
+    /// new templates and ad hoc movements become plan items.
     ///
     /// **RPE is deliberately not written back.** The template's RPE is the *target*
     /// effort the program prescribed; the logged RPE is how hard the set actually felt.
@@ -67,7 +117,7 @@ enum TemplateWriteBack {
     /// Returns the number of template sets written, for tests and telemetry.
     @discardableResult
     static func apply(session: ActiveSession, to workout: Workout, context: ModelContext,
-                      date: Date = Date()) -> Int {
+                      date: Date = Date(), saveAdditions: Bool = false) -> Int {
         var written = 0
         for (exercise, item) in matches(sessionExercises: session.exercises, items: workout.items) {
             let templatesByOrder = Dictionary(item.orderedSets.map { ($0.order, $0) },
@@ -80,6 +130,7 @@ enum TemplateWriteBack {
                     template.estimated = false
                     template.updatedAt = date
                 } else {
+                    guard saveAdditions else { continue }
                     let template = SetTemplate(weightKg: logged.weightKg, reps: logged.reps,
                                                rpe: logged.rpe, order: nextOrder, estimated: false)
                     template.updatedAt = date
@@ -87,6 +138,38 @@ enum TemplateWriteBack {
                     context.insert(template)
                     nextOrder += 1
                 }
+                written += 1
+            }
+        }
+        if saveAdditions {
+            written += adopt(session: session, into: workout, context: context, date: date)
+        }
+        return written
+    }
+
+    /// Adds the movements this session did but the workout never prescribed, in the order
+    /// they were logged, each carrying the sets that were actually completed.
+    private static func adopt(session: ActiveSession, into workout: Workout,
+                              context: ModelContext, date: Date) -> Int {
+        let prescribed = Set(matches(sessionExercises: session.exercises, items: workout.items)
+            .map(\.exercise.id))
+        var nextItemOrder = Reordering.nextOrder(after: workout.items)
+        var written = 0
+        for exercise in session.exercises.sorted(by: { $0.order < $1.order })
+        where !prescribed.contains(exercise.id) {
+            let done = exercise.orderedSets.filter(\.done)
+            guard !done.isEmpty else { continue }
+            let item = PlanItem(exId: exercise.exId, order: nextItemOrder)
+            item.restSeconds = exercise.restSeconds
+            item.workout = workout
+            context.insert(item)
+            nextItemOrder += 1
+            for (order, logged) in done.enumerated() {
+                let template = SetTemplate(weightKg: logged.weightKg, reps: logged.reps,
+                                           rpe: logged.rpe, order: order, estimated: false)
+                template.updatedAt = date
+                template.item = item
+                context.insert(template)
                 written += 1
             }
         }
@@ -155,12 +238,26 @@ enum TemplateWriteBack {
     /// invoke this unconditionally.
     @discardableResult
     static func applyIfComplete(session: ActiveSession, context: ModelContext,
-                                date: Date = Date()) -> Int {
-        guard session.isComplete, let workoutId = session.workoutId else { return 0 }
-        let descriptor = FetchDescriptor<Workout>(predicate: #Predicate { $0.id == workoutId })
-        guard let workout = try? context.fetch(descriptor).first else { return 0 }
-        let written = apply(session: session, to: workout, context: context, date: date)
+                                date: Date = Date(), saveAdditions: Bool = false) -> Int {
+        guard session.isComplete,
+              let workout = self.workout(for: session, context: context) else { return 0 }
+        let written = apply(session: session, to: workout, context: context,
+                            date: date, saveAdditions: saveAdditions)
         propagateWithinPlan(session: session, source: workout, context: context, date: date)
         return written
+    }
+
+    /// The workout a live session was built from, if it still exists.
+    static func workout(for session: ActiveSession, context: ModelContext) -> Workout? {
+        guard let workoutId = session.workoutId else { return nil }
+        let descriptor = FetchDescriptor<Workout>(predicate: #Predicate { $0.id == workoutId })
+        return try? context.fetch(descriptor).first
+    }
+
+    /// What this session added beyond the workout it came from, or an empty set when the
+    /// workout is gone. Convenience for the Finish flow, which asks before writing.
+    static func additions(for session: ActiveSession, context: ModelContext) -> Additions {
+        guard let workout = workout(for: session, context: context) else { return Additions() }
+        return additions(session: session, workout: workout)
     }
 }

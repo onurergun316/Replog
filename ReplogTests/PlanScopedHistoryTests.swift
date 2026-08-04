@@ -156,7 +156,8 @@ struct PlanScopedHistoryTests {
         ctx.insert(extra)
         try ctx.save()
 
-        TemplateWriteBack.applyIfComplete(session: session, context: ctx)
+        // Opting in, so the extra set is kept — the strongest form of this test.
+        TemplateWriteBack.applyIfComplete(session: session, context: ctx, saveAdditions: true)
 
         // The source workout grew, because that is where the set was actually done.
         #expect(pushA.orderedItems[0].sets.count == 3)
