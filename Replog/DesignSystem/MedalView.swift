@@ -47,44 +47,71 @@ struct MedalView: View {
 
     private var palette: MedalPalette { MedalPalette.named(badge.palette) }
 
+    /// How much of the plate the device may occupy. A triangle has far less usable area
+    /// around its centre than a circle, so a single fraction for every shape pushes the
+    /// device out past the edges on the pointed ones.
+    private var motifScale: CGFloat {
+        switch badge.shape {
+        case .triangle:            return 0.34
+        case .diamond, .starburst: return 0.44
+        case .shield:              return 0.46
+        default:                   return 0.52
+        }
+    }
+
+    /// A triangle's usable area sits below its centre; everything else is centred.
+    private var motifOffset: CGFloat { badge.shape == .triangle ? size * 0.10 : 0 }
+
     var body: some View {
         ZStack {
             plate
-            if earned {
-                MedalMotifShape(motif: badge.motif)
-                    .fill(palette.accent)
-                    .frame(width: size * 0.52, height: size * 0.52)
-                MedalMotifShape(motif: badge.motif)
-                    .fill(palette.detail.opacity(0.55))
-                    .frame(width: size * 0.52, height: size * 0.52)
-                    .offset(x: -size * 0.012, y: -size * 0.012)
-                    .blendMode(.screen)
-            } else {
-                MedalMotifShape(motif: badge.motif)
-                    .fill(Color.text3.opacity(0.35))
-                    .frame(width: size * 0.52, height: size * 0.52)
-            }
+            motif
         }
         .frame(width: size, height: size)
         .accessibilityElement()
         .accessibilityLabel(earned ? "\(badge.name), earned" : "\(badge.name), locked")
     }
 
+    @ViewBuilder
+    private var motif: some View {
+        let shape = MedalMotifShape(motif: badge.motif)
+        let side = size * motifScale
+        if earned {
+            ZStack {
+                shape.fill(palette.accent)
+                shape.fill(palette.detail.opacity(0.5))
+                    .offset(x: -size * 0.012, y: -size * 0.012)
+                    .blendMode(.screen)
+            }
+            .frame(width: side, height: side)
+            .offset(y: motifOffset)
+        } else {
+            shape.fill(lockedInk)
+                .frame(width: side, height: side)
+                .offset(y: motifOffset)
+        }
+    }
+
     private var outline: MedalOutline { MedalOutline(shape: badge.shape) }
+
+    /// A locked medal has to be a visible empty slot, not a ghost. `surface2` sits a couple
+    /// of percent off the page background, which made the whole locked half of the board
+    /// disappear; a neutral grey drawn from the text ramp reads as "not yet" on both themes.
+    private var lockedInk: Color { Color.text3.opacity(0.55) }
 
     /// The plate itself: a bevel gradient running top-left to bottom-right, which is what
     /// makes a flat fill read as struck metal.
     private var plateFill: AnyShapeStyle {
-        guard earned else { return AnyShapeStyle(Color.surface2) }
+        guard earned else { return AnyShapeStyle(Color.text3.opacity(0.16)) }
         let gradient = LinearGradient(colors: [palette.detail, palette.body],
                                       startPoint: .topLeading, endPoint: .bottomTrailing)
         return AnyShapeStyle(gradient)
     }
 
-    private var rimColor: Color { earned ? palette.accent.opacity(0.85) : Color.border }
+    private var rimColor: Color { earned ? palette.accent.opacity(0.85) : Color.text3.opacity(0.5) }
 
     private var innerRingColor: Color {
-        earned ? palette.detail.opacity(0.6) : Color.border.opacity(0.6)
+        earned ? palette.detail.opacity(0.6) : Color.text3.opacity(0.3)
     }
 
     /// The struck plate: filled outline, hairline rim, and the inner ring every real medal
@@ -248,12 +275,24 @@ struct MedalMotifShape: Shape {
                                     cornerSize: CGSize(width: w * 0.04, height: w * 0.04))
             }
         case .laurel:
+            // Two wreath branches: a curved stem with elongated leaves angled off it.
+            // Axis-aligned ellipses along a straight line just read as scattered dots.
             for side in [-1.0, 1.0] {
+                var stem = Path()
+                stem.move(to: CGPoint(x: w * (0.5 + side * 0.30), y: h * 0.10))
+                stem.addQuadCurve(to: CGPoint(x: w * (0.5 + side * 0.14), y: h * 0.92),
+                                  control: CGPoint(x: w * (0.5 + side * 0.52), y: h * 0.62))
+                path.addPath(stem.strokedPath(.init(lineWidth: h * 0.07, lineCap: .round)))
+
                 for index in 0..<4 {
-                    let t = 0.16 + Double(index) * 0.21
-                    let x = w * 0.5 + side * w * (0.16 + Double(index) * 0.055)
-                    path.addEllipse(in: CGRect(x: x - w * 0.09, y: h * t,
-                                               width: w * 0.18, height: h * 0.13))
+                    let t = 0.20 + Double(index) * 0.20
+                    let centre = CGPoint(x: w * (0.5 + side * (0.34 - Double(index) * 0.035)),
+                                         y: h * t)
+                    let leaf = CGRect(x: -w * 0.15, y: -h * 0.055, width: w * 0.30, height: h * 0.11)
+                    let angle = Angle(degrees: side > 0 ? -32 : 32)
+                    let transform = CGAffineTransform(translationX: centre.x, y: centre.y)
+                        .rotated(by: CGFloat(angle.radians))
+                    path.addPath(Path(ellipseIn: leaf).applying(transform))
                 }
             }
         case .concentricRings:
@@ -273,15 +312,29 @@ struct MedalMotifShape: Shape {
                                     width: w * 0.22, height: stepHeight))
             }
         case .flame:
-            path.move(to: CGPoint(x: w * 0.5, y: h * 0.06))
-            path.addQuadCurve(to: CGPoint(x: w * 0.84, y: h * 0.62),
-                              control: CGPoint(x: w * 0.86, y: h * 0.24))
-            path.addQuadCurve(to: CGPoint(x: w * 0.5, y: h * 0.96),
-                              control: CGPoint(x: w * 0.82, y: h * 0.92))
-            path.addQuadCurve(to: CGPoint(x: w * 0.16, y: h * 0.62),
-                              control: CGPoint(x: w * 0.18, y: h * 0.92))
-            path.addQuadCurve(to: CGPoint(x: w * 0.5, y: h * 0.06),
-                              control: CGPoint(x: w * 0.14, y: h * 0.24))
+            // A drawn-out tip and a wide, rounded base. Symmetric quad curves out of a
+            // centred apex just produced an egg; a flame needs the kink on the way up.
+            // A long, leaning tongue over a wide base, with the tell-tale kink on the
+            // right shoulder. Keeping the widest point low and the tip narrow for most of
+            // its height is what separates a flame from a water droplet.
+            // Sides that stay tight to the axis for the top half and only flare low down.
+            // Flaring early is what turned earlier attempts into an onion.
+            path.move(to: CGPoint(x: w * 0.50, y: h * 0.00))
+            path.addCurve(to: CGPoint(x: w * 0.90, y: h * 0.70),
+                          control1: CGPoint(x: w * 0.54, y: h * 0.30),
+                          control2: CGPoint(x: w * 0.90, y: h * 0.44))
+            path.addCurve(to: CGPoint(x: w * 0.50, y: h * 1.00),
+                          control1: CGPoint(x: w * 0.90, y: h * 0.89),
+                          control2: CGPoint(x: w * 0.73, y: h * 1.00))
+            path.addCurve(to: CGPoint(x: w * 0.10, y: h * 0.70),
+                          control1: CGPoint(x: w * 0.27, y: h * 1.00),
+                          control2: CGPoint(x: w * 0.10, y: h * 0.89))
+            path.addCurve(to: CGPoint(x: w * 0.38, y: h * 0.30),
+                          control1: CGPoint(x: w * 0.10, y: h * 0.50),
+                          control2: CGPoint(x: w * 0.34, y: h * 0.46))
+            path.addCurve(to: CGPoint(x: w * 0.50, y: h * 0.00),
+                          control1: CGPoint(x: w * 0.42, y: h * 0.20),
+                          control2: CGPoint(x: w * 0.44, y: h * 0.10))
             path.closeSubpath()
         case .wave:
             for index in 0..<3 {
