@@ -13,11 +13,13 @@
 
 import SwiftUI
 import SwiftData
+import StoreKit
 
 struct RootView: View {
     @Environment(\.modelContext) private var context
     @Environment(SubscriptionStore.self) private var subscriptions
     @Environment(PremiumGate.self) private var gate
+    @Environment(\.requestReview) private var requestReview
     @Query private var profiles: [UserProfile]
     @Query private var settings: [AppSettings]
     @Query private var activeSessions: [ActiveSession]
@@ -45,7 +47,7 @@ struct RootView: View {
                 // Cover dismissed (e.g. swipe) → pause the session, don't destroy it.
                 if newValue == nil { activeSessions.first(where: \.isOpen)?.isOpen = false }
             }
-        )) { session in
+        ), onDismiss: requestReviewIfEarned) { session in
             ActiveWorkoutView(session: session)
                 .preferredColorScheme(darkMode ? .dark : .light)
         }
@@ -71,5 +73,30 @@ struct RootView: View {
     private func syncGate() {
         gate.isPremium = subscriptions.isPremium
         gate.freeDayDate = freeDayDate
+    }
+
+    /// Asks for a rating once the athlete has three real training days behind them.
+    ///
+    /// Fired when the workout cover closes, which is the calmest moment the app has — never
+    /// mid-session, never over the celebration or the badge. **A pause leaves the session in
+    /// the store and a finish deletes it**, so an empty store here is what distinguishes
+    /// "they finished" from "they stepped away", and only the former earns the ask.
+    private func requestReviewIfEarned() {
+        guard activeSessions.isEmpty,
+              let profile = profiles.first, let settings = settings.first,
+              ReviewPrompt.shouldRequest(completedDayCount: profile.doneDates.count,
+                                         alreadyRequested: settings.hasRequestedReview)
+        else { return }
+
+        // Written down before asking, not after. iOS may decline to show the prompt at all,
+        // and re-asking on every future finish because it stayed invisible is exactly the
+        // nagging this is supposed to avoid.
+        settings.hasRequestedReview = true
+        try? context.save()
+
+        Task {
+            try? await Task.sleep(for: .milliseconds(900))
+            requestReview()
+        }
     }
 }
