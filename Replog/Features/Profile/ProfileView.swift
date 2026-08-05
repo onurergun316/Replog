@@ -336,11 +336,7 @@ struct ProfileView: View {
         .padding(14)
     }
 
-    private func icon(_ name: String) -> some View {
-        Image(systemName: name).font(.system(size: 14, weight: .bold)).foregroundStyle(Color.accent)
-            .frame(width: 30, height: 30)
-            .background(RoundedRectangle(cornerRadius: 9, style: .continuous).fill(Color.accentSoft))
-    }
+    private func icon(_ name: String) -> some View { SettingsRowIcon(systemName: name) }
 
     private var resetButton: some View {
         Button(role: .destructive) { showResetConfirm = true } label: {

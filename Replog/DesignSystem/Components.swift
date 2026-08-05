@@ -289,3 +289,24 @@ struct SectionHeader: View {
         Text(title).eyebrow().frame(maxWidth: .infinity, alignment: .leading)
     }
 }
+
+// MARK: - Settings row icon
+
+/// The small accent tile that leads a row inside a grouped settings card.
+///
+/// Lives here rather than as a private helper because it had already been re-rolled twice
+/// (Profile's preferences and the badge detail sheet) and is about to be needed by two more
+/// sections. Its exact size and radius are what makes the rows in a card line up.
+struct SettingsRowIcon: View {
+    let systemName: String
+    /// Overridable so a destructive or informational row can tint differently.
+    var tint: Color = .accent
+    var background: Color = .accentSoft
+
+    var body: some View {
+        Image(systemName: systemName)
+            .font(.system(size: 14, weight: .bold)).foregroundStyle(tint)
+            .frame(width: 30, height: 30)
+            .background(RoundedRectangle(cornerRadius: 9, style: .continuous).fill(background))
+    }
+}

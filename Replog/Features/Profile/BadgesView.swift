@@ -263,10 +263,7 @@ struct BadgeDetailSheet: View {
 
     private func row(_ icon: String, _ title: String, _ value: String) -> some View {
         HStack(spacing: 12) {
-            Image(systemName: icon)
-                .font(.system(size: 14, weight: .bold)).foregroundStyle(Color.accent)
-                .frame(width: 30, height: 30)
-                .background(RoundedRectangle(cornerRadius: 9, style: .continuous).fill(Color.accentSoft))
+            SettingsRowIcon(systemName: icon)
             Text(title).font(.rounded(14, .heavy)).foregroundStyle(Color.textPrimary)
             Spacer(minLength: 8)
             Text(value)
