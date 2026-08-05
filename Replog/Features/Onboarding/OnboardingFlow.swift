@@ -21,6 +21,7 @@ struct OnboardingFlow: View {
     var onGenerated: ((Plan) -> Void)? = nil
 
     @Environment(\.exerciseCatalog) private var catalog
+    @Environment(PremiumGate.self) private var gate
     @State private var vm = OnboardingViewModel()
     @State private var showReport = false
     @State private var showProgram = false
@@ -499,6 +500,19 @@ struct OnboardingFlow: View {
         if mode == .generatePlan {
             onGenerated?(plan)
             dismiss()
+        } else {
+            // First run only. This is the highest-intent moment the app ever has: they have
+            // just watched it build them a real programme and read why. Offering Premium here
+            // costs them nothing — they still have their free day, and the sheet is
+            // dismissible — but asking later means asking someone who has stopped being
+            // impressed.
+            //
+            // Deferred a beat so it arrives over the main app rather than racing the
+            // onboarding flow's own dismissal.
+            Task {
+                try? await Task.sleep(for: .milliseconds(700))
+                gate.presentPaywall()
+            }
         }
     }
 }
