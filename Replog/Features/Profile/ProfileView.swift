@@ -354,6 +354,11 @@ struct ProfileView: View {
 
     private func save() { try? context.save() }
 
+    /// Wipes the athlete's training data and sends them back through onboarding.
+    ///
+    /// Deliberately does NOT touch `AppSettings` — and in particular not
+    /// `AppSettings.freeDayDate`. Resetting your data is a reasonable thing to want; being
+    /// handed a fresh free day every time you did it would make Premium optional.
     private func resetAll() {
         for plan in plans { context.delete(plan) }
         for entry in history { context.delete(entry) }
