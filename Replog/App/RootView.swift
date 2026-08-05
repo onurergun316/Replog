@@ -69,10 +69,28 @@ struct RootView: View {
         #endif
     }
 
-    /// Copies the gate's two inputs across from the store and from settings.
+    /// Copies the gate's two inputs across from the store and from settings, then makes sure a
+    /// stale session cannot reopen itself.
     private func syncGate() {
         gate.isPremium = subscriptions.isPremium
         gate.freeDayDate = freeDayDate
+        parkUnfinishableSession()
+    }
+
+    /// Pauses an open session the athlete is no longer entitled to finish.
+    ///
+    /// Closing a workout with "X" sets `isOpen = false`, and so does swiping the cover away —
+    /// but **force-quitting mid-workout leaves it true**. Without this, an athlete whose access
+    /// lapsed while a session was open would be dropped straight back into a writable workout
+    /// on every launch, for good, since the cover presents on `isOpen` alone.
+    ///
+    /// Parking it rather than deleting it keeps their logged sets: Today then shows "Continue",
+    /// which asks the gate like every other way back in.
+    private func parkUnfinishableSession() {
+        guard let open = activeSessions.first(where: \.isOpen),
+              !gate.allowsFinishing(sessionStartedAt: open.startedAt) else { return }
+        open.isOpen = false
+        try? context.save()
     }
 
     /// Asks for a rating once the athlete has three real training days behind them.
