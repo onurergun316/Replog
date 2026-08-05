@@ -42,7 +42,11 @@ struct RootView: View {
         .tint(.accent)
         .preferredColorScheme(darkMode ? .dark : .light)
         .fullScreenCover(item: Binding(
-            get: { activeSessions.first(where: \.isOpen) },
+            // `isOpen` alone is not enough. It is a stored flag any caller could flip, and the
+            // screen behind this cover carries no gate of its own — presenting it IS granting
+            // every write in the logging loop. Asking `allowsFinishing` here means a session
+            // the athlete may not finish can never be presented, whoever set the flag.
+            get: { activeSessions.first { $0.isOpen && gate.allowsFinishing(sessionStartedAt: $0.startedAt) } },
             set: { newValue in
                 // Cover dismissed (e.g. swipe) → pause the session, don't destroy it.
                 if newValue == nil { activeSessions.first(where: \.isOpen)?.isOpen = false }

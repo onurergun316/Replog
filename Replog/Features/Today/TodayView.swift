@@ -347,8 +347,7 @@ struct TodayView: View {
     @ViewBuilder
     private func resumeBanner(_ session: ActiveSession) -> some View {
         Button {
-            session.isOpen = true
-            try? context.save()
+            resume(session)
         } label: {
             HStack(spacing: 12) {
                 Image(systemName: "figure.strengthtraining.traditional")
@@ -419,19 +418,28 @@ struct TodayView: View {
 
     private func start(_ workout: Workout) {
         // One session at a time: resume the in-progress one rather than starting a second.
-        // Reopening is judged on when that session BEGAN — a workout started on the free day
-        // stays finishable the morning after, which is the whole point of `allowsFinishing`.
         if let existing = activeSession {
-            guard gate.allowsFinishing(sessionStartedAt: existing.startedAt) else {
-                return gate.presentPaywall()
-            }
-            existing.isOpen = true
-            try? context.save()
+            resume(existing)
         } else {
             // A brand-new session is a write, so it needs the gate. The readiness check comes
             // after, so a locked athlete never sees a sheet that leads nowhere.
             gate.require { pendingWorkout = workout }
         }
+    }
+
+    /// Reopens a paused session — the single place that flips `isOpen` back on.
+    ///
+    /// Reopening is judged on when the session BEGAN, not on today: a workout started on the
+    /// free day stays finishable the morning after, which is the whole point of
+    /// `allowsFinishing`. There are three routes back into a paused workout (the hero button,
+    /// Plan Detail's Start, and the resume banner) and they must not disagree, so they all
+    /// come through here.
+    private func resume(_ session: ActiveSession) {
+        guard gate.allowsFinishing(sessionStartedAt: session.startedAt) else {
+            return gate.presentPaywall()
+        }
+        session.isOpen = true
+        try? context.save()
     }
 
     /// Begins a new session after the readiness sheet, applying any check-in.
