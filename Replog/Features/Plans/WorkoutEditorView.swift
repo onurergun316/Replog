@@ -52,7 +52,8 @@ struct WorkoutEditorView: View {
                         onRemove: { requestRemove(item) }
                     )
                     .plainListRow(top: 8, bottom: 8)
-                    .reorderAccessibilityActions(index: index, count: items.count, move: moveItems)
+                    .reorderAccessibilityActions(index: index, count: items.count,
+                                                 move: requestMoveItems)
                 }
                 .onMove(perform: reorderHandler)
             }
@@ -179,6 +180,13 @@ struct WorkoutEditorView: View {
     // body reads as a list of intents instead of a list of closures, and enough nested
     // closures in one `List` pushed the type-checker into reporting an unrelated ambiguity on
     // the toolbar.
+
+    /// The VoiceOver rotor's Move up/down call their handler directly, so unlike the drag —
+    /// which `reorderHandler` switches off outright — they have to be gated here. A rotor
+    /// action is not a lesser way to use the app, and it must not be a way around the gate.
+    private func requestMoveItems(from source: IndexSet, to destination: Int) {
+        gate.require { moveItems(from: source, to: destination) }
+    }
 
     private func openRestSheet() { gate.require { showRestSheet = true } }
     private func openPicker() { gate.require { showPicker = true } }

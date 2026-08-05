@@ -80,7 +80,8 @@ struct PlanDetailView: View {
                         NavigationLink(value: workout) { EmptyView() }.opacity(0) // hides the List chevron
                     }
                     .plainListRow()
-                    .reorderAccessibilityActions(index: index, count: workouts.count, move: moveWorkouts)
+                    .reorderAccessibilityActions(index: index, count: workouts.count,
+                                                 move: requestMoveWorkouts)
                     .swipeActions(edge: .trailing) {
                         Button(role: .destructive) { requestDeleteWorkout(workout) } label: {
                             Label("Delete", systemImage: "trash")
@@ -208,6 +209,12 @@ struct PlanDetailView: View {
     }
 
     // MARK: Gated intents
+
+    /// The VoiceOver rotor calls its handler directly, so it needs the gate the drag gets by
+    /// being switched off. See the note in `WorkoutEditorView`.
+    private func requestMoveWorkouts(from source: IndexSet, to destination: Int) {
+        gate.require { moveWorkouts(from: source, to: destination) }
+    }
 
     private func openRestSheet() { gate.require { showRestSheet = true } }
     private func requestAddWorkout() { gate.require { addWorkout() } }
