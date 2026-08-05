@@ -16,6 +16,7 @@ struct WorkoutEditorView: View {
     @Environment(\.modelContext) private var context
     @Environment(\.dismiss) private var dismiss
     @Environment(\.exerciseCatalog) private var catalog
+    @Environment(PremiumGate.self) private var gate
     @Bindable var workout: Workout
     @Query private var settingsList: [AppSettings]
 
@@ -36,30 +37,7 @@ struct WorkoutEditorView: View {
 
     var body: some View {
         List {
-            Section {
-                Group {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(workout.plan?.name ?? "Plan").eyebrow()
-                        TextField("Workout name", text: $workout.name)
-                            .font(.screenTitle).foregroundStyle(Color.textPrimary)
-                            .onChange(of: workout.name) { try? context.save() }
-                    }
-
-                    dayPicker
-
-                    // Optional description — below the day pills, above the count line,
-                    // styled like the count line but editable. Selectable/copyable like any
-                    // text field (tap in, long-press for Select All / Copy).
-                    TextField("Add a description (optional)", text: $workout.notes, axis: .vertical)
-                        .font(.rounded(13, .semibold)).foregroundStyle(Color.text2)
-                        .lineLimit(1...6)
-                        .onChange(of: workout.notes) { try? context.save() }
-
-                    Text("\(workout.items.count) exercises · \(workout.setCount) sets · hold to reorder")
-                        .font(.rounded(13, .semibold)).foregroundStyle(Color.text2)
-                }
-                .plainListRow(top: 8, bottom: 8)
-            }
+            Section { headerRows.plainListRow(top: 8, bottom: 8) }
 
             Section {
                 let items = workout.orderedItems
@@ -67,24 +45,26 @@ struct WorkoutEditorView: View {
                     ExerciseEditRow(
                         item: item,
                         exercise: catalog.exercise(id: item.exId),
-                        onOpen: { detailItem = item },
+                        // The set sheet is pure editing — there is nothing on it to read that
+                        // the row does not already show — so it is gated rather than disabled.
+                        onOpen: { openSetSheet(item) },
                         onInfo: { detailRef = ExerciseRef(id: item.exId) },
-                        onRemove: { remove(item) }
+                        onRemove: { requestRemove(item) }
                     )
                     .plainListRow(top: 8, bottom: 8)
                     .reorderAccessibilityActions(index: index, count: items.count, move: moveItems)
                 }
-                .onMove(perform: moveItems)
+                .onMove(perform: reorderHandler)
             }
 
             Section {
                 Group {
-                    Button { showPicker = true } label: {
+                    Button(action: openPicker) {
                         dashedLabel(icon: "plus", title: "Add exercise", color: .accent)
                     }
                     .buttonStyle(.plain)
 
-                    Button(role: .destructive) { deleteWorkout() } label: {
+                    Button(role: .destructive, action: requestDeleteWorkout) {
                         HStack(spacing: 6) { Image(systemName: "trash"); Text("Delete workout") }
                             .font(.rounded(15, .heavy)).foregroundStyle(Color.down)
                             .frame(maxWidth: .infinity).padding(.vertical, 14)
@@ -133,12 +113,80 @@ struct WorkoutEditorView: View {
         }
     }
 
+    /// The title, weekday picker and description.
+    ///
+    /// Extracted from `body` because adding the locked banner's conditional pushed the List's
+    /// generic type past what the type-checker would solve, and it reported that as an
+    /// unrelated ambiguity on the toolbar forty lines further down.
+    @ViewBuilder
+    private var headerRows: some View {
+        // A locked athlete keeps every bit of read access to their own plan; only the controls
+        // stop working. Saying so is what keeps that from reading as a bug — a text field that
+        // will not focus has no other explanation.
+        if gate.isLocked {
+            LockedBanner(message: "Read-only. Subscribe to edit this workout.") {
+                gate.presentPaywall()
+            }
+        }
+
+        VStack(alignment: .leading, spacing: 4) {
+            Text(workout.plan?.name ?? "Plan").eyebrow()
+            TextField("Workout name", text: $workout.name)
+                .font(.screenTitle).foregroundStyle(Color.textPrimary)
+                .onChange(of: workout.name) { try? context.save() }
+                // Bound straight to the model, so a keystroke IS the mutation. There is no
+                // later point at which this could be intercepted.
+                .disabled(gate.isLocked)
+        }
+
+        dayPicker
+
+        // Optional description — below the day pills, above the count line, styled like the
+        // count line but editable. Selectable/copyable like any text field.
+        TextField("Add a description (optional)", text: $workout.notes, axis: .vertical)
+            .font(.rounded(13, .semibold)).foregroundStyle(Color.text2)
+            .lineLimit(1...6)
+            .onChange(of: workout.notes) { try? context.save() }
+            .disabled(gate.isLocked)
+
+        Text("\(workout.items.count) exercises · \(workout.setCount) sets · hold to reorder")
+            .font(.rounded(13, .semibold)).foregroundStyle(Color.text2)
+    }
+
     private var restForAllButton: some View {
-        Button { showRestSheet = true } label: {
+        Button(action: openRestSheet) {
             Image(systemName: "timer").font(.system(size: 16, weight: .semibold))
                 .foregroundStyle(Color.text2)
         }
     }
+
+    /// `nil` while locked, which turns the drag off outright — a reorder is committed by the
+    /// system before any handler of ours could refuse it.
+    ///
+    /// A computed property rather than a `let` inside the `List`'s builder, and a `guard`
+    /// rather than a ternary. Both matter: binding an optional function type inside that
+    /// builder defeats the type-checker and it blames the toolbar fifty lines away, and
+    /// `isLocked ? nil : moveItems` will not promote a method reference to an optional on its
+    /// own. Neither failure names the real line. Leave this shape alone.
+    private var reorderHandler: ((IndexSet, Int) -> Void)? {
+        guard !gate.isLocked else { return nil }
+        return moveItems
+    }
+
+    // MARK: Gated intents
+    //
+    // Named rather than inlined as `gate.require { … }` at each call site. Two reasons: the
+    // body reads as a list of intents instead of a list of closures, and enough nested
+    // closures in one `List` pushed the type-checker into reporting an unrelated ambiguity on
+    // the toolbar.
+
+    private func openRestSheet() { gate.require { showRestSheet = true } }
+    private func openPicker() { gate.require { showPicker = true } }
+    private func openSetSheet(_ item: PlanItem) { gate.require { detailItem = item } }
+    private func requestRemove(_ item: PlanItem) { gate.require { remove(item) } }
+    private func requestDeleteWorkout() { gate.require { deleteWorkout() } }
+    private func requestSetExtra() { gate.require { setExtra() } }
+    private func requestSetDay(_ day: Weekday) { gate.require { setDay(day) } }
 
     private func applyRestToAll(_ seconds: Int?) {
         for item in workout.items { item.restSeconds = seconds }
@@ -151,11 +199,11 @@ struct WorkoutEditorView: View {
                 // "Extra" first: a day-less slot the user can run any time. Never locked —
                 // a plan can hold any number of extras.
                 dayPill(label: "Extra", icon: "sparkles",
-                        isSelected: workout.isExtra, disabled: false) { setExtra() }
+                        isSelected: workout.isExtra, disabled: false) { requestSetExtra() }
                 ForEach(Weekday.allCases) { day in
                     dayPill(label: day.short, icon: nil,
                             isSelected: !workout.isExtra && workout.day == day,
-                            disabled: takenDays.contains(day)) { setDay(day) }
+                            disabled: takenDays.contains(day)) { requestSetDay(day) }
                 }
             }
         }
