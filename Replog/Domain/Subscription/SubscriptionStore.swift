@@ -46,6 +46,16 @@ final class SubscriptionStore {
     /// Everything Profile and the gate read.
     private(set) var state: SubscriptionState = .free
 
+    /// The terms this Apple Account may still take the introductory offer on.
+    ///
+    /// A product carrying a trial and an account being *allowed* that trial are different
+    /// questions, and only the second one decides what they are charged. Somebody who already
+    /// used the 3 days in this group is offered the product with the offer still attached —
+    /// so advertising it from the product alone shows them "3 days free" and then bills them
+    /// in full. Absent from this set means the paywall under-promises, which is the only safe
+    /// direction to be wrong in.
+    private(set) var introEligibleTerms: Set<PremiumTerm> = []
+
     /// The term currently being purchased, for the CTA's spinner.
     private(set) var purchasing: PremiumTerm?
 
@@ -86,10 +96,13 @@ final class SubscriptionStore {
                 .formatted(product.priceFormatStyle)
         }
 
+        // The trial is advertised only to an account that may actually take it.
+        let trial = introEligibleTerms.contains(term) ? Self.freeTrialText(for: product) : nil
+
         return PlanOffer(term: term,
                          displayPrice: product.displayPrice,
                          perMonthPrice: perMonth,
-                         freeTrialText: Self.freeTrialText(for: product),
+                         freeTrialText: trial,
                          savingsPercent: savings)
     }
 
@@ -154,9 +167,25 @@ final class SubscriptionStore {
             products = Dictionary(uniqueKeysWithValues: loaded.compactMap { product in
                 PremiumTerm.term(forProductID: product.id).map { ($0, product) }
             })
+            await refreshIntroEligibility()
         } catch {
             products = [:]
+            introEligibleTerms = []
         }
+    }
+
+    /// Asks the store which introductory offers this Apple Account may still take.
+    ///
+    /// Re-run after every entitlement refresh as well as at load, so the moment a purchase
+    /// consumes the trial the paywall stops offering it.
+    private func refreshIntroEligibility() async {
+        var eligible: Set<PremiumTerm> = []
+        for (term, product) in products {
+            guard let subscription = product.subscription,
+                  subscription.introductoryOffer != nil else { continue }
+            if await subscription.isEligibleForIntroOffer { eligible.insert(term) }
+        }
+        introEligibleTerms = eligible
     }
 
     // MARK: - Refresh
@@ -176,6 +205,9 @@ final class SubscriptionStore {
         let read = await readEntitlements()
         let enriched = await enrich(read)
         state = EntitlementReconciler.reconciled(read: enriched, grant: grant, now: clock())
+        // Buying the yearly plan consumes the trial, so eligibility has to be re-read here
+        // and not only at launch — otherwise the paywall keeps offering it afterwards.
+        await refreshIntroEligibility()
     }
 
     /// What the athlete is actually entitled to, right now. Authoritative.
