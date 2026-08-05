@@ -14,6 +14,7 @@ import Charts
 struct ExerciseDetailView: View {
     @Environment(\.exerciseCatalog) private var catalog
     @Environment(\.modelContext) private var context
+    @Environment(PremiumGate.self) private var gate
     @Query(sort: \Plan.order) private var plans: [Plan]
     @Query(sort: \BodyweightEntry.date) private var bodyweightEntries: [BodyweightEntry]
     @Query private var settingsRows: [AppSettings]
@@ -72,8 +73,8 @@ struct ExerciseDetailView: View {
             if isCustom, exercise != nil {
                 ToolbarItem(placement: .topBarTrailing) {
                     Menu {
-                        Button { showEditCustom = true } label: { Label("Edit", systemImage: "pencil") }
-                        Button(role: .destructive) { confirmDeleteCustom = true } label: {
+                        Button { requestEditCustom() } label: { Label("Edit", systemImage: "pencil") }
+                        Button(role: .destructive) { requestDeleteCustom() } label: {
                             Label("Delete", systemImage: "trash")
                         }
                     } label: {
@@ -99,6 +100,17 @@ struct ExerciseDetailView: View {
         dismiss()
     }
 
+    // MARK: Gated intents
+    //
+    // This screen is reachable from Progress, which is otherwise entirely read-only — so
+    // these three are the only way a write can start from inside that tab. Everything else
+    // here is reading: the photos, the instructions, the chart and the session log all stay
+    // open to a locked athlete.
+
+    private func requestAddToWorkout() { gate.require { showAddToWorkout = true } }
+    private func requestEditCustom() { gate.require { showEditCustom = true } }
+    private func requestDeleteCustom() { gate.require { confirmDeleteCustom = true } }
+
     /// "In your workouts" chips + an Add button. Hidden when the user has no plans yet
     /// (e.g. the read-only preview during onboarding).
     @ViewBuilder
@@ -122,7 +134,7 @@ struct ExerciseDetailView: View {
                         }
                     }
                 }
-                Button { showAddToWorkout = true } label: {
+                Button(action: requestAddToWorkout) {
                     HStack(spacing: 8) {
                         Image(systemName: "plus.circle.fill")
                         Text(membership.isEmpty ? "Add to workout" : "Add to another workout")
