@@ -1205,7 +1205,7 @@ hostage — which is a one-star review, not a conversion.
 |---|---|---|
 | Product id | `test.Replog.premium.monthly` | `test.Replog.premium.yearly` |
 | Price | $4.99 | $29.99 (**SAVE 50%**) |
-| Free trial | none | **3 days** |
+| Free trial | none | **3 days**, offered only to eligible accounts |
 | Service level | 2 | **1** (higher) |
 
 One subscription group, "Replog Premium". Yearly sits at the higher service level so StoreKit
@@ -1217,6 +1217,15 @@ date, which is why a pending plan change in practice only ever describes a downg
 > `Product.displayPrice` in the athlete's own storefront, and the SAVE badge is computed from the
 > two real prices by `PremiumPricing`. Guideline 3.1.2(c) — and the only way the paywall stays
 > honest if a price is changed in App Store Connect without a new build.
+
+> **The trial is advertised from eligibility, not from the product.** A product keeps its
+> introductory offer attached whether or not *this* Apple Account may still take it, so reading
+> the product alone shows a returning customer "3 days free, then $29.99" and then charges them
+> in full. `SubscriptionStore.introEligibleTerms` asks `isEligibleForIntroOffer` and is re-read
+> after every entitlement refresh, so buying the yearly plan stops the paywall offering the trial
+> it just consumed. An account we cannot confirm is treated as **ineligible** — under-promising
+> is the only safe direction to be wrong in, and `PlanOffer` already degrades cleanly with no
+> trial (`callToAction` becomes "Subscribe Now", the disclosure drops the "free").
 
 ### 16.2 The architecture
 
@@ -1277,13 +1286,14 @@ could refuse it), and every action routes through a named intent that asks the g
 | A first launch **after 20:00** rolls the free day to tomorrow | Installing at 23:50 would otherwise buy ten minutes |
 | Access is granted **on or before** the free day | So the late installer keeps the evening that earned the roll |
 | A session **started** on the free day is always finishable | It is already theirs; a workout you can see but never close is worse than the slack |
+| All **three** ways back into a paused session ask `allowsFinishing` | Hero, Plan Detail's Start and the resume banner. `RootView`'s cover binding asks too — presenting that screen *is* granting every write in the logging loop, and `isOpen` is just a stored flag |
 | `resetAll()` must never clear `freeDayDate` | Otherwise "Reset all data" is an infinite free trial |
 | Ambient writes stay ungated | Launch backfills, badge awarding, report scheduling all operate on training that already happened |
 | The coach card is hidden when locked | Every insight it produces is an instruction to go and train |
 
 ### 16.5 The StoreKit layer
 
-Four things in `SubscriptionStore` are load-bearing, each a real bug if dropped:
+Five things in `SubscriptionStore` are load-bearing, each a real bug if dropped:
 
 1. **`Transaction.currentEntitlements` is the truth.** `Product.SubscriptionInfo.status` is
    enrichment only — it frequently returns nothing, so anything that lets it revoke entitlement
@@ -1296,6 +1306,8 @@ Four things in `SubscriptionStore` are load-bearing, each a real bug if dropped:
    A read that *found* something stays authoritative, so refunds and downgrades still land at once.
 4. **The `Transaction.updates` listener starts at launch and is never cancelled**, so renewals,
    refunds and Ask-to-Buy approvals arrive.
+5. **Trial eligibility is asked, not assumed** — see the note in [§16.1](#161-the-products). This is
+   the one bug in the feature that takes real money from somebody who was told it would not.
 
 > **Refresh-on-return is critical.** Cancelling or switching inside Apple's
 > `.manageSubscriptionsSheet` only flips *renewal info* — no transaction is created — so
@@ -1319,10 +1331,17 @@ happy ones: guideline 1.1.7 exists to stop that, and a rating you filtered for t
 
 ### 16.7 Developing against it
 
-`Configuration/Replog.storekit` defines both products locally and is referenced from the scheme's
-Run and Test actions. It sits **outside** `Replog/` on purpose — that folder is a synchronized
-root group, so anything inside it becomes a bundled resource, and a file listing your price plan
-has no business inside the shipped app.
+`Configuration/Replog.storekit` defines both products locally and is set on the scheme's **Run**
+action (`Edit Scheme → Run → Options → StoreKit Configuration`). It sits **outside** `Replog/` on
+purpose — that folder is a synchronized root group, so anything inside it becomes a bundled
+resource, and a file listing your price plan has no business inside the shipped app. It is a
+`PBXFileReference` with no build-file entry, so it is in the navigator but in no target.
+
+Test carries no reference and does not need one: every subscription suite is pure and touches no
+StoreKit. Set it there too if a `StoreKitTest`-based suite is ever added.
+
+> **Let Xcode own the scheme.** Editing `Replog.xcscheme` on disk while the project is open gets
+> silently overwritten on Xcode's next save. Set it from the Edit Scheme dialog instead.
 
 ```bash
 # force any access state without buying anything or waiting for midnight
