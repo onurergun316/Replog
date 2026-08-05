@@ -57,6 +57,7 @@ struct ProfileView: View {
                     if !recentInsights.isEmpty { coachInsightsSection }
                     preferences
                     notificationsSection
+                    LegalSection()
                     resetButton
                 }
                 .padding(20)
