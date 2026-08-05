@@ -143,7 +143,7 @@ struct TodayView: View {
                         if let workout = shownWorkout {
                             TodayHeroCard(workout: workout, catalog: catalog,
                                           isResuming: isActive(workout),
-                                          isLocked: gate.isLocked) { start(workout) }
+                                          isLocked: !canTrain) { start(workout) }
                         } else {
                             restDayCard
                         }
@@ -425,6 +425,19 @@ struct TodayView: View {
             // after, so a locked athlete never sees a sheet that leads nowhere.
             gate.require { pendingWorkout = workout }
         }
+    }
+
+    /// Whether the hero's button will actually do something.
+    ///
+    /// Not the same question as `gate.isLocked`. A paused session the athlete may still
+    /// finish reopens even while locked — which is the case `allowsFinishing` exists for — so
+    /// a free athlete with a paused free-day session must not be shown a padlock and
+    /// "Unlock to train" on a button that is about to resume their workout.
+    private var canTrain: Bool {
+        if let session = activeSession {
+            return gate.allowsFinishing(sessionStartedAt: session.startedAt)
+        }
+        return !gate.isLocked
     }
 
     /// Reopens a paused session — the single place that flips `isOpen` back on.
