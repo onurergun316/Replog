@@ -39,6 +39,15 @@ final class PremiumGate {
     /// and subscribed states without buying anything or waiting for midnight.
     var debugOverride: Access?
 
+    /// The moment `access` is judged against.
+    ///
+    /// It has to be stored rather than read live. `access` depends on today's date, but
+    /// neither of the inputs above changes at midnight — so with a live `Date()` an app left
+    /// open overnight would keep answering "free day" until something unrelated happened to
+    /// redraw it. `revalidate()` advances this on foreground, which is the same trigger
+    /// `TodayView.reanchorIfNeeded` uses to re-anchor its week strip.
+    private(set) var asOf: Date = Date()
+
     // MARK: - Paywall presentation
 
     /// Bound directly by `RootView`'s sheet. Writable so a swipe-down works like any other
@@ -54,8 +63,11 @@ final class PremiumGate {
     // MARK: - The answer
 
     var access: Access {
-        debugOverride ?? AccessPolicy.access(isPremium: isPremium, freeDayDate: freeDayDate)
+        debugOverride ?? AccessPolicy.access(isPremium: isPremium, freeDayDate: freeDayDate, now: asOf)
     }
+
+    /// Re-judges access against the current moment. Call on foreground.
+    func revalidate() { asOf = Date() }
 
     /// Whether writes are allowed. The question every call site asks.
     var isUnlocked: Bool { access.isUnlocked }
