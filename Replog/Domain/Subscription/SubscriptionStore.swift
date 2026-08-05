@@ -54,6 +54,60 @@ final class SubscriptionStore {
 
     func product(for term: PremiumTerm) -> Product? { products[term] }
 
+    // MARK: - Priced offers
+
+    /// The plans the paywall renders, priced in the athlete's own storefront.
+    ///
+    /// Empty until the products load, which is what the paywall shows a spinner for. Yearly
+    /// first, matching `PremiumTerm`'s declaration order.
+    var offers: [PlanOffer] {
+        PremiumTerm.allCases.compactMap(offer(for:))
+    }
+
+    private func offer(for term: PremiumTerm) -> PlanOffer? {
+        guard let product = products[term] else { return nil }
+
+        // The saving is computed from the two real prices, so it stays true if either is
+        // repriced in App Store Connect without a new build.
+        var savings: Int?
+        if term == .yearly, let monthly = products[.monthly] {
+            savings = PremiumPricing.savingsPercent(monthlyPrice: monthly.price,
+                                                    yearlyPrice: product.price)
+        }
+
+        var perMonth: String?
+        if term == .yearly {
+            perMonth = PremiumPricing.monthlyEquivalent(ofYearly: product.price)
+                .formatted(product.priceFormatStyle)
+        }
+
+        return PlanOffer(term: term,
+                         displayPrice: product.displayPrice,
+                         perMonthPrice: perMonth,
+                         freeTrialText: Self.freeTrialText(for: product),
+                         savingsPercent: savings)
+    }
+
+    /// The product's introductory free trial in words, or nil when it has none.
+    ///
+    /// Read from the product rather than assumed, so the paywall can never promise a trial the
+    /// store will not grant — the one bug in this feature that ends with somebody being told
+    /// "free" and then charged.
+    private static func freeTrialText(for product: Product) -> String? {
+        guard let intro = product.subscription?.introductoryOffer,
+              intro.paymentMode == .freeTrial else { return nil }
+        let count = intro.period.value
+        let unit: String
+        switch intro.period.unit {
+        case .day:   unit = count == 1 ? "day" : "days"
+        case .week:  unit = count == 1 ? "week" : "weeks"
+        case .month: unit = count == 1 ? "month" : "months"
+        case .year:  unit = count == 1 ? "year" : "years"
+        @unknown default: return nil
+        }
+        return "\(count) \(unit)"
+    }
+
     // MARK: - Internals
 
     private let clock: () -> Date
