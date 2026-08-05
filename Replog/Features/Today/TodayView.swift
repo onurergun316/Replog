@@ -34,6 +34,7 @@ struct TodayView: View {
     /// app sits open, the strip re-anchors to the new current week instead of silently
     /// showing a week that is no longer "this" one.
     @State private var anchoredDay = Calendar.current.startOfDay(for: Date())
+    @Environment(PremiumGate.self) private var gate
     /// Which calendar day the Today coach card was dismissed on (max one card per day).
     @AppStorage("coachCardDismissedDay") private var coachCardDismissedDay = ""
 
@@ -121,7 +122,10 @@ struct TodayView: View {
                                   selected: shownDay,
                                   weekOffset: $weekOffset) { select($0) }
 
-                    if let insight = coachInsight {
+                    // Suppressed when locked: every insight the coach produces is an
+                    // instruction to go and train, and telling somebody to do a thing the
+                    // app will not let them do is worse than saying nothing.
+                    if let insight = coachInsight, !gate.isLocked {
                         CoachCardView(insight: insight) { coachCardDismissedDay = todayKey }
                             .onAppear {
                                 if CoachContextBuilder.recordDailyCard(insight, context: context) != nil {
@@ -138,7 +142,8 @@ struct TodayView: View {
                     Group {
                         if let workout = shownWorkout {
                             TodayHeroCard(workout: workout, catalog: catalog,
-                                          isResuming: isActive(workout)) { start(workout) }
+                                          isResuming: isActive(workout),
+                                          isLocked: gate.isLocked) { start(workout) }
                         } else {
                             restDayCard
                         }
@@ -166,7 +171,7 @@ struct TodayView: View {
                         snapshot: bodyweightSnapshot,
                         due: BodyweightTracker.checkInDue(lastDate: bodyweightSnapshot?.date),
                         units: units, goal: profile.goal
-                    ) { showingBodyweightSheet = true }
+                    ) { gate.require { showingBodyweightSheet = true } }
 
                     if let highlight = recentHighlight { highlight }
                 }
@@ -318,9 +323,11 @@ struct TodayView: View {
     }
 
     private func createPlanAndOpen() {
-        let plan = PlanFactory.emptyPlan(into: context, order: Reordering.nextOrder(after: plans))
-        try? context.save()
-        path.append(plan)
+        gate.require {
+            let plan = PlanFactory.emptyPlan(into: context, order: Reordering.nextOrder(after: plans))
+            try? context.save()
+            path.append(plan)
+        }
     }
 
     // MARK: Stats
@@ -412,12 +419,18 @@ struct TodayView: View {
 
     private func start(_ workout: Workout) {
         // One session at a time: resume the in-progress one rather than starting a second.
+        // Reopening is judged on when that session BEGAN — a workout started on the free day
+        // stays finishable the morning after, which is the whole point of `allowsFinishing`.
         if let existing = activeSession {
+            guard gate.allowsFinishing(sessionStartedAt: existing.startedAt) else {
+                return gate.presentPaywall()
+            }
             existing.isOpen = true
             try? context.save()
         } else {
-            // A brand-new session first offers the optional readiness check.
-            pendingWorkout = workout
+            // A brand-new session is a write, so it needs the gate. The readiness check comes
+            // after, so a locked athlete never sees a sheet that leads nowhere.
+            gate.require { pendingWorkout = workout }
         }
     }
 
@@ -437,6 +450,10 @@ private struct TodayHeroCard: View {
     let workout: Workout
     let catalog: ExerciseCatalog
     var isResuming: Bool = false
+    /// A free athlete whose day has passed. The card stays fully readable — they can still see
+    /// what today's session is — but the button says what will actually happen when it is
+    /// tapped, rather than promising a workout and producing a paywall.
+    var isLocked: Bool = false
     let onStart: () -> Void
 
     private var muscleChips: [String] {
@@ -495,8 +512,10 @@ private struct TodayHeroCard: View {
 
             Button(action: onStart) {
                 HStack(spacing: 8) {
-                    Image(systemName: isResuming ? "arrow.forward.circle.fill" : "play.fill")
-                    Text(isResuming ? "Continue" : "Start Workout")
+                    Image(systemName: isLocked ? "lock.fill"
+                          : isResuming ? "arrow.forward.circle.fill" : "play.fill")
+                    Text(isLocked ? "Unlock to train"
+                         : isResuming ? "Continue" : "Start Workout")
                 }
                 .font(.rounded(16, .heavy)).foregroundStyle(Color.accent)
                 .frame(maxWidth: .infinity).padding(.vertical, 15)
