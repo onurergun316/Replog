@@ -50,6 +50,7 @@ struct ProfileView: View {
                     Text("Profile").font(.screenTitle).foregroundStyle(Color.textPrimary)
                     profileHeader
                     statsRow
+                    SubscriptionSection()
                     badgesSection
                     if !plansWithReports.isEmpty { coachReports }
                     if !trainingReports.isEmpty { trainingReportsSection }

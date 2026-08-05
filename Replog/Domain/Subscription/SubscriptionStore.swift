@@ -2,12 +2,17 @@
 //  SubscriptionStore.swift
 //  Replog
 //
-//  The only file in the app that imports StoreKit.
+//  The only place that reads or writes StoreKit state.
 //
 //  Everything the rest of Replog needs to know about money arrives through this one object:
 //  the two products, whether the athlete is entitled, and the dates Profile prints. The
 //  decisions with any judgement in them live next door in `EntitlementReconciler`, which has
 //  no StoreKit import and is therefore actually testable.
+//
+//  One other file imports StoreKit — `SubscriptionSection`, for `.manageSubscriptionsSheet`,
+//  which is a SwiftUI modifier presenting Apple's own screen. It reads no state and buys
+//  nothing. The rule that matters is that entitlement is decided in exactly one place, and it
+//  is this one.
 //
 //  Four things here are not stylistic, and each is a real bug if it is dropped:
 //
