@@ -98,6 +98,23 @@ final class AppSettings {
     /// before history recorded which workout produced them.
     var sessionAttributionVersion: Int = 0
 
+    // MARK: Replog Premium
+    //
+    // A free athlete gets exactly one calendar day of full access. These two fields are the
+    // only persisted state that decides it, and neither is user-facing.
+
+    /// The one calendar day a free athlete may train on, stamped at first launch and never
+    /// moved. `nil` only before the very first launch has completed.
+    ///
+    /// **Never clear this.** "Reset all data" deliberately leaves it alone — resetting the
+    /// store is a legitimate thing to want, and handing out a fresh free day every time would
+    /// make the subscription optional. See `ProfileView.resetAll`.
+    var freeDayDate: Date?
+
+    /// Whether the App Store review prompt has been requested. Once, ever — Apple throttles it
+    /// anyway, and asking twice is what makes an app feel like it is nagging.
+    var hasRequestedReview: Bool = false
+
     // MARK: Notifications (Phase 7)
     /// Master switch — off until the user opts in (permission is requested in context).
     var notificationsEnabled: Bool = false

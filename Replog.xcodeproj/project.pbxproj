@@ -24,6 +24,7 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		3926B2373023F27800C1BCEF /* Replog.storekit */ = {isa = PBXFileReference; lastKnownFileType = text; name = Replog.storekit; path = Configuration/Replog.storekit; sourceTree = "<group>"; };
 		39B432CE2FF3ABEF006131AA /* Replog.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Replog.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		39B432DB2FF3ABF0006131AA /* ReplogTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = ReplogTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		39B432E52FF3ABF0006131AA /* ReplogUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = ReplogUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -75,6 +76,7 @@
 		39B432C52FF3ABEF006131AA = {
 			isa = PBXGroup;
 			children = (
+				3926B2373023F27800C1BCEF /* Replog.storekit */,
 				39B432D02FF3ABEF006131AA /* Replog */,
 				39B432DE2FF3ABF0006131AA /* ReplogTests */,
 				39B432E82FF3ABF0006131AA /* ReplogUITests */,

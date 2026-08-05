@@ -11,6 +11,7 @@ import SwiftData
 
 struct PlansListView: View {
     @Environment(\.modelContext) private var context
+    @Environment(PremiumGate.self) private var gate
     @Query(sort: \Plan.order) private var plans: [Plan]
     @State private var path = NavigationPath()
     @State private var showGenerate = false
@@ -63,14 +64,18 @@ struct PlansListView: View {
     }
 
     private func delete(_ plan: Plan) {
-        context.delete(plan)
-        try? context.save()
+        gate.require {
+            context.delete(plan)
+            try? context.save()
+        }
     }
 
     private var createCards: some View {
         HStack(spacing: 12) {
             CreateCard(icon: "sparkles", title: "Generate with AI",
-                       subtitle: "Answer a few questions", filled: true) { showGenerate = true }
+                       subtitle: "Answer a few questions", filled: true) {
+                gate.require { showGenerate = true }
+            }
             CreateCard(icon: "plus", title: "Build your own",
                        subtitle: "Add exercises manually", filled: false) { buildYourOwn() }
         }
@@ -88,9 +93,11 @@ struct PlansListView: View {
     }
 
     private func buildYourOwn() {
-        let plan = PlanFactory.emptyPlan(into: context, order: Reordering.nextOrder(after: plans))
-        try? context.save()
-        path.append(plan)
+        gate.require {
+            let plan = PlanFactory.emptyPlan(into: context, order: Reordering.nextOrder(after: plans))
+            try? context.save()
+            path.append(plan)
+        }
     }
 }
 

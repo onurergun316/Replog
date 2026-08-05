@@ -50,12 +50,14 @@ struct ProfileView: View {
                     Text("Profile").font(.screenTitle).foregroundStyle(Color.textPrimary)
                     profileHeader
                     statsRow
+                    SubscriptionSection()
                     badgesSection
                     if !plansWithReports.isEmpty { coachReports }
                     if !trainingReports.isEmpty { trainingReportsSection }
                     if !recentInsights.isEmpty { coachInsightsSection }
                     preferences
                     notificationsSection
+                    LegalSection()
                     resetButton
                 }
                 .padding(20)
@@ -336,11 +338,7 @@ struct ProfileView: View {
         .padding(14)
     }
 
-    private func icon(_ name: String) -> some View {
-        Image(systemName: name).font(.system(size: 14, weight: .bold)).foregroundStyle(Color.accent)
-            .frame(width: 30, height: 30)
-            .background(RoundedRectangle(cornerRadius: 9, style: .continuous).fill(Color.accentSoft))
-    }
+    private func icon(_ name: String) -> some View { SettingsRowIcon(systemName: name) }
 
     private var resetButton: some View {
         Button(role: .destructive) { showResetConfirm = true } label: {
@@ -354,6 +352,11 @@ struct ProfileView: View {
 
     private func save() { try? context.save() }
 
+    /// Wipes the athlete's training data and sends them back through onboarding.
+    ///
+    /// Deliberately does NOT touch `AppSettings` — and in particular not
+    /// `AppSettings.freeDayDate`. Resetting your data is a reasonable thing to want; being
+    /// handed a fresh free day every time you did it would make Premium optional.
     private func resetAll() {
         for plan in plans { context.delete(plan) }
         for entry in history { context.delete(entry) }

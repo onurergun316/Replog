@@ -6,6 +6,11 @@
 //  Lightweight line-based rendering: # / ## headings, "- " bullets, "> " callout, and
 //  paragraphs. Used from the onboarding result screen and the Profile tab.
 //
+//  The eyebrow is a parameter rather than a constant because the renderer outlived its
+//  original job: the legal documents go through it too, and stamping "Your AI Coach" on a
+//  privacy policy would be both wrong and, given what the policy says about on-device
+//  processing, faintly absurd.
+//
 
 import SwiftUI
 
@@ -13,14 +18,17 @@ struct CoachReportView: View {
     let title: String
     let markdown: String
     var showsDoneButton: Bool = false
+    /// The small uppercase label above the content, and its SF Symbol.
+    var eyebrow: String = "Your AI Coach"
+    var eyebrowIcon: String = "sparkles"
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
                 HStack(spacing: 8) {
-                    Image(systemName: "sparkles").foregroundStyle(Color.accent)
-                    Text("Your AI Coach").eyebrow()
+                    Image(systemName: eyebrowIcon).foregroundStyle(Color.accent)
+                    Text(eyebrow).eyebrow()
                 }
                 ForEach(Array(blocks.enumerated()), id: \.offset) { _, block in
                     block.view

@@ -14,6 +14,7 @@ struct PlanDetailView: View {
     @Environment(\.modelContext) private var context
     @Environment(\.dismiss) private var dismiss
     @Environment(\.exerciseCatalog) private var catalog
+    @Environment(PremiumGate.self) private var gate
     @Query private var settingsList: [AppSettings]
     @Bindable var plan: Plan
     @State private var showRestSheet = false
@@ -32,11 +33,18 @@ struct PlanDetailView: View {
         List {
             Section {
                 Group {
+                    if gate.isLocked {
+                        LockedBanner(message: "Read-only. Subscribe to edit this plan.") {
+                            gate.presentPaywall()
+                        }
+                    }
                     VStack(alignment: .leading, spacing: 4) {
                         Text("Plan").eyebrow()
                         TextField("Plan name", text: $plan.name)
                             .font(.screenTitle).foregroundStyle(Color.textPrimary)
                             .onChange(of: plan.name) { try? context.save() }
+                            // Bound straight to the model — a keystroke is the mutation.
+                            .disabled(gate.isLocked)
                     }
                     Text("\(plan.workouts.count) workouts · \(plan.exerciseCount) exercises · hold to reorder · swipe to delete")
                         .font(.rounded(13, .semibold)).foregroundStyle(Color.text2)
@@ -72,24 +80,25 @@ struct PlanDetailView: View {
                         NavigationLink(value: workout) { EmptyView() }.opacity(0) // hides the List chevron
                     }
                     .plainListRow()
-                    .reorderAccessibilityActions(index: index, count: workouts.count, move: moveWorkouts)
+                    .reorderAccessibilityActions(index: index, count: workouts.count,
+                                                 move: requestMoveWorkouts)
                     .swipeActions(edge: .trailing) {
-                        Button(role: .destructive) { deleteWorkout(workout) } label: {
+                        Button(role: .destructive) { requestDeleteWorkout(workout) } label: {
                             Label("Delete", systemImage: "trash")
                         }
                     }
                 }
-                .onMove(perform: moveWorkouts)
+                .onMove(perform: reorderHandler)
             }
 
             Section {
                 Group {
-                    Button { addWorkout() } label: {
+                    Button(action: requestAddWorkout) {
                         dashedButtonLabel(icon: "plus", title: "Add workout")
                     }
                     .buttonStyle(.plain)
 
-                    Button(role: .destructive) { deletePlan() } label: {
+                    Button(role: .destructive, action: requestDeletePlan) {
                         HStack(spacing: 6) {
                             Image(systemName: "trash")
                             Text("Delete plan")
@@ -118,7 +127,7 @@ struct PlanDetailView: View {
         }
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
-                Button { showRestSheet = true } label: {
+                Button(action: openRestSheet) {
                     Image(systemName: "timer").font(.system(size: 16, weight: .semibold))
                         .foregroundStyle(Color.text2)
                 }
@@ -165,12 +174,20 @@ struct PlanDetailView: View {
 
     private func start(_ workout: Workout) {
         // One session at a time: resume an in-progress workout instead of starting a second.
+        // Reopening is judged on when that session began, so a workout started on the free day
+        // can still be finished afterwards.
         if let existing = (try? context.fetch(FetchDescriptor<ActiveSession>()))?.first {
+            guard gate.allowsFinishing(sessionStartedAt: existing.startedAt) else {
+                return gate.presentPaywall()
+            }
             existing.isOpen = true
+            try? context.save()
         } else {
-            SessionBuilder.start(workout: workout, into: context)
+            gate.require {
+                SessionBuilder.start(workout: workout, into: context)
+                try? context.save()
+            }
         }
-        try? context.save()
     }
 
     private func addWorkout() {
@@ -183,6 +200,26 @@ struct PlanDetailView: View {
         try? context.save()
         dismiss()
     }
+
+    /// `nil` while locked — see the note on `WorkoutEditorView.reorderHandler`; the same two
+    /// type-checker traps apply, so keep the guard rather than a ternary.
+    private var reorderHandler: ((IndexSet, Int) -> Void)? {
+        guard !gate.isLocked else { return nil }
+        return moveWorkouts
+    }
+
+    // MARK: Gated intents
+
+    /// The VoiceOver rotor calls its handler directly, so it needs the gate the drag gets by
+    /// being switched off. See the note in `WorkoutEditorView`.
+    private func requestMoveWorkouts(from source: IndexSet, to destination: Int) {
+        gate.require { moveWorkouts(from: source, to: destination) }
+    }
+
+    private func openRestSheet() { gate.require { showRestSheet = true } }
+    private func requestAddWorkout() { gate.require { addWorkout() } }
+    private func requestDeletePlan() { gate.require { deletePlan() } }
+    private func requestDeleteWorkout(_ workout: Workout) { gate.require { deleteWorkout(workout) } }
 }
 
 // MARK: - Workout card

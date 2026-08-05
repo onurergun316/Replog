@@ -10,6 +10,7 @@ import SwiftUI
 
 struct LibraryView: View {
     @Environment(\.exerciseCatalog) private var catalog
+    @Environment(PremiumGate.self) private var gate
     @State private var model = LibraryViewModel()
     @State private var showFilters = false
     @State private var addRef: ExerciseRef?
@@ -75,7 +76,7 @@ struct LibraryView: View {
     @ViewBuilder
     private var multiAddBar: some View {
         if selectionMode && !selected.isEmpty {
-            Button { showMultiAdd = true } label: {
+            Button { gate.require { showMultiAdd = true } } label: {
                 Text("Add \(selected.count) to workout")
                     .font(.rounded(16, .heavy)).foregroundStyle(.white)
                     .frame(maxWidth: .infinity).padding(.vertical, 15)
@@ -141,7 +142,7 @@ struct LibraryView: View {
                     .listRowInsets(EdgeInsets(top: 8, leading: 20, bottom: 8, trailing: 20))
                     .swipeActions(edge: .trailing, allowsFullSwipe: true) {
                         if !selectionMode {
-                            Button { addRef = ExerciseRef(id: ex.id) } label: {
+                            Button { requestAdd(ex.id) } label: {
                                 Label("Add", systemImage: "plus")
                             }
                             .tint(.accent)
@@ -151,6 +152,14 @@ struct LibraryView: View {
         }
         .listStyle(.plain)
         .scrollDismissesKeyboard(.immediately)
+    }
+
+    /// Adding to a workout writes; browsing and searching the catalogue never does, so the
+    /// Library itself stays completely open to a locked athlete. It is 873 exercises of
+    /// reference material, and walling it off would make the free tier useless without
+    /// making Premium any more attractive.
+    private func requestAdd(_ exId: String) {
+        gate.require { addRef = ExerciseRef(id: exId) }
     }
 
     @ViewBuilder

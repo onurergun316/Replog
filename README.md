@@ -43,10 +43,11 @@ the reports and the reasoning all run on the phone.
 | 13 | [Streaks & the calendar](#13-streaks--the-calendar)                    |
 | 14 | [Progress — the four-layer onion](#14-progress--the-four-layer-onion)  |
 | 15 | [Badges & medals](#15-badges--medals)                                  |
-| 16 | [Design system](#16-design-system)                                     |
-| 17 | [Testing](#17-testing)                                                 |
-| 18 | [Conventions & gotchas](#18-conventions--gotchas)                      |
-| 19 | [Roadmap & known gaps](#19-roadmap--known-gaps)                        |
+| 16 | [Replog Premium — the subscription](#16-replog-premium--the-subscription) |
+| 17 | [Design system](#17-design-system)                                     |
+| 18 | [Testing](#18-testing)                                                 |
+| 19 | [Conventions & gotchas](#19-conventions--gotchas)                      |
+| 20 | [Roadmap & known gaps](#20-roadmap--known-gaps)                        |
 
 ---
 
@@ -62,13 +63,14 @@ the reports and the reasoning all run on the phone.
 | **Persistence** | **SwiftData** — 15 `@Model` types, one on-disk store, cascade deletes |
 | **"AI"** | Apple **`FoundationModels`** (on-device Apple Intelligence), always with a deterministic fallback |
 | **Network** | **None.** No URLSession, no backend, no analytics, no account |
+| **Monetization** | Freemium. **One free day**, then read-only. Replog Premium: $4.99/mo · $29.99/yr with a 3-day trial. StoreKit 2 |
 | **Third-party deps** | **None.** No SPM, no CocoaPods, no Carthage |
 | **Bundled data** | 873 exercises · 1 746 photos · 62 training programs · 67 weight comparisons · 74 badges |
-| **Source size** | 137 app `.swift` files (~23.8k lines) |
-| **Tests** | **682 tests** across 55 Swift Testing suites (~9.3k lines) |
+| **Source size** | 151 app `.swift` files (~25.6k lines) |
+| **Tests** | **759 tests** across 67 Swift Testing suites (~10k lines) |
 | **Resources** | ≈19 MB (HEIC image set dominates) |
 
-### The five things that make this app what it is
+### The six things that make this app what it is
 
 1. **Nothing is hardcoded that could be computed.** Starting weights are derived from the athlete's
    sex, experience and bodyweight against published untrained standards — never a magic number.
@@ -80,6 +82,8 @@ the reports and the reasoning all run on the phone.
    function over value types. SwiftData reads and writes stay in the view.
 5. **A plan is a scope.** History, progression, stall detection and write-back are all scoped *per
    plan*, so benching 100 kg in a strength block never rewrites the 70 kg in a hypertrophy plan.
+6. **Paying gates writing, never reading.** A free athlete keeps every screen, every chart and
+   every number they ever logged. What Premium buys is the ability to add to it — see [§16](#16-replog-premium--the-subscription).
 
 ---
 
@@ -186,8 +190,11 @@ Replog/                              ← repo root (the Xcode project lives here
 │   │   ├── AI/ (9) ............. AIPlanService · ProgramPlanBuilder · PlanBlueprint (@Generable) ·
 │   │   │                         CoachEngine · CoachVoice · CoachContextBuilder · AthleteContext ·
 │   │   │                         CoachingKnowledge · ReportComposer
-│   │   └── Badges/ (6) ......... Badge · BadgeCriterion · BadgeCatalog · BadgeEngine ·
-│   │                             BadgeSnapshot · BadgeAwarding · MedalPalettes
+│   │   ├── Badges/ (6) ......... Badge · BadgeCriterion · BadgeCatalog · BadgeEngine ·
+│   │   │                         BadgeSnapshot · BadgeAwarding · MedalPalettes
+│   │   └── Subscription/ (8) ... AccessPolicy (the gate) · PremiumGate · SubscriptionStore
+│   │                             (StoreKit) · EntitlementReconciler · SubscriptionSummary ·
+│   │                             PremiumPlan · PlanOffer · ReviewPrompt
 │   │
 │   ├── Features/ (46) .......... One folder per screen. View + (where earned) an @Observable VM.
 │   │   ├── Onboarding/ ......... the 13-step quiz + "Building your plan" + result & report
@@ -199,7 +206,10 @@ Replog/                              ← repo root (the Xcode project lives here
 │   │   ├── Progress/ (14) ...... the 4-layer dashboard onion
 │   │   ├── Calendar/ ........... paged month grid + drag-select range summary
 │   │   ├── Coach/ .............. debrief sheet · Today card · insight list
-│   │   ├── Badges/ · Profile/ .. celebration overlay · trophy cabinet · reports · preferences
+│   │   ├── Badges/ · Profile/ .. celebration overlay · trophy cabinet · reports · preferences ·
+│   │   │                         subscription status · legal
+│   │   ├── Paywall/ ............ PaywallView · PlanOptionRow · LockedBanner
+│   │   ├── Legal/ .............. renders the bundled privacy policy & terms
 │   │   └── Programs/ ........... reader view for a bundled library program
 │   │
 │   ├── DesignSystem/ (10) ...... Theme tokens · SF Rounded type scale · Pill/Stepper/
@@ -208,13 +218,18 @@ Replog/                              ← repo root (the Xcode project lives here
 │   │                             DragToReorder
 │   │
 │   ├── Resources/ .............. exercises.json (1.0 MB) · programs.json (319 KB) ·
-│   │                             comparisons.json (25 KB) · ExerciseImages/*.heic (1 746 files)
+│   │                             comparisons.json (25 KB) · ExerciseImages/*.heic (1 746 files) ·
+│   │                             Legal/privacy-policy.md · Legal/terms-of-use.md
 │   │
 │   └── Scripts/build-exercise-db.sh ... one-shot dev tool: compresses the source Free Exercise DB
 │                                        (lives at ../../free-exercise-db-main, not committed).
 │
-├── ReplogTests/ (56) ........... Swift Testing. 682 @Test cases · 55 suites · 1 eval harness.
-├── ReplogUITests/ (2) .......... Xcode's default stubs. Not a real suite — see §19.
+├── Configuration/Replog.storekit ... local store for developing the paywall. OUTSIDE Replog/
+│                                     on purpose — that folder is a synchronized root group, so
+│                                     anything inside it ships in the app bundle.
+│
+├── ReplogTests/ (62) ........... Swift Testing. 759 @Test cases · 67 suites · 1 eval harness.
+├── ReplogUITests/ (2) .......... Xcode's default stubs. Not a real suite — see §20.
 ├── Scripts/render-app-icon.swift
 │
 └── docs at root:
@@ -991,7 +1006,7 @@ Weeks are **Sunday-first everywhere, regardless of locale**, so the Today strip,
 > `UIGestureRecognizerRepresentable`. A SwiftUI `LongPressGesture` would win the touch race against
 > the scroll views without arbitrating; the UIKit recognizer participates in the system's
 > arbitration, so scrolling and month-paging win when the finger moves early and the press wins only
-> on a genuine hold. Same lesson as `DragToReorder` (§18).
+> on a genuine hold. Same lesson as `DragToReorder` (§19).
 
 ---
 
@@ -1155,7 +1170,193 @@ than one buzz. A badge is rarer than a finished session, so it gets the louder m
 
 ---
 
-## 16. Design system
+## 16. Replog Premium — the subscription
+
+Replog is free to download and free to use **for one calendar day** — the day of first launch.
+That day is the whole product: onboard, get an AI-built programme, train, log every set, finish,
+read the debrief. Nothing is withheld.
+
+When the day ends the app becomes **read-only**. Every tab still opens, every chart still draws,
+the Library stays entirely usable — but everything that *writes* asks for a subscription.
+
+```
+   ┌──────────────────────────────────────────────────────────────────────────────┐
+   │  READ-ONLY (a free athlete, day expired)                                     │
+   │                                                                              │
+   │  Today     visible · hero button reads "Unlock to train" · coach card hidden │
+   │  Plans     visible · name fields disabled · reorder off · banner explains     │
+   │  Library   FULLY usable — 873 exercises, all six filter facets, every photo  │
+   │  Progress  visible · every chart, every drill-down, the whole session log    │
+   │  Profile   visible · subscription status · restore · legal                   │
+   │                                                                              │
+   │  GATED → paywall:  start a workout · log · finish · create or edit a plan     │
+   │                    add an exercise · bodyweight & readiness check-ins         │
+   │                    custom exercises · generate a plan with AI                 │
+   └──────────────────────────────────────────────────────────────────────────────┘
+```
+
+Reading stays open deliberately. A reviewer has to be able to evaluate the app (3.1.1 / 2.1), and
+somebody who logged a real workout and then cannot see it reads that as their own data being held
+hostage — which is a one-star review, not a conversion.
+
+### 16.1 The products
+
+| | Monthly | Yearly |
+|---|---|---|
+| Product id | `test.Replog.premium.monthly` | `test.Replog.premium.yearly` |
+| Price | $4.99 | $29.99 (**SAVE 50%**) |
+| Free trial | none | **3 days**, offered only to eligible accounts |
+| Service level | 2 | **1** (higher) |
+
+One subscription group, "Replog Premium". Yearly sits at the higher service level so StoreKit
+treats monthly→yearly as an **upgrade** and applies it immediately with proration it calculates
+itself. **We never compute proration.** Yearly→monthly is a downgrade and defers to the renewal
+date, which is why a pending plan change in practice only ever describes a downgrade.
+
+> **No price, period or saving appears anywhere in Swift.** Every figure comes from
+> `Product.displayPrice` in the athlete's own storefront, and the SAVE badge is computed from the
+> two real prices by `PremiumPricing`. Guideline 3.1.2(c) — and the only way the paywall stays
+> honest if a price is changed in App Store Connect without a new build.
+
+> **The trial is advertised from eligibility, not from the product.** A product keeps its
+> introductory offer attached whether or not *this* Apple Account may still take it, so reading
+> the product alone shows a returning customer "3 days free, then $29.99" and then charges them
+> in full. `SubscriptionStore.introEligibleTerms` asks `isEligibleForIntroOffer` and is re-read
+> after every entitlement refresh, so buying the yearly plan stops the paywall offering the trial
+> it just consumed. An account we cannot confirm is treated as **ineligible** — under-promising
+> is the only safe direction to be wrong in, and `PlanOffer` already degrades cleanly with no
+> trial (`callToAction` becomes "Subscribe Now", the disclosure drops the "free").
+
+### 16.2 The architecture
+
+```
+  Domain/Subscription/                        ← pure, unit-tested
+  ┌────────────────────┐  ┌──────────────────────┐  ┌────────────────────────┐
+  │ AccessPolicy       │  │ SubscriptionSummary  │  │ PremiumPlan            │
+  │ THE gate decision  │  │ every Profile string │  │ ids · savings maths    │
+  │ premium/freeDay/   │  │ for every state      │  │ PlanOffer: the priced  │
+  │ locked             │  │                      │  │ plan the paywall reads │
+  └────────────────────┘  └──────────────────────┘  └────────────────────────┘
+  ┌────────────────────┐  ┌──────────────────────┐
+  │ EntitlementRecon.  │  │ ReviewPrompt         │
+  │ which plan wins ·  │  │ when to ask          │
+  │ the grant window   │  │                      │
+  └────────────────────┘  └──────────────────────┘
+           ▲                                            ▲
+           │ used by                                    │ used by
+  ┌────────┴─────────────────────┐          ┌───────────┴──────────────────┐
+  │ SubscriptionStore            │          │ PremiumGate                  │
+  │ @MainActor @Observable       │─────────▶│ @MainActor @Observable       │
+  │ the ONLY StoreKit state      │ isPremium│ access · paywall · the        │
+  │ products · entitlement ·     │          │ pending action                │
+  │ purchase · restore           │          │                              │
+  └──────────────────────────────┘          └───────────┬──────────────────┘
+                                                        │ .environment(…)
+                                                        ▼
+                         every screen:  gate.require { …the write… }
+```
+
+`PremiumGate` mirrors its two inputs — `isPremium` from the store, `freeDayDate` from
+`AppSettings` — rather than reaching for them. `RootView` is the one view that already has both
+and keeps them current. That keeps SwiftData access in the View, where CLAUDE.md wants it, and it
+makes the gate testable with no store at all.
+
+### 16.3 `gate.require` — one word per call site
+
+```swift
+Button("Start Workout") { gate.require { start(workout) } }
+```
+
+Unlocked, it runs. Locked, it **keeps the closure**, opens the paywall, and runs it if they
+subscribe — so buying Premium from a Start button starts the workout instead of returning you to
+the screen to press the same button again. Dismissing the paywall drops the closure, so a
+"Delete plan" you thought better of can never fire later from an unrelated paywall.
+
+**Why the gate is at entry, not at the store.** `PlanDetailView`, `WorkoutEditorView` and
+`ActiveWorkoutView` bind `@Bindable` directly to `@Model` properties — a keystroke *is* the
+mutation, and two of them call `context.insert` directly, bypassing `PlanFactory`. A `save()`-
+layer or factory-layer gate would be silently bypassed. So text fields are `.disabled()`,
+drag-to-reorder is switched off outright (a reorder is committed by the system before any handler
+could refuse it), and every action routes through a named intent that asks the gate.
+
+### 16.4 Rules worth knowing
+
+| Rule | Why |
+|---|---|
+| A first launch **after 20:00** rolls the free day to tomorrow | Installing at 23:50 would otherwise buy ten minutes |
+| Access is granted **on or before** the free day | So the late installer keeps the evening that earned the roll |
+| A session **started** on the free day is always finishable | It is already theirs; a workout you can see but never close is worse than the slack |
+| All **three** ways back into a paused session ask `allowsFinishing` | Hero, Plan Detail's Start and the resume banner. `RootView`'s cover binding asks too — presenting that screen *is* granting every write in the logging loop, and `isOpen` is just a stored flag |
+| `resetAll()` must never clear `freeDayDate` | Otherwise "Reset all data" is an infinite free trial |
+| Ambient writes stay ungated | Launch backfills, badge awarding, report scheduling all operate on training that already happened |
+| The coach card is hidden when locked | Every insight it produces is an instruction to go and train |
+
+### 16.5 The StoreKit layer
+
+Five things in `SubscriptionStore` are load-bearing, each a real bug if dropped:
+
+1. **`Transaction.currentEntitlements` is the truth.** `Product.SubscriptionInfo.status` is
+   enrichment only — it frequently returns nothing, so anything that lets it revoke entitlement
+   logs paying athletes out.
+2. **Refreshes are chained.** Roughly seven call sites overlap in practice; unchained they
+   interleave and whichever finishes *last* wins, possibly the one that read stale entitlements.
+3. **A verified purchase opens a short optimistic window** (`EntitlementReconciler`) during which
+   an **empty** read cannot revoke. Without it, the purchase's own refresh reads nothing yet,
+   concludes "lapsed", and writes the athlete back to free — they paid, and the app locked anyway.
+   A read that *found* something stays authoritative, so refunds and downgrades still land at once.
+4. **The `Transaction.updates` listener starts at launch and is never cancelled**, so renewals,
+   refunds and Ask-to-Buy approvals arrive.
+5. **Trial eligibility is asked, not assumed** — see the note in [§16.1](#161-the-products). This is
+   the one bug in the feature that takes real money from somebody who was told it would not.
+
+> **Refresh-on-return is critical.** Cancelling or switching inside Apple's
+> `.manageSubscriptionsSheet` only flips *renewal info* — no transaction is created — so
+> `Transaction.updates` never fires. `SubscriptionSection` refreshes on that sheet's dismissal and
+> `ReplogApp` refreshes on `scenePhase == .active`. Remove either and Profile shows stale state
+> indefinitely.
+
+### 16.6 Legal & the review prompt
+
+Both documents ship as **bundled markdown** (`Resources/Legal/`), rendered through
+`CoachReportView`, linked from the paywall footer and from Profile → Legal. They work offline,
+like the rest of the app, and cannot drift from the version the build was reviewed against.
+
+The privacy policy is unusually short because it is true: no servers, no network requests, no
+account, no analytics, no third-party SDKs. The terms lead with the training disclaimer rather
+than burying it — this app prescribes specific weights to somebody it has never seen lift.
+
+The **review prompt** is Apple's own, requested once, after three distinct days with a completed
+workout, fired as the workout cover dismisses. We never show our own stars and forward only the
+happy ones: guideline 1.1.7 exists to stop that, and a rating you filtered for tells you nothing.
+
+### 16.7 Developing against it
+
+`Configuration/Replog.storekit` defines both products locally and is set on the scheme's **Run**
+action (`Edit Scheme → Run → Options → StoreKit Configuration`). It sits **outside** `Replog/` on
+purpose — that folder is a synchronized root group, so anything inside it becomes a bundled
+resource, and a file listing your price plan has no business inside the shipped app. It is a
+`PBXFileReference` with no build-file entry, so it is in the navigator but in no target.
+
+Test carries no reference and does not need one: every subscription suite is pure and touches no
+StoreKit. Set it there too if a `StoreKitTest`-based suite is ever added.
+
+> **Let Xcode own the scheme.** Editing `Replog.xcscheme` on disk while the project is open gets
+> silently overwritten on Xcode's next save. Set it from the Edit Scheme dialog instead.
+
+```bash
+# force any access state without buying anything or waiting for midnight
+SIMCTL_CHILD_REPLOG_ACCESS=locked  …   # read-only
+SIMCTL_CHILD_REPLOG_ACCESS=premium …   # subscribed
+SIMCTL_CHILD_REPLOG_ACCESS=freeday …   # inside the free day
+```
+
+> With the config on the **Run** action, ⌘R buys from a local fake store. Those transactions live
+> in the app container, vanish when the app is deleted, and cannot be restored against the real
+> App Store. Clear the reference and use a Sandbox account to exercise the real thing.
+
+---
+
+## 17. Design system
 
 Warm brand over native iOS 26 controls, Liquid Glass, and `.sensoryFeedback` haptics.
 
@@ -1210,7 +1411,7 @@ keyboard-toolbar "Done") · `PrimaryButton` · `SegmentedToggle` · `SectionHead
 Scroll containers use `.scrollDismissesKeyboard(.immediately)`; text screens use `.hideKeyboardOnTap()`
 (a *simultaneous* tap gesture that never steals button taps).
 
-**`DragToReorder`** — see the gotcha in §18. It adds *only* the drop-commit haptic and the VoiceOver
+**`DragToReorder`** — see the gotcha in §19. It adds *only* the drop-commit haptic and the VoiceOver
 "Move up / Move down" actions, because those are the only things that can't compete for a touch.
 
 ### Sheet conventions
@@ -1221,7 +1422,7 @@ where it actually *does* something.
 
 ---
 
-## 17. Testing
+## 18. Testing
 
 **682 tests · 55 Swift Testing suites · 1 eval harness.** `import Testing`, no XCTest in the logic
 suites, no third-party frameworks. The logic layer (`Domain` / `Models` / `Catalog` / view models) is
@@ -1271,7 +1472,7 @@ every good program must satisfy** — regardless of which specific exercises the
 
 ---
 
-## 18. Conventions & gotchas
+## 19. Conventions & gotchas
 
 ### Naming
 
@@ -1333,10 +1534,11 @@ filters in memory on purpose — it's one exercise's entries, at most one row pe
 
 ---
 
-## 19. Roadmap & known gaps
+## 20. Roadmap & known gaps
 
 | # | Item | Notes |
 |---|---|---|
+| 0 | **Three legal placeholders must be filled before submission.** | `[SUPPORT EMAIL]`, `[DEVELOPER NAME]` and `[JURISDICTION]` in `Resources/Legal/*.md`. App Store Connect also needs a **hosted** privacy policy URL — in-app text does not satisfy it; publish the bundled copy so the two cannot disagree. |
 | 1 | **`ReplogUITests` is Xcode's default stub.** | Two generated methods (`testExample`, `testLaunchPerformance`). The owner's call was no UI tests; the target exists but asserts nothing. Either delete it or make it real — right now it implies coverage that isn't there. |
 | 2 | **Localization.** | 100 % hardcoded English, no `.xcstrings`. Large surface: much of the coach's copy is computed and interpolated, so it won't auto-extract from `Text("literal")`. |
 | 3 | **Accessibility sweep.** | `DragToReorder` ships VoiceOver move actions and the type scale is Dynamic-Type friendly, but a full label/trait audit across 46 feature files hasn't been done. |
