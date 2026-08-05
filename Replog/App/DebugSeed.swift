@@ -24,6 +24,20 @@ enum DebugSeed {
         ProcessInfo.processInfo.environment["REPLOG_BODYWEIGHT"] == "1"
     }
 
+    /// REPLOG_ACCESS=locked|freeday|premium -> forces `PremiumGate`'s answer.
+    ///
+    /// The read-only state is otherwise only reachable by waiting for midnight, and the
+    /// subscribed state only by buying something. Neither is a reasonable way to check a
+    /// screen looks right.
+    static var accessOverride: Access? {
+        switch ProcessInfo.processInfo.environment["REPLOG_ACCESS"] {
+        case "locked":  return .locked
+        case "freeday": return .freeDay
+        case "premium": return .premium
+        default: return nil
+        }
+    }
+
     static var initialTab: MainTabView.Tab? {
         switch ProcessInfo.processInfo.environment["REPLOG_TAB"] {
         case "plans": return .plans
