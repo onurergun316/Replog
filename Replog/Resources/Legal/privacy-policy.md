@@ -77,4 +77,4 @@ described here rather than buried.
 
 ## Contact
 
-Questions about this policy: **[SUPPORT EMAIL]**
+Questions about this policy: **filmifyapps@gmail.com**
