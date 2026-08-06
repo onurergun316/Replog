@@ -2,7 +2,7 @@
 
 _Last updated 5 August 2026_
 
-These terms are the agreement between you and **[DEVELOPER NAME]** ("we", "us") for the Replog app.
+These terms are the agreement between you and **Onur Ergun** ("we", "us") for the Replog app.
 By using Replog you accept them. If you do not, please do not use the app.
 
 ## Train sensibly — please read this part
@@ -102,8 +102,8 @@ terms.
 
 ## Governing law
 
-These terms are governed by the laws of **[JURISDICTION]**, without regard to conflict-of-law rules.
+These terms are governed by the laws of **Sweden**, without regard to conflict-of-law rules.
 
 ## Contact
 
-**[SUPPORT EMAIL]**
+**filmifyapps@gmail.com**
