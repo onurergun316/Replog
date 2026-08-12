@@ -2,19 +2,19 @@
 
 _Last updated 5 August 2026_
 
-These terms are the agreement between you and **Onur Ergun** ("we", "us") for the Replog app.
-By using Replog you accept them. If you do not, please do not use the app.
+These terms are the agreement between you and **Onur Ergun** ("we", "us") for the Grewyn app.
+By using Grewyn you accept them. If you do not, please do not use the app.
 
 ## Train sensibly — please read this part
 
-**Replog is not a doctor, a physiotherapist, or a substitute for either.**
+**Grewyn is not a doctor, a physiotherapist, or a substitute for either.**
 
-Replog prescribes exercises, sets, repetitions and **specific weights**. Those numbers are generated
+Grewyn prescribes exercises, sets, repetitions and **specific weights**. Those numbers are generated
 by software from what you told it during setup and from what you have logged. The app has never seen
 you lift. It does not know your injury history beyond the boxes you ticked, how you slept, or what
 your joints did yesterday.
 
-By using Replog you accept that:
+By using Grewyn you accept that:
 
 - You train at your own risk, and you are responsible for your own safety.
 - You should get medical advice before starting any new training programme, and especially if you
@@ -26,17 +26,17 @@ By using Replog you accept that:
 
 ## Your licence
 
-We grant you a personal, non-transferable, non-exclusive licence to use Replog on Apple devices you
+We grant you a personal, non-transferable, non-exclusive licence to use Grewyn on Apple devices you
 own or control, as permitted by the App Store Terms of Service. You may not copy, sell, rent,
 reverse-engineer, or attempt to extract the source of the app, except where the law says you may
 regardless of what these terms say.
 
-## Replog Premium
+## Grewyn Premium
 
-Replog is free to download. It gives you full access on your first day of use, after which the app
-continues to show everything you have logged but new logging requires **Replog Premium**.
+Grewyn is free to download. It gives you full access on your first day of use, after which the app
+continues to show everything you have logged but new logging requires **Grewyn Premium**.
 
-**Replog Premium is an auto-renewing subscription** offered in two terms:
+**Grewyn Premium is an auto-renewing subscription** offered in two terms:
 
 - **Monthly** — billed once a month. **No free trial.**
 - **Yearly** — billed once a year, and including a **3-day free trial** for subscribers who have not
@@ -54,7 +54,7 @@ You should know the following, all of which are Apple's standard subscription me
   paid yearly subscription automatically.**
 - Any unused part of a free trial is forfeited when you buy a subscription.
 - You manage and cancel your subscription in your Apple Account settings, reachable from Profile in
-  the app. **Deleting Replog does not cancel your subscription.**
+  the app. **Deleting Grewyn does not cancel your subscription.**
 - Refunds are handled by Apple under the Apple Media Services Terms and Conditions. We cannot issue
   them.
 
@@ -66,12 +66,12 @@ is a matter of your device backups.
 
 ## Exercise data
 
-Replog includes exercise descriptions and photographs from the open-source Free Exercise DB, used
+Grewyn includes exercise descriptions and photographs from the open-source Free Exercise DB, used
 under its licence. The training programmes and coaching content are ours.
 
 ## What we do not promise
 
-Replog is provided "as is". To the fullest extent the law allows, we make no warranty that it will
+Grewyn is provided "as is". To the fullest extent the law allows, we make no warranty that it will
 be uninterrupted, error-free, or fit for any particular purpose, and we disclaim all implied
 warranties.
 
@@ -85,19 +85,19 @@ for anything else that cannot lawfully be excluded.
 
 ## Ending these terms
 
-You may stop using Replog at any time by deleting it. We may end this licence if you materially
+You may stop using Grewyn at any time by deleting it. We may end this licence if you materially
 breach these terms. The training, safety, liability and governing-law sections survive.
 
 ## Apple
 
-Apple is not a party to these terms and has no responsibility for Replog. Apple has no obligation
+Apple is not a party to these terms and has no responsibility for Grewyn. Apple has no obligation
 to provide support or maintenance for the app. Apple and its subsidiaries are third-party
 beneficiaries of these terms and may enforce them against you.
 
 ## Changes
 
 We may update these terms. Material changes will be shown in the app before they take effect, and
-the date at the top will change. Continuing to use Replog after that means you accept the updated
+the date at the top will change. Continuing to use Grewyn after that means you accept the updated
 terms.
 
 ## Governing law
