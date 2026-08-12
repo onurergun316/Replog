@@ -274,6 +274,9 @@ struct BadgeEngineTests {
         #expect(s.monthsActive == 2)
     }
 
+    // `BadgeAwarding` is MainActor-isolated by the project's default isolation, so this
+    // case has to be too — the rest of the suite only touches nonisolated types.
+    @MainActor
     @Test func aComebackIsAGapThatWasFollowedByTraining() {
         // An open gap is not a comeback: the athlete has not come back yet.
         let dates = [daysAgo(100), daysAgo(80), daysAgo(1)]
