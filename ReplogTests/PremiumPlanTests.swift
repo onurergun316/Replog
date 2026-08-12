@@ -16,13 +16,13 @@ import Foundation
 struct PremiumTermTests {
 
     @Test func productIdentifiersAreExactlyWhatTheStoreWasConfiguredWith() {
-        #expect(PremiumTerm.monthly.productID == "test.Replog.premium.monthly")
-        #expect(PremiumTerm.yearly.productID == "test.Replog.premium.yearly")
+        #expect(PremiumTerm.monthly.productID == "test.Grewyn.premium.monthly")
+        #expect(PremiumTerm.yearly.productID == "test.Grewyn.premium.yearly")
     }
 
     @Test func bothProductsAreRequestedFromTheStore() {
-        #expect(Set(PremiumTerm.allProductIDs) == ["test.Replog.premium.monthly",
-                                                   "test.Replog.premium.yearly"])
+        #expect(Set(PremiumTerm.allProductIDs) == ["test.Grewyn.premium.monthly",
+                                                   "test.Grewyn.premium.yearly"])
     }
 
     /// Yearly first — it carries the trial and it is the better deal, so it leads the paywall.
@@ -31,9 +31,9 @@ struct PremiumTermTests {
     }
 
     @Test func anIdentifierResolvesBackToItsTerm() {
-        #expect(PremiumTerm.term(forProductID: "test.Replog.premium.yearly") == .yearly)
-        #expect(PremiumTerm.term(forProductID: "test.Replog.premium.monthly") == .monthly)
-        #expect(PremiumTerm.term(forProductID: "test.Replog.pro.lifetime") == nil)
+        #expect(PremiumTerm.term(forProductID: "test.Grewyn.premium.yearly") == .yearly)
+        #expect(PremiumTerm.term(forProductID: "test.Grewyn.premium.monthly") == .monthly)
+        #expect(PremiumTerm.term(forProductID: "test.Grewyn.pro.lifetime") == nil)
     }
 
     @Test func onlyYearlyIsMeantToCarryATrial() {

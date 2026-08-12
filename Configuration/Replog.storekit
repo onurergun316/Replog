@@ -92,7 +92,7 @@
               "locale" : "en_US"
             }
           ],
-          "productID" : "test.Replog.premium.yearly",
+          "productID" : "test.Grewyn.premium.yearly",
           "recurringSubscriptionPeriod" : "P1Y",
           "referenceName" : "Grewyn Premium Yearly",
           "subscriptionGroupID" : "21598374",
@@ -120,7 +120,7 @@
               "locale" : "en_US"
             }
           ],
-          "productID" : "test.Replog.premium.monthly",
+          "productID" : "test.Grewyn.premium.monthly",
           "recurringSubscriptionPeriod" : "P1M",
           "referenceName" : "Grewyn Premium Monthly",
           "subscriptionGroupID" : "21598374",
