@@ -70,7 +70,7 @@ struct PaywallView: View {
                         .fill(LinearGradient(colors: [Color.accent, Color.accentPress],
                                              startPoint: .topLeading, endPoint: .bottomTrailing))
                 )
-            Text("Replog Premium")
+            Text("Grewyn Premium")
                 .font(.rounded(30, .black)).foregroundStyle(Color.textPrimary)
                 .multilineTextAlignment(.center)
             Text("Train every day, and keep every number you log.")

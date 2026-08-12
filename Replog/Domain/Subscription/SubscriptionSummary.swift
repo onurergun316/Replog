@@ -59,7 +59,7 @@ nonisolated struct SubscriptionState: Equatable, Sendable {
 
 /// The two lines Profile renders, plus whether to offer reactivation.
 nonisolated struct SubscriptionSummary: Equatable, Sendable {
-    /// The bold line: "Replog Premium" or "Free".
+    /// The bold line: "Grewyn Premium" or "Free".
     var headline: String
     /// The explanatory line underneath. Never empty, and never ends in a dangling "on".
     var detail: String
@@ -70,7 +70,7 @@ nonisolated struct SubscriptionSummary: Equatable, Sendable {
 
 extension SubscriptionSummary {
 
-    static let premiumHeadline = "Replog Premium"
+    static let premiumHeadline = "Grewyn Premium"
     static let freeHeadline = "Free"
 
     /// The summary for a given state. `access` and `freeDayDate` are only consulted when the

@@ -67,7 +67,7 @@
       "localizations" : [
 
       ],
-      "name" : "Replog Premium",
+      "name" : "Grewyn Premium",
       "subscriptions" : [
         {
           "adHocOffers" : [
@@ -87,14 +87,14 @@
           },
           "localizations" : [
             {
-              "description" : "Full access to Replog. Train and log every day, with your complete history and progress.",
+              "description" : "Full access to Grewyn. Train and log every day, with your complete history and progress.",
               "displayName" : "Yearly",
               "locale" : "en_US"
             }
           ],
           "productID" : "test.Replog.premium.yearly",
           "recurringSubscriptionPeriod" : "P1Y",
-          "referenceName" : "Replog Premium Yearly",
+          "referenceName" : "Grewyn Premium Yearly",
           "subscriptionGroupID" : "21598374",
           "type" : "RecurringSubscription",
           "winbackOffers" : [
@@ -115,14 +115,14 @@
           "introductoryOffer" : null,
           "localizations" : [
             {
-              "description" : "Full access to Replog. Train and log every day, with your complete history and progress.",
+              "description" : "Full access to Grewyn. Train and log every day, with your complete history and progress.",
               "displayName" : "Monthly",
               "locale" : "en_US"
             }
           ],
           "productID" : "test.Replog.premium.monthly",
           "recurringSubscriptionPeriod" : "P1M",
-          "referenceName" : "Replog Premium Monthly",
+          "referenceName" : "Grewyn Premium Monthly",
           "subscriptionGroupID" : "21598374",
           "type" : "RecurringSubscription",
           "winbackOffers" : [
