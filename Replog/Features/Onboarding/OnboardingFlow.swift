@@ -109,7 +109,7 @@ struct OnboardingFlow: View {
     private var ctaTitle: String {
         switch vm.current {
         case .welcome: return "Get started"
-        case .result: return mode == .firstRun ? "Start Replog" : "Use this plan"
+        case .result: return mode == .firstRun ? "Start Grewyn" : "Use this plan"
         default: return vm.nextIsGenerating ? "Build my plan" : "Continue"
         }
     }
@@ -154,7 +154,7 @@ struct OnboardingFlow: View {
                 .frame(width: 72, height: 72)
                 .overlay(Image(systemName: "dumbbell.fill").font(.system(size: 30)).foregroundStyle(.white))
                 .padding(.top, 40)
-            Text("Welcome to Replog.").font(.screenTitle).foregroundStyle(Color.textPrimary)
+            Text("Welcome to Grewyn.").font(.screenTitle).foregroundStyle(Color.textPrimary)
             Text("Answer a few quick questions and your on-device AI coach will build a training plan tailored to you.")
                 .font(.bodyText).foregroundStyle(Color.text2)
         }
@@ -197,7 +197,7 @@ struct OnboardingFlow: View {
     }
 
     private var goalStep: some View {
-        OnboardingStepScaffold(eyebrow: "Your goal", question: "What brings you to Replog?",
+        OnboardingStepScaffold(eyebrow: "Your goal", question: "What brings you to Grewyn?",
                                caption: "We'll tailor your plan to this.") {
             VStack(spacing: 10) {
                 ForEach(Goal.allCases) { goal in

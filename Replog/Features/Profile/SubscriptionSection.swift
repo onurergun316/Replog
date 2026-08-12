@@ -117,7 +117,7 @@ struct SubscriptionSection: View {
     }
 
     private var upgradeButton: some View {
-        PrimaryButton(title: "Get Replog Premium", systemImage: "flame.fill") {
+        PrimaryButton(title: "Get Grewyn Premium", systemImage: "flame.fill") {
             gate.presentPaywall()
         }
     }

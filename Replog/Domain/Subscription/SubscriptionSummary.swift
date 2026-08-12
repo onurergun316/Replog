@@ -70,7 +70,7 @@ nonisolated struct SubscriptionSummary: Equatable, Sendable {
 
 extension SubscriptionSummary {
 
-    static let premiumHeadline = "Replog Premium"
+    static let premiumHeadline = "Grewyn Premium"
     static let freeHeadline = "Free"
 
     /// The summary for a given state. `access` and `freeDayDate` are only consulted when the

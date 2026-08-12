@@ -184,7 +184,7 @@ enum CoachEngine {
         if out.isEmpty && ctx.isFreshUser {
             out.append(CoachInsight(
                 kind: .welcome, priority: .low,
-                title: "Welcome to Replog",
+                title: "Welcome to Grewyn",
                 body: "Log your first workout and I'll start tailoring your training and coaching to how you actually progress."))
         }
         return out.sorted { lhs, rhs in
