@@ -1,8 +1,16 @@
-# Replog — Rep + Log
+# Grewyn — Gym Log & AI Coach
 
 A native iOS gym planner with an on-device coach. Plan your training, log your working sets at the
 gym, and watch the numbers move. No backend, no account, no network call — the planner, the coach,
 the reports and the reasoning all run on the phone.
+
+> **The product is Grewyn; the codebase is still Replog.** The app shipped for review as *Replog*
+> and was rejected under guideline 4.1(a) — three apps named *RepLog* already ship in Health &
+> Fitness, so the name read as a misleading association with another developer's app. Everything an
+> athlete sees was renamed. The Xcode target, module, scheme, folders and the bundle id
+> (`test.Replog`) were **not**: they are invisible to users, and changing the bundle id would mean a
+> new App Store record. So `Replog` throughout this document means the code, and `Grewyn` means the
+> product.
 
 ```
    ┌──────────────┐    ┌────────────────────┐    ┌──────────────┐    ┌──────────────────┐
@@ -43,7 +51,7 @@ the reports and the reasoning all run on the phone.
 | 13 | [Streaks & the calendar](#13-streaks--the-calendar)                    |
 | 14 | [Progress — the four-layer onion](#14-progress--the-four-layer-onion)  |
 | 15 | [Badges & medals](#15-badges--medals)                                  |
-| 16 | [Replog Premium — the subscription](#16-replog-premium--the-subscription) |
+| 16 | [Grewyn Premium — the subscription](#16-grewyn-premium--the-subscription) |
 | 17 | [Design system](#17-design-system)                                     |
 | 18 | [Testing](#18-testing)                                                 |
 | 19 | [Conventions & gotchas](#19-conventions--gotchas)                      |
@@ -58,12 +66,12 @@ the reports and the reasoning all run on the phone.
 | **Platform** | iOS 26.5+ · iPhone + iPad (`TARGETED_DEVICE_FAMILY = "1,2"`) |
 | **Language / UI** | Swift 5 language mode · SwiftUI + Swift Charts (UIKit only where SwiftUI can't reach) |
 | **Concurrency** | `SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor` · `SWIFT_APPROACHABLE_CONCURRENCY = YES` |
-| **Bundle id** | `test.Replog` · version 1.0 |
+| **Bundle id** | `test.Replog` (unchanged by the rename) · version 1.1 |
 | **Architecture** | Layered: `App → Features → {DesignSystem, Domain, Catalog} → Models`. **MV + selective MVVM** |
 | **Persistence** | **SwiftData** — 15 `@Model` types, one on-disk store, cascade deletes |
 | **"AI"** | Apple **`FoundationModels`** (on-device Apple Intelligence), always with a deterministic fallback |
 | **Network** | **None.** No URLSession, no backend, no analytics, no account |
-| **Monetization** | Freemium. **One free day**, then read-only. Replog Premium: $4.99/mo · $29.99/yr with a 3-day trial. StoreKit 2 |
+| **Monetization** | Freemium. **One free day**, then read-only. Grewyn Premium: $4.99/mo · $29.99/yr with a 3-day trial. StoreKit 2 |
 | **Third-party deps** | **None.** No SPM, no CocoaPods, no Carthage |
 | **Bundled data** | 873 exercises · 1 746 photos · 62 training programs · 67 weight comparisons · 74 badges |
 | **Source size** | 151 app `.swift` files (~25.6k lines) |
@@ -1170,9 +1178,9 @@ than one buzz. A badge is rarer than a finished session, so it gets the louder m
 
 ---
 
-## 16. Replog Premium — the subscription
+## 16. Grewyn Premium — the subscription
 
-Replog is free to download and free to use **for one calendar day** — the day of first launch.
+Grewyn is free to download and free to use **for one calendar day** — the day of first launch.
 That day is the whole product: onboard, get an AI-built programme, train, log every set, finish,
 read the debrief. Nothing is withheld.
 
@@ -1208,7 +1216,13 @@ hostage — which is a one-star review, not a conversion.
 | Free trial | none | **3 days**, offered only to eligible accounts |
 | Service level | 2 | **1** (higher) |
 
-One subscription group, "Replog Premium". Yearly sits at the higher service level so StoreKit
+One subscription group, "Grewyn Premium". The original group could not be renamed — App Store
+Connect permanently locks a subscription localization's `NAME` field once it has been through a
+rejection (409 `ENTITY_ERROR.ATTRIBUTE.INVALID.UNMODIFIABLE`) — and a product id can never be
+reused on an app record, so the rename forced a new group and new identifiers. Safe only because
+the app had never shipped: no receipt anywhere names the old ids.
+
+Yearly sits at the higher service level so StoreKit
 treats monthly→yearly as an **upgrade** and applies it immediately with proration it calculates
 itself. **We never compute proration.** Yearly→monthly is a downgrade and defers to the renewal
 date, which is why a pending plan change in practice only ever describes a downgrade.
