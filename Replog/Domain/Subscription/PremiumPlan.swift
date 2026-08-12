@@ -30,8 +30,8 @@ nonisolated enum PremiumTerm: String, CaseIterable, Identifiable, Sendable {
     /// change once shipped — a receipt names the product by this string.
     var productID: String {
         switch self {
-        case .yearly:  return "test.Replog.premium.yearly"
-        case .monthly: return "test.Replog.premium.monthly"
+        case .yearly:  return "test.Grewyn.premium.yearly"
+        case .monthly: return "test.Grewyn.premium.monthly"
         }
     }
 

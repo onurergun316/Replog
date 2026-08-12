@@ -1203,7 +1203,7 @@ hostage — which is a one-star review, not a conversion.
 
 | | Monthly | Yearly |
 |---|---|---|
-| Product id | `test.Replog.premium.monthly` | `test.Replog.premium.yearly` |
+| Product id | `test.Grewyn.premium.monthly` | `test.Grewyn.premium.yearly` |
 | Price | $4.99 | $29.99 (**SAVE 50%**) |
 | Free trial | none | **3 days**, offered only to eligible accounts |
 | Service level | 2 | **1** (higher) |
