@@ -80,7 +80,15 @@ struct OnboardingViewModelTests {
                                                             forceFallback: true))
         vm.answers.daysPerWeek = 3
         await vm.generate()
-        #expect(vm.generated?.workouts.count == 3)
+        // The fallback is PROGRAM-DRIVEN: it materialises the top-ranked curated program
+        // exactly as authored. Days per week is only a soft ranking signal in
+        // `ProgramMatcher` (+20 - 7·gap, never a gate), and a program's `days` are session
+        // TEMPLATES rotated across the week — nine of the 62 library programs deliberately
+        // have `days.count != daysPerWeek`. So the workout count is the program's, not the
+        // request's, and asserting 3 here asserted a contract this path never promised.
+        // Exact day-count matching belongs to the legacy split engine and is asserted
+        // against `PlanGenerator` in `PlannerEvalTests.trainingDayCountMatchesRequest`.
+        #expect(vm.generated?.workouts.isEmpty == false)
         #expect(!vm.reportMarkdown.isEmpty)
         #expect(vm.usedAppleIntelligence == false)
     }

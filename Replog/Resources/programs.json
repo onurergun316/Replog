@@ -1404,6 +1404,7 @@
       "id": "couch_to_5k_9wk",
       "name": "Run Start: 0 to 5K",
       "category": "endurance",
+      "sport": "running",
       "goals": [
         "endurance",
         "weight_loss",

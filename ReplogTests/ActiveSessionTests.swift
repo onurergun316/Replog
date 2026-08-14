@@ -65,7 +65,16 @@ struct ActiveSessionTests {
         #expect(bench.orderedSets[0].prevReps == 9)
         #expect(bench.orderedSets[1].prevWeight == 75)
         #expect(bench.orderedSets[1].prevReps == 7)
-        // Trend: current 60 < prev 65 -> down.
+        // The arrow starts flat, and that is the carry-forward working rather than a bug.
+        // `seedWorkout`'s templates never set `updatedAt`, so `supersededBy` returns true and
+        // `SessionBuilder` opens the set on last session's numbers — 65, not the template's
+        // 60. Current and previous are then the same value by construction, so a freshly
+        // built session can never open pointing down. The old assertion expected .down and
+        // contradicted the prefill this very test had just asserted two lines above.
+        #expect(bench.orderedSets[0].weightKg == 65)
+        #expect(bench.orderedSets[0].weightTrend == .flat)
+        // Back off the weight and the arrow earns its direction.
+        bench.orderedSets[0].weightKg = 60
         #expect(bench.orderedSets[0].weightTrend == .down)
     }
 
