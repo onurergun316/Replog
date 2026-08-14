@@ -55,8 +55,26 @@ struct RootView: View {
             ActiveWorkoutView(session: session)
                 .preferredColorScheme(darkMode ? .dark : .light)
         }
+        // The two shared objects are handed to the sheet explicitly rather than left to
+        // inherit. Presented content is hosted outside this view's hierarchy, and on
+        // "My Mac (Designed for iPad)" the `@Observable` objects injected up in
+        // `ReplogApp`'s WindowGroup did not reach it: opening the paywall right after
+        // onboarding trapped in `Environment+Objects.swift` with "No Observable object of
+        // type SubscriptionStore found", with the app already on screen behind it.
+        //
+        // The asymmetry is what identified it. `ActiveWorkoutView` above is presented the
+        // same way and never failed, because it reads only key-path environment values
+        // (`\.modelContext`, `\.exerciseCatalog`) — those propagate into presentations;
+        // the object-based ones did not. `PaywallView` is the only thing this view
+        // presents that needs them, and it is the only thing that crashed.
+        //
+        // This view demonstrably holds both objects — it renders, and `.task` below calls
+        // `subscriptions.start()` on one of them — so passing its own copies down cannot
+        // fail, whatever SwiftUI is doing with inheritance across a presentation boundary.
         .sheet(isPresented: $gate.isPaywallPresented) {
             PaywallView()
+                .environment(subscriptions)
+                .environment(gate)
                 .preferredColorScheme(darkMode ? .dark : .light)
         }
         .task {

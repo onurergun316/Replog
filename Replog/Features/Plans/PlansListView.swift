@@ -48,8 +48,15 @@ struct PlansListView: View {
             .background(Color.bg.ignoresSafeArea())
             .toolbar(.hidden, for: .navigationBar)
             .planNavigationDestinations()
+            // Handed down explicitly for the same reason as the paywall sheet in
+            // `RootView` — see the note there. `OnboardingFlow` reads `PremiumGate` as an
+            // object, and object-based environment values were not reaching presented
+            // content. This sheet is the only other place in the app that presents a view
+            // needing one, so it carries the same latent trap: it would fail the first
+            // time anybody generated a second plan, on the same line of SwiftUI.
             .sheet(isPresented: $showGenerate) {
                 OnboardingFlow(mode: .generatePlan) { path.append($0) }
+                    .environment(gate)
             }
         }
     }
