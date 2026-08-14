@@ -352,6 +352,16 @@ enum WeeklyReportComposer {
     /// the nearest-5 lb plate rounding would be nonsense on a weekly total.
     private static func formatVolume(kg: Double, units: Units) -> String {
         let value = units == .kg ? kg : kg * 2.20462
-        return "\(Int(value.rounded()).formatted(.number.grouping(.automatic)))\(units.label)"
+        // Grouped in English, not in the device's locale. Every other word of this report is
+        // an English string literal, and an unpinned `IntegerFormatStyle` resolves against
+        // `Locale.current` — so on a Swedish or German device the sentence read
+        // "**1 000kg** total volume", with a non-breaking space where English wants a comma.
+        //
+        // The document was already inconsistent with itself: the bodyweight line beside this
+        // one goes through `Formulas.formatBodyweight`, which is `String(format:)` and
+        // therefore always POSIX, so the same report showed "1 000kg" and "78.2kg" together.
+        let grouped = Int(value.rounded())
+            .formatted(.number.grouping(.automatic).locale(Locale(identifier: "en_US")))
+        return "\(grouped)\(units.label)"
     }
 }
