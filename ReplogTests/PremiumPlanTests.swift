@@ -49,13 +49,32 @@ struct PremiumTermTests {
 
 struct PremiumPricingTests {
 
-    /// The shipped pair: 12 × 4.99 = 59.88, and 29.99 is 49.9% off, which rounds to 50.
-    @Test func theShippedPricesReadAsFiftyPercent() {
-        #expect(PremiumPricing.savingsPercent(monthlyPrice: 4.99, yearlyPrice: 29.99) == 50)
+    /// The shipped pair: 12 × 4.99 = 59.88, and 29.99 is 49.92 % off — so the badge claims 49,
+    /// not 50. The saving is rounded down so the number can never be larger than the truth.
+    @Test func theShippedPricesRoundTheSavingDown() {
+        #expect(PremiumPricing.savingsPercent(monthlyPrice: 4.99, yearlyPrice: 29.99) == 49)
     }
 
     @Test func anExactHalvingIsFiftyPercent() {
         #expect(PremiumPricing.savingsPercent(monthlyPrice: 10, yearlyPrice: 60) == 50)
+    }
+
+    /// The property the rounding mode exists for: the claimed percentage may never exceed the
+    /// real one. Half-up rounding broke this at 49.92 %, and would break it again at any price
+    /// pair whose saving lands just under a whole number.
+    @Test func theBadgeNeverClaimsMoreThanTheRealSaving() {
+        let pairs: [(monthly: Decimal, yearly: Decimal)] = [
+            (4.99, 29.99), (9.99, 59.99), (2.99, 17.99), (12.99, 79.99), (5.99, 35.99),
+        ]
+        for pair in pairs {
+            guard let claimed = PremiumPricing.savingsPercent(monthlyPrice: pair.monthly,
+                                                              yearlyPrice: pair.yearly)
+            else { continue }
+            let twelve = pair.monthly * 12
+            let real = (twelve - pair.yearly) / twelve * 100
+            #expect(Decimal(claimed) <= real,
+                    "claimed \(claimed)% against a real saving of \(real)%")
+        }
     }
 
     /// Never brag about nothing. A yearly plan priced at twelve months has no badge at all
