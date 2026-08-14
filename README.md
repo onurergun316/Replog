@@ -1212,7 +1212,7 @@ hostage — which is a one-star review, not a conversion.
 | | Monthly | Yearly |
 |---|---|---|
 | Product id | `test.Grewyn.premium.monthly` | `test.Grewyn.premium.yearly` |
-| Price | $4.99 | $29.99 (**SAVE 50%**) |
+| Price | $4.99 | $29.99 (**SAVE 49%**) |
 | Free trial | none | **3 days**, offered only to eligible accounts |
 | Service level | 2 | **1** (higher) |
 

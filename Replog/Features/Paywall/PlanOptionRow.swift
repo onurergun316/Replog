@@ -25,16 +25,27 @@ struct PlanOptionRow: View {
         Button(action: action) {
             HStack(spacing: 14) {
                 radio
-                VStack(alignment: .leading, spacing: 3) {
+                // Guideline 3.1.2(c): the charge is the loudest thing in the row — largest,
+                // heaviest, full contrast — and every other figure is subordinate to it in size
+                // and sits below or beside it, never above. The per-month division draws at 12pt
+                // in text3; the savings pill is smaller still. Ranking these by eye is what got
+                // 1.0 rejected, so the order is written down.
+                VStack(alignment: .leading, spacing: 2) {
                     HStack(spacing: 8) {
                         Text(offer.term.displayName)
-                            .font(.rounded(17, .heavy)).foregroundStyle(Color.textPrimary)
+                            .font(.rounded(15, .heavy)).foregroundStyle(Color.textPrimary)
                         if let badge = offer.savingsBadge {
                             Pill(text: badge, style: .accent)
                         }
                     }
-                    Text(offer.priceLine)
-                        .font(.rounded(13, .semibold)).foregroundStyle(Color.text2)
+                    Text(offer.price)
+                        .font(.rounded(20, .heavy)).foregroundStyle(Color.textPrimary)
+                        .lineLimit(1).minimumScaleFactor(0.7)
+                    if let perMonth = offer.perMonthEquivalent {
+                        Text(perMonth)
+                            .font(.rounded(12, .semibold)).foregroundStyle(Color.text3)
+                            .lineLimit(1).minimumScaleFactor(0.8)
+                    }
                 }
                 Spacer(minLength: 0)
             }
@@ -51,6 +62,10 @@ struct PlanOptionRow: View {
         .buttonStyle(.plain)
         .sensoryFeedback(.selection, trigger: isSelected)
         .accessibilityElement(children: .combine)
+        .accessibilityLabel(
+            "\(offer.term.displayName), \(offer.spokenPrice)"
+            + (offer.savingsBadge.map { ", \($0)" } ?? "")
+        )
         .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
     }
 

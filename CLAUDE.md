@@ -5,7 +5,11 @@ Plan your training → log working sets at the gym → track progression over ti
 SwiftUI, iOS 26.5, on-device only (no backend, no network).
 
 ## ⚠️ Working agreement (do this every time)
-- **Never commit.** Make changes only; the owner reviews the diff and commits.
+- **Never push.** Pushing and anything touching `main` is the owner's, always.
+- **Commit constantly**, one change per commit, so history pinpoints which commit caused what.
+  There is no commit budget; err toward more, smaller commits. The owner reviews the commits.
+  (This line used to read "never commit, the owner commits" — that was wrong, and it cost a
+  session's work being handed over as one unreviewable pile of uncommitted edits.)
 - Work only on the **`development`** branch.
 - Write professional unit tests alongside code; keep the **logic layer ≥80% covered**.
 - The product spec is the source of truth: `../README.md` and `../design_handoff_replog/`
@@ -13,6 +17,15 @@ SwiftUI, iOS 26.5, on-device only (no backend, no network).
 - **Build clean** (0 errors / 0 warnings) and run the tests on **iPhone 17** before calling
   anything done. (The mid-edit "Cannot find type … in scope" SourceKit diagnostics are cross-file
   indexing noise; trust `xcodebuild`, not the live diagnostics.)
+- **No simulator device exists on this machine** — only the iOS 26.5 *runtime*. `-destination
+  'platform=iOS Simulator,name=iPhone 17'` therefore fails until one is created. Create exactly
+  one, use it in a single session, then `xcrun simctl delete <udid>` and purge the test clones
+  (`xcrun simctl --set testing delete all`); device data lands on the tight internal SSD. The
+  zero-write `swiftc -typecheck` recipe below needs no device and catches every compile error.
+- **Four tests fail on `development` and did so before this session** — `WeeklyReportTests
+  .volumeRendersInDisplayUnits`, `ProgramCatalogTests.couchTo5kUsesWeeklyStructure`,
+  `ActiveSessionTests.startPrefillsPreviousFromHistory`, `OnboardingViewModelTests
+  .generateProducesPlanAndReportViaFallback`. Baseline against a stash before blaming your diff.
 
 ## ⚙️ Delivery standard — the 4-pass method (apply to every numbered task list)
 Whenever the owner hands over a **numbered** list of bugfixes/improvements (1, 2, 3, … n), take each
