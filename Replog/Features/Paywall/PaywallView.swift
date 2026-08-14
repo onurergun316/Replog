@@ -59,10 +59,19 @@ struct PaywallView: View {
 
     // MARK: - Hero
 
+    /// The tile is the app icon, not an illustration of one.
+    ///
+    /// It drew `flame.fill` — a generic SF Symbol that appears nowhere else in Grewyn and had
+    /// nothing to do with the identity. `BrandMark` is the icon's own mark, template-rendered so
+    /// the punched-out tally strokes let the gradient through exactly as they do on the Home
+    /// Screen. Same construction as the onboarding welcome tile, at the same mark-to-tile ratio,
+    /// so the athlete meets one mark and keeps meeting it.
     private var hero: some View {
         VStack(spacing: 12) {
-            Image(systemName: "flame.fill")
-                .font(.system(size: 38, weight: .bold))
+            Image("BrandMark")
+                .resizable()
+                .scaledToFit()
+                .frame(width: 44)
                 .foregroundStyle(.white)
                 .frame(width: 84, height: 84)
                 .background(
@@ -70,6 +79,7 @@ struct PaywallView: View {
                         .fill(LinearGradient(colors: [Color.accent, Color.accentPress],
                                              startPoint: .topLeading, endPoint: .bottomTrailing))
                 )
+                .accessibilityHidden(true)
             Text("Grewyn Premium")
                 .font(.rounded(30, .black)).foregroundStyle(Color.textPrimary)
                 .multilineTextAlignment(.center)
