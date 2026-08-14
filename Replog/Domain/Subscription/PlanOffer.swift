@@ -45,20 +45,42 @@ nonisolated struct PlanOffer: Equatable, Sendable, Identifiable {
     // MARK: - Copy
     //
     // Apple requires a paywall to state the subscription's length and price, and — where there
-    // is an introductory offer — what happens when it ends. These four properties are that
-    // disclosure, so the requirement is met in one reviewable place rather than scattered
-    // through a view body.
+    // is an introductory offer — what happens when it ends. It also requires the billed amount
+    // to outrank every other figure on the screen. These properties are that disclosure, and
+    // the split between `price` and `perMonthEquivalent` is that ranking, so both are met in
+    // one reviewable place rather than scattered through a view body.
 
-    /// The price line under the plan name.
-    /// Yearly: "$2.50 per month ($29.99 per year)". Monthly: "$4.99 per month".
-    var priceLine: String {
-        guard let perMonthPrice, term == .yearly else {
-            return "\(displayPrice) per \(term.periodNoun)"
-        }
-        return "\(perMonthPrice) per month (\(displayPrice) per year)"
+    /// **What the athlete will actually be charged**, per term: "$29.99 per year",
+    /// "$4.99 per month".
+    ///
+    /// Guideline 3.1.2(c) requires this to be the most clear and conspicuous pricing element on
+    /// the screen, with every other figure subordinate to it in *both* size and position. It is
+    /// therefore a property of its own rather than a clause inside a longer sentence: a view
+    /// cannot rank two numbers that were joined into one string before it saw them.
+    var price: String {
+        "\(displayPrice) per \(term.periodNoun)"
     }
 
-    /// The badge on the row, e.g. "SAVE 50%".
+    /// The **calculated** monthly cost of a yearly plan — "$2.50 per month" — or nil where the
+    /// billed period is already a month and there is nothing to divide.
+    ///
+    /// Subordinate to `price` by contract: the row draws it beneath the real charge, smaller and
+    /// dimmer, never beside it and never first. Grewyn 1.0 shipped these the other way round —
+    /// "$2.50 per month ($29.99 per year)", one string at one size — and App Review rejected it.
+    var perMonthEquivalent: String? {
+        guard term == .yearly, let perMonthPrice else { return nil }
+        return "\(perMonthPrice) per month"
+    }
+
+    /// The row as one spoken sentence. VoiceOver has no type scale, so word order is the only
+    /// subordination available to it: the charge is said first, and the division is named as a
+    /// division rather than read out as a second price.
+    var spokenPrice: String {
+        guard let perMonthEquivalent else { return price }
+        return "\(price), which works out at \(perMonthEquivalent)"
+    }
+
+    /// The badge on the row, e.g. "SAVE 49%".
     var savingsBadge: String? {
         savingsPercent.map { "SAVE \($0)%" }
     }
