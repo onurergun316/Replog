@@ -83,6 +83,20 @@ enum PlanExerciseSync {
         return changed
     }
 
+    /// Gives a freshly added item whatever prescription the rest of its plan already uses
+    /// for that movement. Returns whether anything was adopted.
+    ///
+    /// The mirror rule read from the other end. Adding bench to Thursday when Monday already
+    /// benches 100 kg x 5 should not open at a generic 20 kg x 10, because the very next edit
+    /// to either day would overwrite one with the other anyway — the plan would simply be
+    /// inconsistent in the meantime, and the athlete would have to retype numbers the plan
+    /// already knows.
+    @discardableResult
+    static func adoptPlanPrescription(_ item: PlanItem, context: ModelContext) -> Bool {
+        guard let source = siblings(of: item).first else { return false }
+        return apply(source.orderedSets, to: item, context: context)
+    }
+
     /// Makes `target` prescribe exactly `source`. Returns whether anything actually moved,
     /// so a no-op mirror doesn't report a change it didn't make.
     private static func apply(_ source: [SetTemplate], to target: PlanItem,

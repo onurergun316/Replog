@@ -251,6 +251,46 @@ struct PlanExerciseSyncTests {
         #expect(PlanExerciseSync.siblings(of: item).isEmpty)
     }
 
+    // MARK: - Adopting the plan's existing prescription
+
+    @Test func addingAMovementThePlanAlreadyTrainsAdoptsItsNumbers() throws {
+        let ctx = makeContext()
+        let plan = seedPlan(ctx, named: "PPL", workouts: ["Monday"], sets: 4, kg: 100, reps: 5)
+        let thursday = Workout(name: "Thursday", day: .thu, order: 1)
+        thursday.plan = plan
+        ctx.insert(thursday)
+
+        let added = PlanFactory.addExercise("Bench", to: thursday, into: ctx)
+        try? ctx.save()
+
+        #expect(added.sets.count == 4)
+        #expect(added.orderedSets.allSatisfy { $0.weightKg == 100 && $0.reps == 5 })
+    }
+
+    @Test func addingAMovementThePlanDoesNotTrainKeepsTheDefaults() throws {
+        let ctx = makeContext()
+        let plan = seedPlan(ctx, named: "PPL", workouts: ["Monday"], exIds: ["Bench"])
+        let workout = plan.orderedWorkouts[0]
+
+        let added = PlanFactory.addExercise("Squat", to: workout, into: ctx)
+        try? ctx.save()
+
+        #expect(added.sets.count == 3)
+        #expect(added.orderedSets.allSatisfy { $0.weightKg == 20 && $0.reps == 10 })
+    }
+
+    @Test func adoptionNeverReachesIntoAnotherPlan() throws {
+        let ctx = makeContext()
+        seedPlan(ctx, named: "Plan A", workouts: ["Monday"], sets: 4, kg: 100, reps: 5)
+        let planB = seedPlan(ctx, named: "Plan B", workouts: ["Monday"], exIds: ["Squat"])
+
+        let added = PlanFactory.addExercise("Bench", to: planB.orderedWorkouts[0], into: ctx)
+        try? ctx.save()
+
+        #expect(added.sets.count == 3)
+        #expect(added.orderedSets.allSatisfy { $0.weightKg == 20 })
+    }
+
     // MARK: - `SetTemplate.matches`
 
     @Test func matchesComparesEveryMirroredField() {
