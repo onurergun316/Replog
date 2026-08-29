@@ -109,7 +109,7 @@ struct WorkoutEditorView: View {
                 defaultRest: defaultRest,
                 onAddSet: { addSet(to: item) },
                 onRemoveSet: { removeSet($0, from: item) },
-                onChange: { try? context.save() }
+                onChange: { syncAcrossPlan(item) }
             )
         }
     }
@@ -281,11 +281,26 @@ struct WorkoutEditorView: View {
                               rpe: last?.rpe ?? 8, order: Reordering.nextOrder(after: item.sets))
         set.item = item
         context.insert(set)
-        try? context.save()
+        syncAcrossPlan(item)
     }
 
     private func removeSet(_ set: SetTemplate, from item: PlanItem) {
         context.delete(set)
+        syncAcrossPlan(item)
+    }
+
+    /// Saves an edit to one exercise and carries it to the rest of the plan.
+    ///
+    /// Every write on this screen goes through here rather than a bare `context.save()`:
+    /// the same movement on another day of the same plan is the *same prescription*, so a
+    /// heavier top set, an extra rep or a fourth set lands there too (`PlanExerciseSync`).
+    ///
+    /// Saved twice on purpose. The first save settles a removed set — a pending delete is
+    /// still on the relationship, so the mirror would otherwise read it as prescribed and
+    /// copy it back — and the second flushes the mirror's own inserts and deletes.
+    private func syncAcrossPlan(_ item: PlanItem) {
+        try? context.save()
+        PlanExerciseSync.mirror(item, context: context)
         try? context.save()
     }
 
