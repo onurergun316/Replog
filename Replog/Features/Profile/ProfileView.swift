@@ -140,7 +140,7 @@ struct ProfileView: View {
     }
 
     private var coachInsightsSection: some View {
-        CoachInsightsListView(logs: recentInsights)
+        CoachInsightsListView(logs: recentInsights, units: settings.units)
     }
 
     /// The trophy cabinet. Built lazily on appear rather than on every render: the snapshot
