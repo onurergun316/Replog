@@ -6,6 +6,7 @@
 //  Driven by launch environment variables (never used in Release):
 //    REPLOG_SEED=1     -> seed a demo plan + history and mark onboarding done
 //    REPLOG_TAB=<name> -> initial tab (today|plans|library|progress|profile)
+//    REPLOG_BADGE=1    -> raise the badge unlock celebration at launch
 //
 
 import Foundation
@@ -36,6 +37,19 @@ enum DebugSeed {
         case "premium": return .premium
         default: return nil
         }
+    }
+
+    /// REPLOG_BADGE=1 -> raise the badge unlock celebration at launch, optionally on a
+    /// specific badge (`REPLOG_BADGE=<badge id>`) or on two at once (`REPLOG_BADGE=2`).
+    ///
+    /// The celebration only fires when a badge is genuinely earned, which is not something
+    /// that can be arranged on demand — so without this the one moment in the app that has
+    /// to feel right could only ever be checked by accident.
+    static var sampleUnlockedBadges: [Badge]? {
+        guard let value = ProcessInfo.processInfo.environment["REPLOG_BADGE"] else { return nil }
+        if let badge = BadgeCatalog.badge(id: value) { return [badge] }
+        let count = Int(value) ?? 1
+        return Array(BadgeCatalog.all.prefix(max(1, count)))
     }
 
     static var initialTab: MainTabView.Tab? {

@@ -34,6 +34,12 @@ struct RootView: View {
     /// celebration has to outlive the screen that earned it.
     @State private var completion = SessionCompletion()
 
+    #if DEBUG
+    /// One-shot guard for the `REPLOG_BADGE` preview: `onAppear` can fire more than once,
+    /// and re-raising the celebration every time is not what "show me the moment" means.
+    @State private var didPreviewBadges = false
+    #endif
+
     // Read-only: the singletons are bootstrapped in ReplogApp.init, so body never mutates the context.
     private var onboardingDone: Bool { profiles.first?.onboardingDone ?? false }
     private var darkMode: Bool { settings.first?.darkMode ?? false }
@@ -119,6 +125,11 @@ struct RootView: View {
         .onAppear {
             DebugSeed.seedIfNeeded(context)
             gate.debugOverride = DebugSeed.accessOverride
+            if !didPreviewBadges, let badges = DebugSeed.sampleUnlockedBadges {
+                didPreviewBadges = true
+                completion.finished(badges: badges, insights: [])
+                completion.presentPending()
+            }
         }
         #endif
     }

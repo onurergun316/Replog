@@ -7,8 +7,14 @@
 //  Deliberately a bigger event than the end-of-workout confetti, and deliberately a
 //  different shape of one: that celebration rains down, this one detonates outward. A
 //  badge is rarer than a finished session, so it gets the louder moment — fireworks from
-//  several origins, a shockwave, a medal that slams in and shakes on impact, a glint that
-//  sweeps across it, and a haptic sequence timed to the visuals rather than one buzz.
+//  several origins, a shockwave, and a haptic sequence timed to the visuals rather than
+//  one buzz.
+//
+//  The medal itself does not simply appear. It tumbles in from above and SINKS slowly into
+//  place, lands hard, then floats there — drifting a few points up and down while a slow
+//  3D tilt catches the light across its face and a glow in its own palette breathes behind
+//  it. Slow on purpose: the eye needs a beat to read what was won, and a thing that keeps
+//  moving after it arrives reads as an object rather than a picture of one.
 //
 //  Everything is native SwiftUI and drawn, like `CelebrationOverlay`: no animation assets,
 //  no third-party packages.
@@ -18,7 +24,7 @@
 //  and re-aim mid-flight.
 //
 //  Respects Reduce Motion: the copy, the medal and the haptics all still land, but nothing
-//  flies, spins or shakes.
+//  flies, spins, tilts, floats or shakes.
 //
 
 import SwiftUI
@@ -34,11 +40,16 @@ struct BadgeCelebrationOverlay: View {
     @State private var bursts: [Firework] = []
 
     // Animation state, reset per badge.
-    @State private var medalIn = false
+    /// The medal has finished its descent and struck.
+    @State private var landed = false
     @State private var shockwave = false
     @State private var shake: CGFloat = 0
     @State private var glint = false
     @State private var textIn = false
+    /// The three "it is still alive" loops, started after the landing and left running.
+    @State private var floating = false
+    @State private var tilting = false
+    @State private var glowing = false
 
     // Separate triggers so each kind of haptic can fire on its own schedule.
     @State private var softTick = 0
@@ -47,6 +58,8 @@ struct BadgeCelebrationOverlay: View {
 
     private var badge: Badge? { badges[safe: index] }
     private var isLast: Bool { index >= badges.count - 1 }
+    /// The medal's own colours, so the glow belongs to the badge rather than to the app.
+    private var palette: MedalPalette { MedalPalette.named(badge?.palette ?? "bronze") }
 
     var body: some View {
         ZStack {
@@ -101,15 +114,18 @@ struct BadgeCelebrationOverlay: View {
         .background(RoundedRectangle(cornerRadius: Radius.cardLarge, style: .continuous)
             .fill(Color.surface))
         .padding(.horizontal, 28)
-        .scaleEffect(medalIn ? 1 : 0.86)
-        .opacity(medalIn ? 1 : 0)
+        .scaleEffect(landed ? 1 : 0.86)
+        .opacity(landed ? 1 : 0)
     }
 
-    /// The medal itself: a shockwave ring, rotating rays behind it, the medal slamming in
-    /// with an overshoot, a shake on impact, and a glint sweeping across the face.
+    /// The medal: a glow breathing in its own colours, a shockwave ring, rotating rays, the
+    /// medal sinking in and striking, then floating and tilting in 3D with a glint sweeping
+    /// across its face.
     private func medal(_ badge: Badge) -> some View {
         ZStack {
             if !reduceMotion {
+                glow
+
                 Circle()
                     .strokeBorder(Color.accent.opacity(shockwave ? 0 : 0.85), lineWidth: 5)
                     .frame(width: 150, height: 150)
@@ -118,20 +134,60 @@ struct BadgeCelebrationOverlay: View {
                 MedalRays()
                     .fill(Color.accent.opacity(0.16))
                     .frame(width: 230, height: 230)
-                    .rotationEffect(.degrees(medalIn ? 24 : -6))
-                    .scaleEffect(medalIn ? 1 : 0.7)
-                    .opacity(medalIn ? 1 : 0)
+                    .rotationEffect(.degrees(landed ? 24 : -6))
+                    .scaleEffect(landed ? 1 : 0.7)
+                    .opacity(landed ? 1 : 0)
             }
 
             MedalView(badge: badge, earned: true, size: 132)
-                .scaleEffect(medalIn ? 1 : 0.2)
-                .rotationEffect(.degrees(medalIn ? 0 : -35))
-                .offset(x: reduceMotion ? 0 : shake)
+                .shadow(color: reduceMotion ? .clear : palette.accent.opacity(glowing ? 0.75 : 0.35),
+                        radius: glowing ? 26 : 14)
+                // The descent: it arrives from above, tumbling, and settles rather than pops.
+                .scaleEffect(landed ? 1 : 0.55)
+                .offset(y: descentOffset)
+                .rotation3DEffect(.degrees(landed ? 0 : -150),
+                                  axis: (x: 0.1, y: 1, z: 0), perspective: 0.55)
+                // ...and once landed it never quite stops: a slow tilt, a slow drift.
+                .rotation3DEffect(.degrees(tiltDegrees),
+                                  axis: (x: 0.22, y: 1, z: 0), perspective: 0.65)
+                .offset(x: reduceMotion ? 0 : shake, y: floatOffset)
                 .overlay {
                     if !reduceMotion { glintSweep }
                 }
         }
         .frame(height: 200)
+    }
+
+    /// The halo. A radial wash in the medal's own palette that breathes, which is what makes
+    /// the plate read as lit rather than printed.
+    private var glow: some View {
+        Circle()
+            .fill(RadialGradient(colors: [palette.accent.opacity(0.55),
+                                          palette.body.opacity(0.28), .clear],
+                                 center: .center, startRadius: 8, endRadius: 130))
+            .frame(width: 280, height: 280)
+            .blur(radius: 14)
+            .scaleEffect(glowing ? 1.10 : 0.86)
+            .opacity(landed ? 1 : 0)
+            .allowsHitTesting(false)
+    }
+
+    /// How far above its resting place the medal still is. Reduce Motion has no descent.
+    private var descentOffset: CGFloat {
+        guard !reduceMotion else { return 0 }
+        return landed ? 0 : -120
+    }
+
+    /// The idle drift, once it has landed. Zero until then so it cannot fight the descent.
+    private var floatOffset: CGFloat {
+        guard !reduceMotion, landed else { return 0 }
+        return floating ? -8 : 8
+    }
+
+    /// The idle 3D tilt, once it has landed.
+    private var tiltDegrees: Double {
+        guard !reduceMotion, landed else { return 0 }
+        return tilting ? 13 : -13
     }
 
     /// A specular highlight that travels across the medal once, the way light moves over
@@ -148,14 +204,14 @@ struct BadgeCelebrationOverlay: View {
 
     // MARK: - Choreography
 
-    /// Runs the entrance: fireworks, the medal landing, the shake, the glint and the copy,
-    /// with the haptics timed to the beats rather than fired all at once.
+    /// Runs the entrance: fireworks, the medal sinking in and striking, the shake, the glint
+    /// and the copy, with the haptics timed to the beats rather than fired all at once.
     private func runSequence() async {
         resetForNewBadge()
 
         guard !reduceMotion else {
             withAnimation(.spring(response: 0.45, dampingFraction: 0.75)) {
-                medalIn = true
+                landed = true
                 textIn = true
             }
             successTick += 1
@@ -164,14 +220,18 @@ struct BadgeCelebrationOverlay: View {
 
         bursts = Firework.volley(seed: index)
 
-        // The medal flies in and lands hard.
-        withAnimation(.spring(response: 0.55, dampingFraction: 0.55)) { medalIn = true }
-        softTick += 1
+        // The descent. Slow, and slightly springy at the end so it settles rather than stops
+        // dead — with a ladder of soft taps underneath it that tightens as it falls, which is
+        // what makes the landing feel earned rather than announced.
+        withAnimation(.spring(response: 0.95, dampingFraction: 0.62)) { landed = true }
+        await descentTicks()
 
-        try? await Task.sleep(for: .milliseconds(240))
         heavyTick += 1                                    // impact
         withAnimation(.easeOut(duration: 0.7)) { shockwave = true }
         await shakeImpact()
+
+        // It has arrived: light it, and leave it alive.
+        startIdleMotion()
 
         withAnimation(.easeOut(duration: 0.45)) { textIn = true }
         successTick += 1
@@ -179,7 +239,7 @@ struct BadgeCelebrationOverlay: View {
         // A pop per firework as it opens, so the haptics track what is on screen. Waits
         // are the gap to the *next* burst, not its absolute delay, or they compound and
         // the taps drift further behind the visuals with every one.
-        var elapsed = 0.24
+        var elapsed = 0.68
         for firework in bursts.sorted(by: { $0.delay < $1.delay }) {
             let gap = max(0, firework.delay - elapsed)
             try? await Task.sleep(for: .milliseconds(Int(gap * 1000)))
@@ -189,6 +249,29 @@ struct BadgeCelebrationOverlay: View {
 
         try? await Task.sleep(for: .milliseconds(120))
         withAnimation(.easeInOut(duration: 0.75)) { glint = true }
+    }
+
+    /// Soft taps under the falling medal, closer together as it nears the floor. Together
+    /// they last about as long as the descent, so the heavy strike lands on the impact.
+    private func descentTicks() async {
+        for gap in [170, 150, 130, 110, 90] {
+            softTick += 1
+            try? await Task.sleep(for: .milliseconds(gap))
+        }
+    }
+
+    /// The three loops that keep a landed medal alive. Started once, left running: SwiftUI
+    /// keeps a `repeatForever` animation going for as long as the view is on screen.
+    private func startIdleMotion() {
+        withAnimation(.easeInOut(duration: 2.6).repeatForever(autoreverses: true)) {
+            floating = true
+        }
+        withAnimation(.easeInOut(duration: 3.4).repeatForever(autoreverses: true)) {
+            tilting = true
+        }
+        withAnimation(.easeInOut(duration: 1.9).repeatForever(autoreverses: true)) {
+            glowing = true
+        }
     }
 
     /// A short decaying wobble, the way a struck object rings down rather than stopping dead.
@@ -201,19 +284,28 @@ struct BadgeCelebrationOverlay: View {
     }
 
     private func resetForNewBadge() {
-        medalIn = false
-        shockwave = false
-        textIn = false
-        glint = false
-        shake = 0
-        bursts = []
+        // Without an explicit no-animation reset the running `repeatForever` loops carry
+        // straight over onto the next badge, which then floats before it has landed.
+        var transaction = Transaction()
+        transaction.disablesAnimations = true
+        withTransaction(transaction) {
+            landed = false
+            shockwave = false
+            textIn = false
+            glint = false
+            floating = false
+            tilting = false
+            glowing = false
+            shake = 0
+            bursts = []
+        }
     }
 
     private func advance() {
         if isLast {
             onDone()
         } else {
-            withAnimation(.easeIn(duration: 0.15)) { medalIn = false; textIn = false }
+            withAnimation(.easeIn(duration: 0.15)) { landed = false; textIn = false }
             index += 1
         }
     }
