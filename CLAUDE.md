@@ -89,7 +89,9 @@ numbered the request.
   check-in prompts) — every recommendation carries a plain-language REASON from the deterministic
   engines. `CoachVoice` may reword an insight into coach voice (fallback = verbatim); it never invents
   the decision. Surfaced as a post-Finish debrief sheet, one dismissible Today "Coach" card/day, and a
-  Profile "Coach Insights" list. Weekly/monthly narrative reports (`WeeklyReportComposer`/
+  Profile "Coach Insights" list — **every row of which opens `CoachInsightDetailSheet`**, built by
+  the pure `CoachInsightDetail` (metrics in a fixed order, weights in the athlete's units, catalog
+  ids in the tags resolved to lift names, the insight's own kind not repeated back as a chip). Weekly/monthly narrative reports (`WeeklyReportComposer`/
   `MonthlyReportComposer`, triggered on activation) list under Profile "Training Reports". Optional
   readiness check-in at session start modulates volume (`ReadinessModulator`). Capped, respectful local
   notifications (`NotificationPlanner`: ≤1/day, quiet hours, per-kind toggles, encouraging copy).
@@ -241,13 +243,19 @@ flags a computed starting-load seed (see Key formulas) so the live log renders i
     `CoachContextBuilder` (store glue) + `CoachVoice` (optional reword, fallback verbatim),
     `AthleteContext`, `CoachingKnowledge`. The pure resolvers/composers/planner/coach are fully tested;
     the live model calls are non-deterministic seams (not unit-tested) — verified on-device.
-- `Features/` — `Onboarding` (quiz: **first name only, asked last**; `Gender` (default `.male`),
+- `Features/` — `Badges` (`BadgeCelebrationOverlay`: the medal tumbles in from above and SINKS
+  slowly into place under a tightening ladder of soft haptics, strikes with a heavy tap + shockwave,
+  then stays alive — a slow 3D tilt, a few points of vertical drift, and a halo breathing in the
+  medal's own palette. All drawn, no assets; Reduce Motion keeps the medal, the copy and the success
+  haptic and moves none of it), `Onboarding` (quiz: **first name only, asked last**; `Gender` (default `.male`),
   goal (no emojis), sport when goal is Sport (running/swimming/football/basketball/cycling/boxing/
   volleyball/**Other + free-text** `customSport`), height, weight, equipment-type multi-select that
   restricts the plan; real AI "Building your plan" + result/report — each generated day on the result
   screen opens a read-only `GeneratedWorkoutPreview`), `Today` (streak flame is an orange SF Symbol;
   "Add another" cards tap through to the workout; the three stat cards open `StatDetailSheet` history
-  sheets), `Plans` (list/detail/editor/picker; native swipe-to-delete), `Library` (search + a
+  sheets; **the Recent Highlight card opens `RecentHighlightSheet`** — the set that produced the best
+  est. 1RM, the rest of that session with its top set marked, the plan/day it belonged to, what it
+  beat, the lift's line since, and a link through to full progress), `Plans` (list/detail/editor/picker; native swipe-to-delete), `Library` (search + a
   multi-facet `LibraryFilter`/`LibraryFilterSheet` — level, equipment, force, type, mechanic, muscles;
   the **muscles facet is AND** (must train every selected muscle) with a **scope toggle**
   (`MuscleScope`: primary-only vs primary+secondary), the rest OR-within/AND-across;
