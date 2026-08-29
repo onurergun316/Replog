@@ -156,4 +156,37 @@ struct LibraryViewModelTests {
         vm.clearFilter()
         #expect(vm.filter.isEmpty)
     }
+
+    // MARK: - The view model's own surface
+
+    @Test func theViewModelSearchesTheCatalogThroughItsFilter() {
+        let catalog = ExerciseCatalog(exercises: [
+            Exercise(id: "a", name: "Barbell Bench Press", force: .push, level: .beginner,
+                     mechanic: .compound, equipment: .barbell, primaryMuscles: [.chest],
+                     secondaryMuscles: [.triceps], category: .strength,
+                     instructions: [], images: []),
+            Exercise(id: "b", name: "Dumbbell Curl", force: .pull, level: .beginner,
+                     mechanic: .isolation, equipment: .dumbbell, primaryMuscles: [.biceps],
+                     secondaryMuscles: [], category: .strength, instructions: [], images: []),
+        ])
+        let model = LibraryViewModel()
+
+        #expect(model.results(in: catalog).count == 2)
+
+        model.query = "curl"
+        #expect(model.results(in: catalog).map(\.id) == ["b"])
+
+        model.query = ""
+        model.toggleEquipment(.barbell)
+        #expect(model.results(in: catalog).map(\.id) == ["a"])
+
+        model.toggleEquipment(.barbell)
+        #expect(model.results(in: catalog).count == 2)
+    }
+
+    @Test func bothMuscleScopesAreLabelled() {
+        #expect(MuscleScope.anyRole.label == "Primary + Secondary")
+        #expect(MuscleScope.primary.label == "Primary only")
+        #expect(MuscleScope.allCases.allSatisfy { !$0.label.isEmpty })
+    }
 }

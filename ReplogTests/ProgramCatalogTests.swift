@@ -202,4 +202,110 @@ struct ProgramCatalogTests {
         #expect(!a.admits(age: 15))
         #expect(!a.admits(age: 56))
     }
+
+    // MARK: - Queries over an explicit library
+
+    /// A small library built from JSON, so the queries are tested against known content
+    /// rather than against whatever the bundled 62 happen to contain today.
+    private func library() -> ProgramCatalog {
+        let json = """
+        { "programs": [
+          { "id": "a", "name": "Starting Strength", "category": "strength",
+            "goals": ["get_strong"], "sport": "running",
+            "whoIsItFor": "Novices with a barbell.", "tags": ["barbell", "novice"] },
+          { "id": "b", "name": "Hypertrophy Block", "category": "Hypertrophy",
+            "goals": ["build_muscle"],
+            "whoIsItFor": "Lifters chasing size.", "tags": ["dumbbell"] }
+        ]}
+        """.data(using: .utf8)!
+        return ProgramCatalog(programs: ProgramCatalog.decode(json))
+    }
+
+    @Test func anExplicitLibraryIndexesItsProgramsById() {
+        let catalog = library()
+        #expect(catalog.all.count == 2)
+        #expect(catalog.program(id: "b")?.name == "Hypertrophy Block")
+        #expect(catalog.program(id: "nope") == nil)
+    }
+
+    @Test func categoryMatchingIgnoresCase() {
+        // The library file is hand-maintained; "Hypertrophy" and "hypertrophy" are the
+        // same category and must not split the results.
+        #expect(library().programs(category: "hypertrophy").map(\.id) == ["b"])
+        #expect(library().programs(category: "STRENGTH").map(\.id) == ["a"])
+        #expect(library().programs(category: "nothing").isEmpty)
+    }
+
+    @Test func goalAndSportQueriesFilterOnTheirOwnFields() {
+        #expect(library().programs(goal: "build_muscle").map(\.id) == ["b"])
+        #expect(library().programs(sport: "RUNNING").map(\.id) == ["a"])
+        #expect(library().programs(sport: "curling").isEmpty)
+    }
+
+    @Test func searchLooksAtTheName_theAudienceLine_andTheTags() {
+        let catalog = library()
+        #expect(catalog.search("strength").map(\.id) == ["a"])
+        #expect(catalog.search("chasing size").map(\.id) == ["b"])
+        #expect(catalog.search("BARBELL").map(\.id) == ["a"])
+        #expect(catalog.search("nothing at all").isEmpty)
+    }
+
+    @Test func anEmptySearchIsNotAFilter() {
+        #expect(library().search("").count == 2)
+        #expect(library().search("   ").count == 2)
+    }
+
+    @Test func aDuplicateIdKeepsTheFirstDefinition() {
+        let json = """
+        { "programs": [{ "id": "a", "name": "First" }, { "id": "a", "name": "Second" }]}
+        """.data(using: .utf8)!
+        let catalog = ProgramCatalog(programs: ProgramCatalog.decode(json))
+        #expect(catalog.all.count == 2)
+        #expect(catalog.program(id: "a")?.name == "First")
+    }
+
+    @Test func malformedDataYieldsAnEmptyLibraryRatherThanThrowing() {
+        #expect(ProgramCatalog.decode(Data("not json".utf8)).isEmpty)
+        #expect(ProgramCatalog.decode(Data()).isEmpty)
+    }
+
+    // MARK: - ProgramSex round trip
+
+    @Test func everyKnownSexTokenRoundTripsThroughItsRawValue() {
+        for (raw, expected) in [("any", ProgramSex.any), ("female", .female),
+                                ("female_focused", .femaleFocused),
+                                ("male_focused", .maleFocused)] {
+            #expect(ProgramSex(raw: raw) == expected)
+            #expect(expected.rawValue == raw)
+        }
+    }
+
+    @Test func anUnknownSexTokenIsKeptVerbatimAndSurvivesEncoding() throws {
+        let sex = ProgramSex(raw: "  Nonbinary  ")
+        #expect(sex == .other("nonbinary"))
+        #expect(sex.rawValue == "nonbinary")
+
+        // Encodes as a single string, so a re-encoded library is still readable.
+        let data = try JSONEncoder().encode([sex])
+        #expect(String(decoding: data, as: UTF8.self) == "[\"nonbinary\"]")
+        #expect(try JSONDecoder().decode([ProgramSex].self, from: data) == [sex])
+    }
+
+    @Test func anEmptySexTokenMeansAnyone() {
+        #expect(ProgramSex(raw: "") == .any)
+    }
+
+    // MARK: - Weekly structure
+
+    @Test func aWeeklyStructureEntryCanBeBuiltDirectly() {
+        let entry = WeeklyStructureEntry(week: 3, session: "Intervals")
+        #expect(entry.week == 3)
+        #expect(entry.session == "Intervals")
+    }
+
+    @Test func aMalformedWeeklyStructureEntryDecodesToEmptyRatherThanFailing() throws {
+        let json = #"[{ "week": "three", "session": null }]"#.data(using: .utf8)!
+        let entries = try JSONDecoder().decode([WeeklyStructureEntry].self, from: json)
+        #expect(entries == [WeeklyStructureEntry(week: 0, session: "")])
+    }
 }

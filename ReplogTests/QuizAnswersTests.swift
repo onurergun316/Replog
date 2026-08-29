@@ -140,4 +140,27 @@ struct EquipmentRestrictionTests {
             .candidates(forMuscles: [.chest, .quadriceps, .abdominals], answers: a, limit: 20)
         for ex in cands { #expect(ex.equipment == .machine) }
     }
+
+    // MARK: - Identity & copy for the pickers
+
+    @Test func everyQuizEnumIsIdentifiedByItsRawValue() {
+        // The onboarding pickers key their `ForEach` on these; a wrong id silently
+        // collapses two options into one row.
+        for value in Experience.allCases { #expect(value.id == value.rawValue) }
+        for value in Gender.allCases { #expect(value.id == value.rawValue) }
+        for value in Sport.allCases { #expect(value.id == value.rawValue) }
+        for value in Injury.allCases { #expect(value.id == value.rawValue) }
+        for value in EquipmentAccess.allCases { #expect(value.id == value.rawValue) }
+        for value in Goal.allCases { #expect(value.id == value.rawValue) }
+    }
+
+    @Test func everyEquipmentAccessLevelIsNamedAndPermitsSomething() {
+        for access in EquipmentAccess.allCases {
+            #expect(!access.displayName.isEmpty)
+            #expect(!access.allowedEquipment.isEmpty)
+        }
+        #expect(EquipmentAccess.home.displayName == "Home (dumbbells)")
+        // Bodyweight-only is the narrowest and must never permit a barbell.
+        #expect(!EquipmentAccess.bodyweight.allowedEquipment.contains(.barbell))
+    }
 }
