@@ -165,4 +165,81 @@ struct CoachEngineTests {
         let ctx8 = CoachContext(now: now, workoutStreak: 8)   // not a milestone number
         #expect(!CoachEngine.insights(ctx8).contains { $0.kind == .milestone })
     }
+
+    // MARK: - The other side of each branch
+
+    @Test func aScheduledWorkoutWithNoStreakYetIsAnInvitationNotAWarning() throws {
+        let ctx = CoachContext(now: now, workoutStreak: 0,
+                               hasScheduledWorkoutToday: true, completedScheduledToday: false)
+        let top = try #require(CoachEngine.topInsight(ctx))
+        #expect(top.kind == .adherenceInsight)
+        // Nothing is at risk, so nothing is framed as being at risk.
+        #expect(top.priority == .normal)
+        #expect(top.title == "Today's the day")
+        #expect(!top.body.contains("streak"))
+    }
+
+    @Test func adherenceStaysQuietRightAfterASession() {
+        let outcome = SessionOutcome(lifts: [finished("Squat", name: "Squat", weight: 60, isPR: false)],
+                                     totalVolumeKg: 1920, previousTotalVolumeKg: nil,
+                                     isFullyComplete: true)
+        let ctx = CoachContext(now: now, justFinished: outcome, workoutStreak: 5,
+                               hasScheduledWorkoutToday: true, completedScheduledToday: false)
+        #expect(!CoachEngine.insights(ctx).contains { $0.kind == .adherenceInsight })
+    }
+
+    @Test func everyFourthProgramWeekIsAMilestone() {
+        let fourth = CoachContext(now: now, programWeeksCompleted: 8)
+        #expect(CoachEngine.insights(fourth).contains { $0.title.contains("8 weeks") })
+
+        for weeks in [0, 5, 7] {
+            let ctx = CoachContext(now: now, programWeeksCompleted: weeks)
+            #expect(!CoachEngine.insights(ctx).contains { $0.kind == .milestone })
+        }
+    }
+
+    @Test func eachReadinessPatternGetsItsOwnAdvice() throws {
+        let soreness = CoachContext(now: now, readinessPattern: .highSoreness(days: 4))
+        let sore = try #require(CoachEngine.insights(soreness).first { $0.kind == .readinessTrend })
+        #expect(sore.body.contains("high soreness on 4 days"))
+        #expect(sore.body.contains("outrunning recovery"))
+
+        let stress = CoachContext(now: now, readinessPattern: .highStress(days: 2))
+        let stressed = try #require(CoachEngine.insights(stress).first { $0.kind == .readinessTrend })
+        #expect(stressed.body.contains("high stress on 2 days"))
+        #expect(stressed.metrics["patternDays"] == 2)
+    }
+
+    @Test func readinessStaysQuietRightAfterASession() {
+        // The debrief owns the screen after a finish; a pattern note there is noise.
+        let outcome = SessionOutcome(lifts: [finished("Squat", name: "Squat", weight: 60, isPR: false)],
+                                     totalVolumeKg: 1920, previousTotalVolumeKg: nil,
+                                     isFullyComplete: true)
+        let ctx = CoachContext(now: now, justFinished: outcome, readinessPattern: .lowSleep(days: 3))
+        #expect(!CoachEngine.insights(ctx).contains { $0.kind == .readinessTrend })
+    }
+
+    @Test func anUnfavourableBodyweightTrendSaysSoPlainly() throws {
+        let bw = BodyweightSnapshot(currentKg: 78, date: now, deltaKg: 0.4,
+                                    weeklyRateKg: 0.4, direction: .up, sparklineValues: [])
+        let ctx = CoachContext(goal: .loseWeight, now: now, bodyweight: bw)
+        let insight = try #require(CoachEngine.insights(ctx).first { $0.kind == .bodyweightTrend })
+        #expect(insight.body.contains("up"))
+        #expect(insight.body.contains("against your goal"))
+    }
+
+    @Test func aTrendWithNoBearingOnTheGoalIsReportedNeutrally() throws {
+        let bw = BodyweightSnapshot(currentKg: 78, date: now, deltaKg: 0.4,
+                                    weeklyRateKg: 0.4, direction: .up, sparklineValues: [])
+        let ctx = CoachContext(goal: .recomp, now: now, bodyweight: bw)
+        let insight = try #require(CoachEngine.insights(ctx).first { $0.kind == .bodyweightTrend })
+        #expect(insight.body.contains("Steady, gradual change"))
+    }
+
+    @Test func aFlatBodyweightIsNotWorthMentioning() {
+        let bw = BodyweightSnapshot(currentKg: 78, date: now, deltaKg: 0,
+                                    weeklyRateKg: 0, direction: .flat, sparklineValues: [])
+        let ctx = CoachContext(goal: .loseWeight, now: now, bodyweight: bw)
+        #expect(!CoachEngine.insights(ctx).contains { $0.kind == .bodyweightTrend })
+    }
 }

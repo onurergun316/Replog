@@ -258,4 +258,12 @@ struct ProgressionEngineTests {
             goal: .buildMuscle, targetRPE: 8))
         #expect(rec.suggestedWeightKg == 80)   // not calibrated down to 75
     }
+
+    @Test func everyRecommendedActionIsNamedForTheAthlete() {
+        #expect(ProgressionAction.increaseLoad.displayName == "Add weight")
+        #expect(ProgressionAction.increaseReps.displayName == "Add a rep")
+        #expect(ProgressionAction.hold.displayName == "Repeat")
+        #expect(ProgressionAction.deload.displayName == "Deload")
+        #expect(ProgressionAction.allCases.allSatisfy { !$0.displayName.isEmpty })
+    }
 }

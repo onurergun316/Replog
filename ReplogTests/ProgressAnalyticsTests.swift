@@ -425,4 +425,28 @@ struct ProgressAnalyticsTests {
         #expect(groups[0].volumeKg == 1000)
         #expect(groups[1].exercises.map(\.exId) == ["Row"])
     }
+
+    // MARK: - Naming a session
+
+    @Test func aSessionIsNamedAfterItsWorkoutThenItsPlanThenTheFallback() {
+        let entry = HistoryEntry(exId: "A", date: Date(), topW: 60, topR: 8, e1rm: 76, sets: [])
+
+        let named = ProgressAnalytics.SessionGroup(date: entry.date, entries: [entry],
+                                                   workoutName: "Push Day", planName: "PPL",
+                                                   durationSeconds: nil)
+        #expect(named.title() == "Push Day")
+
+        // Attribution the backfill could only resolve as far as the plan.
+        let planOnly = ProgressAnalytics.SessionGroup(date: entry.date, entries: [entry],
+                                                      workoutName: nil, planName: "PPL",
+                                                      durationSeconds: nil)
+        #expect(planOnly.title() == "PPL")
+
+        // Finished before attribution existed and unclaimable — the caller's last resort.
+        let unattributed = ProgressAnalytics.SessionGroup(date: entry.date, entries: [entry],
+                                                          workoutName: nil, planName: nil,
+                                                          durationSeconds: nil)
+        #expect(unattributed.title() == "Workout")
+        #expect(unattributed.title(fallback: "Session") == "Session")
+    }
 }

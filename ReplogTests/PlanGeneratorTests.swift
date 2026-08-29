@@ -140,4 +140,46 @@ struct PlanGeneratorTests {
             #expect(Set(ids).count == ids.count)
         }
     }
+
+    // MARK: - Selecting for an arbitrary set of muscles (the AI resolver's entry point)
+
+    @Test func selectItemsHonoursTheCountAndTheEquipmentTheAthleteHas() throws {
+        var answers = QuizAnswers()
+        answers.equipment = .bodyweight
+        let items = PlanGenerator().selectItems(targetMuscles: [.chest, .triceps],
+                                                count: 4, answers: answers)
+
+        #expect(items.count == 4)
+        #expect(Set(items.map(\.exId)).count == items.count)   // no repeats within a day
+        for item in items {
+            let exercise = try #require(ExerciseCatalog.shared.exercise(id: item.exId))
+            // Missing equipment counts as bodyweight, which is the whole point of the rule.
+            #expect(answers.allowedEquipment.contains(exercise.equipment ?? .bodyOnly))
+            #expect(!item.sets.isEmpty)
+        }
+    }
+
+    @Test func selectItemsWithNoTargetFallsBackToTheGoalsOwnPriorityMuscles() {
+        var answers = QuizAnswers()
+        answers.goal = .buildMuscle
+        let items = PlanGenerator().selectItems(targetMuscles: [], count: 3, answers: answers)
+        #expect(items.count == 3)
+    }
+
+    @Test func selectItemsNeverReturnsAnEmptyDay() {
+        // A zero (or negative) count is a caller bug, not a reason to prescribe nothing.
+        #expect(PlanGenerator().selectItems(targetMuscles: [.chest], count: 0,
+                                            answers: QuizAnswers()).count == 1)
+    }
+
+    @Test func selectItemsAvoidsAnInjuredAreasMuscles() throws {
+        var answers = QuizAnswers()
+        answers.injuries = [.knee]
+        let items = PlanGenerator().selectItems(targetMuscles: [.quadriceps, .chest],
+                                                count: 4, answers: answers)
+        for item in items {
+            let exercise = try #require(ExerciseCatalog.shared.exercise(id: item.exId))
+            #expect(Set(exercise.primaryMuscles).isDisjoint(with: answers.avoidedMuscles))
+        }
+    }
 }
