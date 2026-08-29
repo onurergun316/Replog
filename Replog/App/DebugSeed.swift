@@ -7,6 +7,7 @@
 //    REPLOG_SEED=1     -> seed a demo plan + history and mark onboarding done
 //    REPLOG_TAB=<name> -> initial tab (today|plans|library|progress|profile)
 //    REPLOG_BADGE=1    -> raise the badge unlock celebration at launch
+//    REPLOG_SHEET=<x>  -> open a detail sheet at launch (highlight|insight)
 //
 
 import Foundation
@@ -23,6 +24,18 @@ enum DebugSeed {
     /// (no UI automation available, so the entry sheet is verified via launch state).
     static var wantsBodyweightSheet: Bool {
         ProcessInfo.processInfo.environment["REPLOG_BODYWEIGHT"] == "1"
+    }
+
+    /// REPLOG_SHEET=highlight|insight -> opens a detail sheet at launch.
+    ///
+    /// Same reasoning as `wantsBodyweightSheet`: there is no UI automation here, so a sheet
+    /// that only exists behind a tap can only be checked by launching into it.
+    static var opensHighlightSheet: Bool {
+        ProcessInfo.processInfo.environment["REPLOG_SHEET"] == "highlight"
+    }
+
+    static var opensFirstInsight: Bool {
+        ProcessInfo.processInfo.environment["REPLOG_SHEET"] == "insight"
     }
 
     /// REPLOG_ACCESS=locked|freeday|premium -> forces `PremiumGate`'s answer.
@@ -157,8 +170,11 @@ enum DebugSeed {
         ReportScheduler.runOnActivation(context: context)
         let ctx = CoachContextBuilder.todayContext(
             profile: profile, settings: context.appSettings(), plans: context.allPlans(), context: context)
-        if let top = CoachEngine.topInsight(ctx) {
-            CoachContextBuilder.recordDailyCard(top, context: context)
+        // The *top* insight for this seed is the seeded plateau, and stall alerts are owned
+        // by `StallDetector` — `recordDailyCard` refuses them, which left the Coach Insights
+        // section empty in the very seed that exists to populate it.
+        if let recordable = CoachEngine.insights(ctx).first(where: { $0.kind != .stallAlert }) {
+            CoachContextBuilder.recordDailyCard(recordable, context: context)
         }
         try? context.save()
     }

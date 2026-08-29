@@ -139,7 +139,10 @@ struct RecentHighlightSheet: View {
                     Text("\(highlight.sessionCount) session\(highlight.sessionCount == 1 ? "" : "s") logged")
                         .font(.rounded(12, .semibold)).foregroundStyle(Color.text3)
                     Spacer()
-                    if let first = highlight.trail.first {
+                    // Only when it says something: "from 180kg" under a 180kg highlight is
+                    // just the same number twice, which happens whenever the best session
+                    // is also the first one.
+                    if let first = highlight.trail.first, first.e1rm != highlight.e1rm {
                         Text("from \(Formulas.formatWeight(kg: Double(first.e1rm), units: units))")
                             .font(.rounded(12, .semibold)).foregroundStyle(Color.text3)
                     }

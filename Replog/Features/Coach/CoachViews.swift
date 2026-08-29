@@ -121,6 +121,16 @@ struct CoachInsightsListView: View {
     /// The row whose detail sheet is up.
     @State private var opened: CoachingLog?
 
+    init(logs: [CoachingLog], units: Units = .kg) {
+        self.logs = logs
+        self.units = units
+        #if DEBUG
+        // REPLOG_SHEET=insight launches straight into the top insight's sheet — there is no
+        // UI automation here, so a sheet behind a tap is otherwise unverifiable.
+        if DebugSeed.opensFirstInsight { _opened = State(initialValue: logs.first) }
+        #endif
+    }
+
     enum Grouping: String, CaseIterable, Identifiable {
         case period, kind
         var id: String { rawValue }

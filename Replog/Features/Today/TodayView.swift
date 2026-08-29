@@ -43,6 +43,7 @@ struct TodayView: View {
     init() {
         #if DEBUG
         if DebugSeed.wantsBodyweightSheet { _showingBodyweightSheet = State(initialValue: true) }
+        if DebugSeed.opensHighlightSheet { _showingHighlight = State(initialValue: true) }
         #endif
     }
 
