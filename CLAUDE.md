@@ -11,21 +11,23 @@ SwiftUI, iOS 26.5, on-device only (no backend, no network).
   (This line used to read "never commit, the owner commits" — that was wrong, and it cost a
   session's work being handed over as one unreviewable pile of uncommitted edits.)
 - Work only on the **`development`** branch.
-- Write professional unit tests alongside code; keep the **logic layer ≥80% covered**.
+- Write professional unit tests alongside code; keep the **logic layer ≥90% covered**
+  (raised from 80% on 2026-08-29, when it reached ~91%).
 - The product spec is the source of truth: `../README.md` and `../design_handoff_replog/`
   (per-screen notes + `screenshots/`). The bundled HTML prototype is **reference only**.
-- **Build clean** (0 errors / 0 warnings) and run the tests on **iPhone 17** before calling
-  anything done. (The mid-edit "Cannot find type … in scope" SourceKit diagnostics are cross-file
+- **Build clean** (0 errors / 0 warnings) and run the tests on the one simulator below before
+  calling anything done. (The mid-edit "Cannot find type … in scope" SourceKit diagnostics are cross-file
   indexing noise; trust `xcodebuild`, not the live diagnostics.)
-- **No simulator device exists on this machine** — only the iOS 26.5 *runtime*. `-destination
-  'platform=iOS Simulator,name=iPhone 17'` therefore fails until one is created. Create exactly
-  one, use it in a single session, then `xcrun simctl delete <udid>` and purge the test clones
-  (`xcrun simctl --set testing delete all`); device data lands on the tight internal SSD. The
-  zero-write `swiftc -typecheck` recipe below needs no device and catches every compile error.
-- **Four tests fail on `development` and did so before this session** — `WeeklyReportTests
-  .volumeRendersInDisplayUnits`, `ProgramCatalogTests.couchTo5kUsesWeeklyStructure`,
-  `ActiveSessionTests.startPrefillsPreviousFromHistory`, `OnboardingViewModelTests
-  .generateProducesPlanAndReportViaFallback`. Baseline against a stash before blaming your diff.
+- **One simulator, and it already exists.** The machine has a single iOS 26.5 runtime and a
+  single device, `CapaCam-iPhone17Pro` (`0099037A-7A35-4AB6-9982-6950D9A63928`) — it belongs to
+  another project, so **use it, never delete it, and never install a second runtime or device**
+  (the owner's disk is tight). There is no device *named* "iPhone 17", so target it by id:
+  `-destination 'platform=iOS Simulator,id=0099037A-7A35-4AB6-9982-6950D9A63928'`. Purge test
+  clones afterwards (`xcrun simctl --set testing delete all`) and keep result bundles off the
+  project disk. The zero-write `swiftc -typecheck` recipe below still needs no device at all.
+- **The suite is green on `development`** (880+ cases, 0 failures) and the logic layer sits at
+  ~91%. The four long-standing failures this file used to list were fixed on 2026-08-29; a red
+  test now is almost certainly yours. Baseline against a stash before concluding otherwise.
 
 ## ⚙️ Delivery standard — the 4-pass method (apply to every numbered task list)
 Whenever the owner hands over a **numbered** list of bugfixes/improvements (1, 2, 3, … n), take each
@@ -185,8 +187,17 @@ flags a computed starting-load seed (see Key formulas) so the live log renders i
   and doesn't count.
 
 ## Project layout (`Replog/`)
-- `App/` — entry, `RootView` (onboarding vs main + dark mode + active-session cover), `MainTabView`,
-  navigation, environment, `DebugSeed` (DEBUG-only launch-env seeding — see below).
+- `App/` — entry, `RootView` (onboarding vs main + dark mode + active-session cover **+ the
+  post-session celebration**), `MainTabView`, navigation, environment, `DebugSeed` (DEBUG-only
+  launch-env seeding — see below).
+  - **Finishing a workout celebrates from `RootView`, not from the workout screen.** Finishing
+    DELETES the `ActiveSession`, and the workout is a `fullScreenCover(item:)` bound to that very
+    session — so anything the workout view presented for itself was torn down mid-flight, which is
+    why the badge moment used to be invisible. `ActiveWorkoutView` now hands what it earned to
+    `onFinished`; `SessionCompletion` (a plain, fully-tested state machine in
+    `Features/ActiveSession/`) holds it until the cover has gone; `RootView` then plays **the badge
+    celebration first** (it is the rare thing, and it is what the athlete just tapped Finish for)
+    and the coach's debrief after it. The rating ask waits for the whole sequence.
 - `DesignSystem/` — color tokens (`Theme`), SF Rounded typography, reusable components
   (Pill, StepperControl, `NumericStepperField` (typeable +/- field), TrendArrow, SegmentedToggle,
   WeekStripView, Sparkline, FlowLayout, `DragToReorder` (reorder commit haptic + a11y move
@@ -203,7 +214,15 @@ flags a computed starting-load seed (see Key formulas) so the live log renders i
   `Scheduling` (incl. `WeekBrowser`), `SessionBuilder`, `SessionFinisher`, `BodyweightTracker`,
   `Reordering`, `CalendarMath`/`CalendarStats` (calendar grid math + range statistics),
   `ProgressAnalytics` (weekly volume buckets, muscle shares, rep-range mix, adherence, PR
-  events, relative strength — the Progress dashboard's derivations).
+  events, relative strength — the Progress dashboard's derivations), `RecentHighlight` (the
+  heaviest logged est. 1RM plus the session around it — Today's highlight card and its sheet),
+  `CoachInsightDetail` (a recorded coaching log opened up: ordered metrics, lift names, notes).
+  - **One plan, one prescription per movement:** `PlanExerciseSync` mirrors an edit to a
+    `PlanItem`'s sets (weight / reps / RPE / set count) onto every *other* workout in the SAME
+    plan that prescribes that movement, occurrence-matched, and never across plans. The Workout
+    Editor routes all three of its writes through it (`syncAcrossPlan`), and `PlanFactory
+    .addExercise` adopts the plan's existing numbers instead of a generic 20 kg x 10. The logged
+    half of the same rule is `TemplateWriteBack.propagateWithinPlan`.
   - **Program-driven planning:** `ProgramMatcher` (hard-gated + soft-scored program selection from
     `QuizAnswers`), `PatternMapping` (slot `MovementPattern` → catalog facets → real candidates),
     `RepScheme` (parses slot reps/intensity into `SetTemplate` targets — ranges→lower bound,
@@ -265,9 +284,15 @@ names** `<id>__<n>.heic` (every exercise has `0.jpg`/`1.jpg` → would collide a
 `Exercise.imageResourceNames` reconstructs these; `ExerciseImageView` resolves via `Bundle.main`.
 
 ## Testing
-- Framework: **Swift Testing** (`import Testing`), in `ReplogTests/`. No UI tests (owner's call).
-- Logic layer (`Domain`/`Models`/`Catalog`/view models) is the coverage target (~80%); SwiftUI
-  views are intentionally not unit-tested.
+- Framework: **Swift Testing** (`import Testing`), in `ReplogTests/`. **No UI tests** (owner's
+  call) — the template `ReplogUITests` target was removed from the project on 2026-08-29, so
+  `ReplogTests` is the only test target. Anything visual is checked by launching a DEBUG-seeded
+  build (below), never by UI automation.
+- Logic layer (`Domain`/`Models`/`Catalog`/view models) is the coverage target (**≥90%**, ~91%
+  today); SwiftUI views are intentionally not unit-tested. What is left uncovered there is the
+  set of framework seams that cannot be exercised in a unit test — StoreKit (`SubscriptionStore`),
+  `UNUserNotificationCenter` (`NotificationScheduler`) and FoundationModels (`AIPlanService`,
+  `CoachVoice`) — plus the SwiftUI views themselves.
 - Persistence/session tests use `ReplogSchema.inMemoryContainer()` and are `@MainActor`
   (models are MainActor-isolated under the project's default actor isolation).
 
@@ -275,14 +300,14 @@ names** `<id>__<n>.heic` (every exercise has `0.jpg`/`1.jpg` → would collide a
 ```bash
 # Build
 xcodebuild -project Replog.xcodeproj -scheme Replog \
-  -destination 'platform=iOS Simulator,name=iPhone 17' build
+  -destination 'platform=iOS Simulator,id=0099037A-7A35-4AB6-9982-6950D9A63928' build
 
 # Test with coverage (logic suites)
 xcodebuild test -project Replog.xcodeproj -scheme Replog \
-  -destination 'platform=iOS Simulator,name=iPhone 17' \
+  -destination 'platform=iOS Simulator,id=0099037A-7A35-4AB6-9982-6950D9A63928' \
   -enableCodeCoverage YES -only-testing:ReplogTests
 ```
-There is no "iPhone 16" simulator installed here; use **iPhone 17**.
+There is no simulator *named* "iPhone 16" or "iPhone 17" here — target the one device by id.
 
 ### Verifying without a build (when disk is tight)
 `xcodebuild` writes DerivedData; `swiftc -typecheck` writes **nothing** and still catches every
@@ -316,6 +341,10 @@ execute. Note `zsh` doesn't word-split a plain `$FLAGS`; use an array or inline 
 ### DEBUG visual checks (no UI automation available)
 Launch envs (DEBUG only, via `SIMCTL_CHILD_*`): `REPLOG_SEED=1` seeds a demo PPL plan + history +
 marks onboarding done; `REPLOG_TAB=today|plans|library|progress|profile` picks the initial tab ("calendar" → progress);
-`REPLOG_ACTIVE=1` drops into a live workout. Example:
+`REPLOG_ACTIVE=1` drops into a live workout (`REPLOG_COMPLETE=1` with it = every set done, so the
+completion celebration is up); `REPLOG_BADGE=1|2|<badge id>` raises the badge unlock celebration;
+`REPLOG_SHEET=highlight|insight` opens Today's Recent Highlight sheet / Profile's top Coach Insight
+sheet. The last two exist because a badge unlock and a sheet behind a tap cannot otherwise be seen
+at all without UI automation. Example:
 `SIMCTL_CHILD_REPLOG_SEED=1 SIMCTL_CHILD_REPLOG_TAB=progress xcrun simctl launch <sim> test.Replog`
 (uninstall first for a deterministic, empty store).
