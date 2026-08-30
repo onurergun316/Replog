@@ -104,7 +104,10 @@ struct ProgramPlanBuilderTests {
         let plan = ProgramPlanBuilder.plan(from: program, answers: answers, catalog: catalog)
         let report = ProgramPlanBuilder.report(for: program, plan: plan, answers: answers)
         #expect(report.whyThisSplit == program.scienceRationale)
-        #expect(report.perDay.count == plan.workouts.count)
+        // One note per DISTINCT session: this program alternates two templates across three
+        // days, and explaining Day A twice would just repeat itself.
+        #expect(report.perDay.count == 2)
+        #expect(plan.workouts.count == 3)
         #expect(report.perDay.allSatisfy { !$0.exercises.isEmpty })
     }
 
@@ -210,6 +213,17 @@ struct ProgramWeekTests {
         let plan = ProgramPlanBuilder.plan(from: ppl, answers: answers(days: 6), catalog: catalog)
         #expect(plan.workouts.count == 6)
         #expect(plan.workouts[0].items.map(\.exId) == plan.workouts[3].items.map(\.exId))
+    }
+
+    @Test func aRepeatedSessionIsExplainedOnce() throws {
+        // Three identical full-body days should not print the same six exercises three times.
+        let hotel = try #require(programs.program(id: "travel_hotel_20min"))
+        var a = answers(days: 3)
+        a.equipmentTypes = [.bodyOnly, .bands]
+        let plan = ProgramPlanBuilder.plan(from: hotel, answers: a, catalog: catalog)
+        let report = ProgramPlanBuilder.report(for: hotel, plan: plan, answers: a)
+        #expect(plan.workouts.count == 3)
+        #expect(report.perDay.count == 1)
     }
 
     @Test func everyBundledProgramFillsTheWeekItClaims() {

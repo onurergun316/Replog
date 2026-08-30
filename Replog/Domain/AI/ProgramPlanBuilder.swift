@@ -173,7 +173,14 @@ enum ProgramPlanBuilder {
             : program.scienceRationale
 
         // Per-day notes come from the resolved plan (names + slot reasons already computed).
-        let perDay: [PerDayNote] = plan.workouts.map { workout in
+        //
+        // One note per distinct session, not per slot in the week: a program that runs the
+        // same full-body day three times would otherwise explain the same six exercises
+        // three times over. Matches what the AI path writes, which reports first occurrences.
+        var explained: Set<[String]> = []
+        let perDay: [PerDayNote] = plan.workouts.compactMap { workout in
+            let signature = workout.items.map(\.exId)
+            guard explained.insert(signature).inserted else { return nil }
             let notes = workout.items.map { item -> ExerciseNote in
                 ExerciseNote(name: ReportComposer.prettyName(item.exId), reason: itemReason(item))
             }
