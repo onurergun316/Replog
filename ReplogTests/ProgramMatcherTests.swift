@@ -201,3 +201,102 @@ struct ProgramMatcherTests {
         #expect(first.map(\.score) == first.map(\.score).sorted(by: >)) // sorted desc
     }
 }
+
+// MARK: - Fitting the athlete's actual answers
+
+@MainActor
+struct ProgramFitTests {
+
+    private let programs = ProgramCatalog(bundle: .main)
+
+    private func athlete(days: Int, minutes: Int, goal: Goal = .buildMuscle) -> MatchContext {
+        MatchContext(goal: goal, experience: .beginner, age: 28, daysPerWeek: days,
+                     minutesPerSession: minutes,
+                     equipment: [.barbell, .dumbbell, .machine, .cable, .bodyOnly, .bands])
+    }
+
+    // MARK: Session length
+
+    @Test func aProgramThatFillsTheSessionScoresBest() {
+        // 50 minutes of program for 55 minutes of time is the shape we want.
+        #expect(ProgramMatcher.sessionFitScore(programMinutes: 50, athleteMinutes: 55) == 26)
+    }
+
+    @Test func aProgramThatNeedsMoreTimeThanTheAthleteHasIsAllButDisqualified() {
+        // It cannot be finished, which is worse than any amount of goal alignment is worth.
+        #expect(ProgramMatcher.sessionFitScore(programMinutes: 60, athleteMinutes: 20) == -60)
+    }
+
+    @Test func underUseIsPenalisedInProportion() {
+        // The bug: a 20-minute program and a 40-minute one scored identically against 90
+        // minutes, so the shorter could win on unrelated points. Closer must score higher.
+        let twenty = ProgramMatcher.sessionFitScore(programMinutes: 20, athleteMinutes: 90)
+        let forty = ProgramMatcher.sessionFitScore(programMinutes: 40, athleteMinutes: 90)
+        let sixty = ProgramMatcher.sessionFitScore(programMinutes: 60, athleteMinutes: 90)
+        #expect(twenty < forty)
+        #expect(forty < sixty)
+        #expect(twenty < 0)
+    }
+
+    @Test func sessionFitIsAboutProportionNotMinutes() {
+        // Half the time you have is half the time you have, at any scale.
+        #expect(ProgramMatcher.sessionFitScore(programMinutes: 10, athleteMinutes: 20)
+                == ProgramMatcher.sessionFitScore(programMinutes: 45, athleteMinutes: 90))
+    }
+
+    @Test func anUnknownSessionLengthScoresNeutralRatherThanGuessing() {
+        #expect(ProgramMatcher.sessionFitScore(programMinutes: 0, athleteMinutes: 60) == 0)
+        #expect(ProgramMatcher.sessionFitScore(programMinutes: 45, athleteMinutes: 0) == 0)
+    }
+
+    @Test func theTwentyMinuteProgramLosesToAnAthleteWithAnHourAndAHalf() throws {
+        // The reported bug, at the level of the decision that caused it.
+        let hotel = try #require(programs.program(id: "travel_hotel_20min"))
+        let ranked = ProgramMatcher.rank(athlete(days: 3, minutes: 85), in: programs)
+        let hotelRank = try #require(ranked.firstIndex { $0.id == hotel.id })
+        #expect(hotelRank > 0, "the 20-minute hotel program was still the top recommendation")
+        #expect(!ProgramMatcher.fitsTheAthlete(hotel, for: athlete(days: 3, minutes: 85)))
+    }
+
+    @Test func theSameProgramIsTheRightAnswerForSomeoneWhoActuallyHasTwentyMinutes() throws {
+        let hotel = try #require(programs.program(id: "travel_hotel_20min"))
+        #expect(ProgramMatcher.fitsTheAthlete(hotel, for: athlete(days: 3, minutes: 20)))
+    }
+
+    // MARK: Frequency
+
+    @Test func theAthletesFrequencyOutweighsAGoalKeyword() {
+        // "Three days a week" is a promise about someone's life, not a training preference.
+        #expect(ProgramMatcher.dayFitScore(gap: 0) > 12 * 2)
+        #expect(ProgramMatcher.dayFitScore(gap: 0) > ProgramMatcher.dayFitScore(gap: 1))
+        #expect(ProgramMatcher.dayFitScore(gap: 3) < 0)
+    }
+
+    // MARK: Gates
+
+    @Test func aProgramWithNoDayTemplatesIsNeverRecommended() {
+        // It cannot be built into a plan: it would silently become a generic split under a
+        // program's name. Better to never offer it.
+        let ranked = ProgramMatcher.rank(athlete(days: 3, minutes: 30, goal: .loseWeight), in: programs)
+        #expect(!ranked.contains { $0.id == "couch_to_5k_9wk" })
+    }
+
+    @Test func aProgramWrittenForAnotherAthleteDropsDownTheListWithoutDisappearing() {
+        let male = MatchContext(goal: .buildMuscle, gender: .male, daysPerWeek: 4,
+                                minutesPerSession: 55,
+                                equipment: [.barbell, .dumbbell, .machine, .cable, .bodyOnly])
+        let ranked = ProgramMatcher.rank(male, in: programs)
+        // Still reachable — it is a good program and nobody is barred from it...
+        #expect(ranked.contains { $0.id == "womens_upper_strength_4d" })
+        // ...but it is not what the app opens with for a male athlete.
+        #expect(ranked.first?.id != "womens_upper_strength_4d")
+    }
+
+    @Test func maintenanceIsNotRecomposition() {
+        // Holding what you have is the opposite of changing it; counting "maintenance" as a
+        // recomp match is what let a maintenance circuit outrank real training programs.
+        let recomp = athlete(days: 3, minutes: 60, goal: .recomp)
+        let ranked = ProgramMatcher.rank(recomp, in: programs)
+        #expect(ranked.first?.id != "travel_hotel_20min")
+    }
+}
