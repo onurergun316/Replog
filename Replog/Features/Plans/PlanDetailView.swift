@@ -21,6 +21,8 @@ struct PlanDetailView: View {
     @State private var showProgram = false
     /// Bumped on every committed drag, purely to drive the confirmation haptic.
     @State private var moves = 0
+    /// The session already in progress when Start was tapped on a *different* workout.
+    @State private var blockingSession: ActiveSession?
 
     private var defaultRest: Int { (settingsList.first ?? context.appSettings()).restSeconds }
 
@@ -118,6 +120,16 @@ struct PlanDetailView: View {
         .scrollContentBackground(.hidden)
         .background(Color.bg.ignoresSafeArea())
         .navigationBarTitleDisplayMode(.inline)
+        .confirmationDialog("Finish what you started?",
+                            isPresented: Binding(get: { blockingSession != nil },
+                                                 set: { if !$0 { blockingSession = nil } }),
+                            titleVisibility: .visible,
+                            presenting: blockingSession) { session in
+            Button("Continue \(session.name)") { resume(session) }
+            Button("Not now", role: .cancel) {}
+        } message: { session in
+            Text("\(session.name) is still in progress. Replog keeps one workout at a time, so pick that one back up — or finish it — before starting another.")
+        }
         .sheet(isPresented: $showProgram) {
             if let program = sourceProgram {
                 NavigationStack {
@@ -180,6 +192,12 @@ struct PlanDetailView: View {
             guard gate.allowsFinishing(sessionStartedAt: existing.startedAt) else {
                 return gate.presentPaywall()
             }
+            // Silently opening a different workout than the one whose Start was tapped is
+            // the app appearing to misread the tap. Say which session is in the way.
+            guard existing.workoutId == workout.id else {
+                blockingSession = existing
+                return
+            }
             existing.isOpen = true
             try? context.save()
         } else {
@@ -188,6 +206,15 @@ struct PlanDetailView: View {
                 try? context.save()
             }
         }
+    }
+
+    /// Reopens the paused session named in the dialog. Same gate question as `start`.
+    private func resume(_ session: ActiveSession) {
+        guard gate.allowsFinishing(sessionStartedAt: session.startedAt) else {
+            return gate.presentPaywall()
+        }
+        session.isOpen = true
+        try? context.save()
     }
 
     private func addWorkout() {
