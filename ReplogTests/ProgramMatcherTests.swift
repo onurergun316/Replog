@@ -15,8 +15,7 @@ struct ProgramMatcherTests {
     private let catalog = ProgramCatalog(bundle: .main)
 
     // Common equipment sets.
-    private let fullGym: Set<Equipment> = [.barbell, .dumbbell, .machine, .cable, .bodyOnly,
-                                           .bands, .kettlebells, .medicineBall]
+    private let fullGym: Set<Equipment> = EquipmentAccess.fullGym.allowedEquipment.intersection(Set(Equipment.selectable))
     private let machineOnly: Set<Equipment> = [.machine]
     private let bodyweightOnly: Set<Equipment> = [.bodyOnly]
 
@@ -65,19 +64,24 @@ struct ProgramMatcherTests {
         }
     }
 
-    @Test func prerequisiteProgramsAreGatedForNoHistoryUsersButAllowedWithHistory() throws {
+    @Test func aPrerequisiteCostsScoreWithoutLockingTheAthleteOut() throws {
         // run_10k_8wk requires "Can run 5K continuously".
+        //
+        // This used to be a hard gate, and it excluded the programme for a runner with no
+        // logged history — which is EVERY athlete at onboarding, the one moment a plan is
+        // generated. Since all four endurance sports declare a prerequisite, no runner,
+        // cyclist, swimmer or triathlete could ever be given their own sport's programme.
+        // It is a caution now: reachable either way, preferred once it is met.
         let prereqID = "run_10k_8wk"
         let noHistory = MatchContext(goal: .sport, sport: .running, age: 30,
                                      equipment: fullGym, satisfiesPrerequisites: false)
         let withHistory = MatchContext(goal: .sport, sport: .running, age: 30,
                                        equipment: fullGym, satisfiesPrerequisites: true)
 
-        let gated = ProgramMatcher.rank(noHistory, in: catalog).map(\.id)
-        #expect(!gated.contains(prereqID))
-
-        let allowed = ProgramMatcher.rank(withHistory, in: catalog).map(\.id)
-        #expect(allowed.contains(prereqID))
+        let unproven = try #require(ProgramMatcher.rank(noHistory, in: catalog).first { $0.id == prereqID })
+        let proven = try #require(ProgramMatcher.rank(withHistory, in: catalog).first { $0.id == prereqID })
+        #expect(proven.score > unproven.score)
+        #expect(unproven.reasons.contains { $0.contains("Assumes some training") })
     }
 
     @Test func ageOutsideAudienceBandExcludesTheProgram() throws {
@@ -199,5 +203,294 @@ struct ProgramMatcherTests {
         let second = ProgramMatcher.rank(ctx, in: catalog)
         #expect(first.map(\.id) == second.map(\.id))                 // deterministic
         #expect(first.map(\.score) == first.map(\.score).sorted(by: >)) // sorted desc
+    }
+}
+
+// MARK: - Fitting the athlete's actual answers
+
+@MainActor
+struct ProgramFitTests {
+
+    private let programs = ProgramCatalog(bundle: .main)
+
+    private func athlete(days: Int, minutes: Int, goal: Goal = .buildMuscle) -> MatchContext {
+        MatchContext(goal: goal, experience: .beginner, age: 28, daysPerWeek: days,
+                     minutesPerSession: minutes,
+                     equipment: [.barbell, .dumbbell, .machine, .cable, .bodyOnly, .bands])
+    }
+
+    // MARK: Session length
+
+    @Test func aProgramThatFillsTheSessionScoresBest() {
+        // 50 minutes of program for 55 minutes of time is the shape we want.
+        #expect(ProgramMatcher.sessionFitScore(programMinutes: 50, athleteMinutes: 55) == 26)
+    }
+
+    @Test func aProgramThatNeedsMoreTimeThanTheAthleteHasIsAllButDisqualified() {
+        // It cannot be finished, which is worse than any amount of goal alignment is worth.
+        #expect(ProgramMatcher.sessionFitScore(programMinutes: 60, athleteMinutes: 20) == -60)
+    }
+
+    @Test func underUseIsPenalisedInProportion() {
+        // The bug: a 20-minute program and a 40-minute one scored identically against 90
+        // minutes, so the shorter could win on unrelated points. Closer must score higher.
+        let twenty = ProgramMatcher.sessionFitScore(programMinutes: 20, athleteMinutes: 90)
+        let forty = ProgramMatcher.sessionFitScore(programMinutes: 40, athleteMinutes: 90)
+        let sixty = ProgramMatcher.sessionFitScore(programMinutes: 60, athleteMinutes: 90)
+        #expect(twenty < forty)
+        #expect(forty < sixty)
+        #expect(twenty < 0)
+    }
+
+    @Test func sessionFitIsAboutProportionNotMinutes() {
+        // Half the time you have is half the time you have, at any scale.
+        #expect(ProgramMatcher.sessionFitScore(programMinutes: 10, athleteMinutes: 20)
+                == ProgramMatcher.sessionFitScore(programMinutes: 45, athleteMinutes: 90))
+    }
+
+    @Test func anUnknownSessionLengthScoresNeutralRatherThanGuessing() {
+        #expect(ProgramMatcher.sessionFitScore(programMinutes: 0, athleteMinutes: 60) == 0)
+        #expect(ProgramMatcher.sessionFitScore(programMinutes: 45, athleteMinutes: 0) == 0)
+    }
+
+    @Test func theTwentyMinuteProgramLosesToAnAthleteWithAnHourAndAHalf() throws {
+        // The reported bug, at the level of the decision that caused it.
+        let hotel = try #require(programs.program(id: "travel_hotel_20min"))
+        let ranked = ProgramMatcher.rank(athlete(days: 3, minutes: 85), in: programs)
+        let hotelRank = try #require(ranked.firstIndex { $0.id == hotel.id })
+        #expect(hotelRank > 0, "the 20-minute hotel program was still the top recommendation")
+        #expect(!ProgramMatcher.fitsTheAthlete(hotel, for: athlete(days: 3, minutes: 85)))
+    }
+
+    @Test func theSameProgramIsTheRightAnswerForSomeoneWhoActuallyHasTwentyMinutes() throws {
+        let hotel = try #require(programs.program(id: "travel_hotel_20min"))
+        #expect(ProgramMatcher.fitsTheAthlete(hotel, for: athlete(days: 3, minutes: 20)))
+    }
+
+    // MARK: Frequency
+
+    @Test func theAthletesFrequencyOutweighsAGoalKeyword() {
+        // "Three days a week" is a promise about someone's life, not a training preference.
+        #expect(ProgramMatcher.dayFitScore(gap: 0) > 12 * 2)
+        #expect(ProgramMatcher.dayFitScore(gap: 0) > ProgramMatcher.dayFitScore(gap: 1))
+        #expect(ProgramMatcher.dayFitScore(gap: 3) < 0)
+    }
+
+    // MARK: Gates
+
+    @Test func aProgramWithNoDayTemplatesIsNeverRecommended() {
+        // It cannot be built into a plan: it would silently become a generic split under a
+        // program's name. Better to never offer it.
+        let ranked = ProgramMatcher.rank(athlete(days: 3, minutes: 30, goal: .loseWeight), in: programs)
+        #expect(!ranked.contains { $0.id == "couch_to_5k_9wk" })
+    }
+
+    @Test func aProgramWrittenForAnotherAthleteDropsDownTheListWithoutDisappearing() {
+        let male = MatchContext(goal: .buildMuscle, gender: .male, daysPerWeek: 4,
+                                minutesPerSession: 55,
+                                equipment: [.barbell, .dumbbell, .machine, .cable, .bodyOnly])
+        let ranked = ProgramMatcher.rank(male, in: programs)
+        // Still reachable — it is a good program and nobody is barred from it...
+        #expect(ranked.contains { $0.id == "womens_upper_strength_4d" })
+        // ...but it is not what the app opens with for a male athlete.
+        #expect(ranked.first?.id != "womens_upper_strength_4d")
+    }
+
+    // MARK: An adjunct is never somebody's whole programme
+
+    @Test func aDeloadOrStretchRoutineIsNeverRecommendedAsTheWholePlan() {
+        // A one-week deload template and a stretching-only routine were winning as primary
+        // plans: a 12-week answer built from a one-week adjunct.
+        let adjuncts = Set(programs.all.filter { !$0.isStandalone }.map(\.id))
+        #expect(adjuncts.contains("recovery_week_template"))
+        #expect(adjuncts.contains("mobility_flexibility_4w"))
+
+        let gym = EquipmentAccess.fullGym.allowedEquipment.intersection(Set(Equipment.selectable))
+        for goal in Goal.allCases {
+            for days in 2...6 {
+                for minutes in [20, 45, 90] {
+                    var ctx = MatchContext(goal: goal, experience: .beginner, age: 30,
+                                           daysPerWeek: days, minutesPerSession: minutes,
+                                           equipment: gym)
+                    if goal == .sport { ctx.sport = .running }
+                    let picked = ProgramMatcher.rank(ctx, in: programs).filter(\.autoPickable)
+                    #expect(!adjuncts.contains(picked.first?.id ?? ""),
+                            "\(goal)/\(days)d/\(minutes)min was given \(picked.first?.id ?? "")")
+                }
+            }
+        }
+    }
+
+    @Test func anAdjunctStaysRankedAndBrowsableEvenThoughItIsNeverPicked() throws {
+        // Gating recommendation, not access — the same rule the disclaimer programmes follow.
+        let gym = EquipmentAccess.fullGym.allowedEquipment.intersection(Set(Equipment.selectable))
+        let ctx = MatchContext(goal: .recomp, experience: .beginner, age: 30, daysPerWeek: 3,
+                               minutesPerSession: 45, equipment: gym)
+        let deload = try #require(ProgramMatcher.rank(ctx, in: programs).first { $0.id == "recovery_week_template" })
+        #expect(!deload.autoPickable)
+    }
+
+    @Test func aProgramIsAPlanUnlessItSaysOtherwise() {
+        // The flag defaults to true, so adding a program to the library does not require
+        // remembering to declare it.
+        #expect(programs.all.filter { !$0.isStandalone }.count == 5)
+        #expect(programs.all.filter(\.isStandalone).count == programs.all.count - 5)
+    }
+
+    // MARK: The library must be reachable by real answers
+
+    @Test func noProgramRequiresGearTheQuizNeverAsksAbout() {
+        // A gate on equipment the onboarding chip grid does not offer can only ever return
+        // false. `medicine_ball` was exactly that: `Equipment.selectable` has no medicine
+        // ball, onboarding intersects the athlete's set with it, so the three programmes
+        // requiring one were dropped for 100% of users — a boxer got generic GPP instead of
+        // the boxing programme written for them. Every requirement must be satisfiable by
+        // an athlete who actually went through the quiz.
+        let reachable = EquipmentAccess.allCases.map {
+            $0.allowedEquipment.intersection(Set(Equipment.selectable))
+        }
+        for program in programs.all {
+            let satisfiedSomewhere = reachable.contains { ProgramMatcher.equipmentSatisfied(program, by: $0) }
+            #expect(satisfiedSomewhere,
+                    "\(program.id) requires \(program.equipmentRequired), which no onboarding answer can grant")
+        }
+    }
+
+    @Test func everySportWithAProgramIsReachableByTheAthleteWhoPlaysIt() {
+        // The same defect from the athlete's side: picking your sport must actually reach
+        // your sport's programme, using equipment onboarding can really produce.
+        let gym = EquipmentAccess.fullGym.allowedEquipment.intersection(Set(Equipment.selectable))
+        for sport in Sport.allCases where sport != .other {
+            let ctx = MatchContext(goal: .sport, sport: sport, experience: .intermediate, age: 26,
+                                   daysPerWeek: 3, minutesPerSession: 55, equipment: gym)
+            guard let token = ctx.sportToken,
+                  programs.all.contains(where: { $0.sport?.lowercased() == token }) else { continue }
+            let ranked = ProgramMatcher.rank(ctx, in: programs)
+            #expect(ranked.contains { $0.program.sport?.lowercased() == token },
+                    "\(sport) cannot reach its own programme")
+        }
+    }
+
+    @Test func aPrerequisiteWarnsRatherThanLocksTheAthleteOut() throws {
+        // A brand-new athlete has no history, so the old hard gate excluded all twelve
+        // prerequisite programmes at exactly the moment the first plan is generated.
+        let gym = EquipmentAccess.fullGym.allowedEquipment.intersection(Set(Equipment.selectable))
+        let newRunner = MatchContext(goal: .sport, sport: .running, experience: .beginner, age: 30,
+                                     daysPerWeek: 4, minutesPerSession: 45, equipment: gym,
+                                     satisfiesPrerequisites: false)
+        let ranked = ProgramMatcher.rank(newRunner, in: programs)
+        #expect(ranked.contains { $0.program.sport?.lowercased() == "running" })
+
+        // ...but it still ranks below the same programme once the athlete qualifies.
+        var qualified = newRunner
+        qualified.satisfiesPrerequisites = true
+        let before = try #require(ranked.first { $0.program.prerequisite != nil }?.score)
+        let after = try #require(ProgramMatcher.rank(qualified, in: programs)
+            .first { $0.program.prerequisite != nil }?.score)
+        #expect(after > before)
+    }
+
+    // MARK: Sport programs reach sport athletes only
+
+    @Test func aSportProgramIsNeverRecommendedToSomeoneNotTrainingForThatSport() {
+        // The reported bug: a user who never chose basketball was handed the basketball
+        // block. It scores zero goal overlap for every non-sport goal, so it won on day
+        // count and session length alone.
+        for goal in [Goal.buildMuscle, .loseWeight, .recomp] {
+            let ctx = MatchContext(goal: goal, experience: .beginner, age: 28, daysPerWeek: 3,
+                                   minutesPerSession: 60,
+                                   equipment: [.barbell, .dumbbell, .machine, .cable, .bodyOnly, .bands])
+            let ranked = ProgramMatcher.rank(ctx, in: programs)
+            #expect(!ranked.contains { $0.id == "basketball_athleticism_8wk" },
+                    "basketball reachable for \(goal)")
+        }
+    }
+
+    @Test func noSportSpecificProgramSurvivesANonSportGoal() {
+        // The whole class, not just basketball: 17 programs declare a sport.
+        let sportIds = Set(programs.all.compactMap { p -> String? in
+            guard let sport = p.sport?.lowercased(), sport != "general" else { return nil }
+            return p.id
+        })
+        #expect(sportIds.count > 10, "expected the library's sport-specific programs")
+
+        for goal in [Goal.buildMuscle, .loseWeight, .recomp] {
+            for days in 2...6 {
+                let ctx = MatchContext(goal: goal, experience: .intermediate, age: 28,
+                                       daysPerWeek: days, minutesPerSession: 55,
+                                       equipment: [.barbell, .dumbbell, .machine, .cable, .bodyOnly, .bands])
+                let leaked = ProgramMatcher.rank(ctx, in: programs).map(\.id).filter { sportIds.contains($0) }
+                #expect(leaked.isEmpty, "\(goal) at \(days) days reached \(leaked)")
+            }
+        }
+    }
+
+    @Test func theSportAthleteStillGetsTheirOwnSport() throws {
+        // The gate must not cost the people it exists for.
+        let baller = MatchContext(goal: .sport, sport: .basketball, experience: .intermediate,
+                                  age: 24, daysPerWeek: 3, minutesPerSession: 60,
+                                  equipment: [.barbell, .dumbbell, .machine, .cable, .bodyOnly])
+        let ranked = ProgramMatcher.rank(baller, in: programs)
+        #expect(ranked.first?.id == "basketball_athleticism_8wk")
+    }
+
+    @Test func aSportAthleteIsNeverGivenADifferentSportsProgram() {
+        for sport in Sport.allCases where sport != .other {
+            let ctx = MatchContext(goal: .sport, sport: sport, experience: .intermediate, age: 26,
+                                   daysPerWeek: 3, minutesPerSession: 55,
+                                   equipment: [.barbell, .dumbbell, .machine, .cable, .bodyOnly])
+            let token = ctx.sportToken
+            for match in ProgramMatcher.rank(ctx, in: programs) {
+                guard let programSport = match.program.sport?.lowercased(),
+                      programSport != "general" else { continue }
+                #expect(programSport == token?.lowercased(),
+                        "\(sport) reached \(match.id) (\(programSport))")
+            }
+        }
+    }
+
+    @Test func afreeTextSportIsReadAsWordsNotSubstrings() {
+        // Substring matching handed real athletes the wrong sport's programme: "skipping"
+        // contains "ski", "basket weaving" contains "basket", and "mountain biking" hit the
+        // hiking key before the bike ones.
+        func token(_ text: String) -> String? {
+            var ctx = MatchContext(goal: .sport, sport: .other)
+            ctx.customSport = text
+            return ctx.sportToken
+        }
+
+        #expect(token("mountain biking") == "cycling")
+        #expect(token("trail running") == "running")
+        #expect(token("olympic weightlifting") == nil)
+        #expect(token("skipping rope") == nil)
+        #expect(token("underwater basket weaving") == nil)
+        #expect(token("quidditch") == nil)
+
+        // The real inputs still land.
+        #expect(token("Basketball") == "basketball")
+        #expect(token("open water swimming") == "swimming")
+        #expect(token("Muay Thai kickboxing") == "boxing")
+        #expect(token("padel") == "tennis_padel")
+        #expect(token("half marathon") == "running")
+    }
+
+    @Test func aSportWithNoProgramFallsBackToGeneralAthleticWork() {
+        // Nothing in the library is built for this, so the athlete gets a general base
+        // rather than another sport's block or nothing at all.
+        var ctx = MatchContext(goal: .sport, sport: .other, experience: .beginner, age: 30,
+                               daysPerWeek: 3, minutesPerSession: 60,
+                               equipment: [.barbell, .dumbbell, .machine, .cable, .bodyOnly])
+        ctx.customSport = "quidditch"
+        let ranked = ProgramMatcher.rank(ctx, in: programs)
+        #expect(!ranked.isEmpty)
+        #expect(ranked.allSatisfy { ($0.program.sport?.lowercased() ?? "general") == "general" })
+    }
+
+    @Test func maintenanceIsNotRecomposition() {
+        // Holding what you have is the opposite of changing it; counting "maintenance" as a
+        // recomp match is what let a maintenance circuit outrank real training programs.
+        let recomp = athlete(days: 3, minutes: 60, goal: .recomp)
+        let ranked = ProgramMatcher.rank(recomp, in: programs)
+        #expect(ranked.first?.id != "travel_hotel_20min")
     }
 }

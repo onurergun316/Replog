@@ -21,7 +21,7 @@ struct ProgramPlanBuilderTests {
     private func fullGymAnswers() -> QuizAnswers {
         var a = QuizAnswers()
         a.goal = .buildMuscle
-        a.equipmentTypes = [.barbell, .dumbbell, .machine, .cable, .bodyOnly, .bands, .kettlebells, .medicineBall]
+        a.equipmentTypes = EquipmentAccess.fullGym.allowedEquipment.intersection(Set(Equipment.selectable))
         return a
     }
 
@@ -104,7 +104,10 @@ struct ProgramPlanBuilderTests {
         let plan = ProgramPlanBuilder.plan(from: program, answers: answers, catalog: catalog)
         let report = ProgramPlanBuilder.report(for: program, plan: plan, answers: answers)
         #expect(report.whyThisSplit == program.scienceRationale)
-        #expect(report.perDay.count == plan.workouts.count)
+        // One note per DISTINCT session: this program alternates two templates across three
+        // days, and explaining Day A twice would just repeat itself.
+        #expect(report.perDay.count == 2)
+        #expect(plan.workouts.count == 3)
         #expect(report.perDay.allSatisfy { !$0.exercises.isEmpty })
     }
 
@@ -138,5 +141,99 @@ struct ProgramPlanBuilderTests {
         // Re-fetch to confirm it's actually persisted, not just in-memory on the object.
         let fetched = try context.fetch(FetchDescriptor<Plan>())
         #expect(fetched.first?.programId == "beginner_full_body_3d")
+    }
+}
+
+// MARK: - The week a program actually prescribes
+
+@MainActor
+struct ProgramWeekTests {
+
+    private let catalog = ExerciseCatalog(bundle: .main)
+    private let programs = ProgramCatalog(bundle: .main)
+
+    private func answers(days: Int) -> QuizAnswers {
+        var a = QuizAnswers()
+        a.goal = .buildMuscle
+        a.daysPerWeek = days
+        a.equipmentTypes = EquipmentAccess.fullGym.allowedEquipment.intersection(Set(Equipment.selectable))
+        return a
+    }
+
+    @Test func aOneTemplateProgramStillFillsTheWeek() throws {
+        // The reported bug: 3 days a week arrived as a plan with a single Monday, because
+        // this program describes its week with one repeated template.
+        let hotel = try #require(programs.program(id: "travel_hotel_20min"))
+        #expect(hotel.days.count == 1)
+        #expect(hotel.daysPerWeek == 3)
+
+        let week = ProgramPlanBuilder.weeklySchedule(for: hotel)
+        #expect(week.count == 3)
+        #expect(week.allSatisfy { $0.templateIndex == 0 })
+    }
+
+    @Test func repeatedSessionsAreNumberedSoTheyCanBeToldApart() throws {
+        let hotel = try #require(programs.program(id: "travel_hotel_20min"))
+        let names = ProgramPlanBuilder.weeklySchedule(for: hotel).map(\.name)
+        #expect(Set(names).count == names.count)
+        #expect(names.first == names.first?.replacingOccurrences(of: " (1)", with: ""))
+    }
+
+    @Test func aRotationRunsInOrderAndRepeats() throws {
+        // Six days from three templates is that rotation twice, not three days.
+        let ppl = try #require(programs.program(id: "ppl_6d"))
+        let week = ProgramPlanBuilder.weeklySchedule(for: ppl)
+        #expect(week.count == 6)
+        #expect(week.map(\.templateIndex) == [0, 1, 2, 0, 1, 2])
+        #expect(week[3].occurrence == 2)
+    }
+
+    @Test func theWeekFollowsTheAthleteWhenTheyAsk() throws {
+        // The library holds only two 6-day programs and three 2-day ones, so binding the
+        // plan to the program's own frequency shortchanges anyone at the edges.
+        let beginner = try #require(programs.program(id: "beginner_full_body_3d"))
+        #expect(ProgramPlanBuilder.weeklySchedule(for: beginner, sessions: 5).count == 5)
+        #expect(ProgramPlanBuilder.weeklySchedule(for: beginner, sessions: 2).count == 2)
+    }
+
+    @Test func aWeekIsNeverLongerThanAWeek() throws {
+        let beginner = try #require(programs.program(id: "beginner_full_body_3d"))
+        #expect(ProgramPlanBuilder.weeklySchedule(for: beginner, sessions: 12).count == 7)
+        #expect(ProgramPlanBuilder.weeklySchedule(for: beginner, sessions: 0).count == 1)
+    }
+
+    @Test func aProgramWithNoTemplatesHasNoWeek() throws {
+        let running = try #require(programs.program(id: "couch_to_5k_9wk"))
+        #expect(ProgramPlanBuilder.weeklySchedule(for: running).isEmpty)
+    }
+
+    @Test func aRepeatedTemplateResolvesToTheSameSessionEveryTime() throws {
+        // Two Push days in a PPL week must not quietly contain different exercises.
+        let ppl = try #require(programs.program(id: "ppl_6d"))
+        let plan = ProgramPlanBuilder.plan(from: ppl, answers: answers(days: 6), catalog: catalog)
+        #expect(plan.workouts.count == 6)
+        #expect(plan.workouts[0].items.map(\.exId) == plan.workouts[3].items.map(\.exId))
+    }
+
+    @Test func aRepeatedSessionIsExplainedOnce() throws {
+        // Three identical full-body days should not print the same six exercises three times.
+        let hotel = try #require(programs.program(id: "travel_hotel_20min"))
+        var a = answers(days: 3)
+        a.equipmentTypes = [.bodyOnly, .bands]
+        let plan = ProgramPlanBuilder.plan(from: hotel, answers: a, catalog: catalog)
+        let report = ProgramPlanBuilder.report(for: hotel, plan: plan, answers: a)
+        #expect(plan.workouts.count == 3)
+        #expect(report.perDay.count == 1)
+    }
+
+    @Test func everyBundledProgramFillsTheWeekItClaims() {
+        // A library-wide guarantee rather than a per-program one: any program added later
+        // that declares more sessions than it has templates is covered the day it lands.
+        for program in programs.all where !program.days.isEmpty {
+            let week = ProgramPlanBuilder.weeklySchedule(for: program)
+            #expect(week.count == min(max(program.daysPerWeek, program.days.count), 7),
+                    "\(program.id) built \(week.count) sessions for \(program.daysPerWeek) days/week")
+            #expect(Set(week.map(\.name)).count == week.count, "\(program.id) has duplicate session names")
+        }
     }
 }

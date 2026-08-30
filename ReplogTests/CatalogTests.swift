@@ -96,4 +96,43 @@ struct CatalogTests {
         // Every catalog entry should yield at least one flattened image resource name.
         #expect(catalog.all.allSatisfy { !$0.imageResourceNames.isEmpty })
     }
+
+    // MARK: Derived properties
+
+    private func exercise(primary: [Muscle], secondary: [Muscle] = [],
+                          images: [String] = [], imageDatas: [Data] = []) -> Exercise {
+        Exercise(id: "X", name: "X", force: nil, level: .beginner, mechanic: nil,
+                 equipment: nil, primaryMuscles: primary, secondaryMuscles: secondary,
+                 category: .strength, instructions: [], images: images,
+                 imageDatas: imageDatas)
+    }
+
+    @Test func allMusclesPutsPrimariesFirstAndDropsRepeats() {
+        let ex = exercise(primary: [.chest, .triceps], secondary: [.triceps, .shoulders])
+        #expect(ex.allMuscles == [.chest, .triceps, .shoulders])
+    }
+
+    @Test func allMusclesOfAMovementWithNoSecondariesIsJustThePrimaries() {
+        #expect(exercise(primary: [.quadriceps]).allMuscles == [.quadriceps])
+    }
+
+    @Test func aBundledExerciseShowsItsShippedPhotos() {
+        let ex = exercise(primary: [.chest], images: ["Bench/0.jpg", "Bench/1.jpg"])
+        #expect(ex.photos == [.bundled("Bench__0"), .bundled("Bench__1")])
+        #expect(ex.imageData == nil)
+    }
+
+    @Test func aCustomExercisesOwnPhotosWinOverAnythingBundled() {
+        let ex = exercise(primary: [.chest], images: ["Bench/0.jpg"],
+                          imageDatas: [Data([0x01]), Data([0x02])])
+        #expect(ex.photos == [.data(Data([0x01])), .data(Data([0x02]))])
+        #expect(ex.imageData == Data([0x01]))
+    }
+
+    @Test func photoIdentityDistinguishesBundledFromData() {
+        // `ForEach` keys carousels on this, so a collision would drop a photo.
+        #expect(ExercisePhoto.bundled("Bench__0").id == "bundled:Bench__0")
+        #expect(ExercisePhoto.bundled("Bench__0").id != ExercisePhoto.bundled("Bench__1").id)
+        #expect(ExercisePhoto.data(Data([0x01])).id.hasPrefix("data:"))
+    }
 }

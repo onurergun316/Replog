@@ -32,6 +32,9 @@ struct MatchContext: Equatable, Sendable {
     var gender: Gender
     var age: Int
     var daysPerWeek: Int
+    /// How long one session may run. Collected at onboarding and, until now, thrown away:
+    /// the matcher could not tell a 20-minute hotel circuit from a 75-minute gym session.
+    var minutesPerSession: Int
     /// The equipment the athlete can train with (already resolved from access level / picks).
     var equipment: Set<Equipment>
     /// Whether the athlete's history satisfies gated prerequisites. False at onboarding
@@ -45,6 +48,7 @@ struct MatchContext: Equatable, Sendable {
          gender: Gender = .male,
          age: Int = 28,
          daysPerWeek: Int = 3,
+         minutesPerSession: Int = 45,
          equipment: Set<Equipment> = [],
          satisfiesPrerequisites: Bool = false) {
         self.goal = goal
@@ -54,6 +58,7 @@ struct MatchContext: Equatable, Sendable {
         self.gender = gender
         self.age = age
         self.daysPerWeek = daysPerWeek
+        self.minutesPerSession = minutesPerSession
         self.equipment = equipment
         self.satisfiesPrerequisites = satisfiesPrerequisites
     }
@@ -68,6 +73,7 @@ struct MatchContext: Equatable, Sendable {
                      gender: quiz.gender,
                      age: quiz.age,
                      daysPerWeek: quiz.daysPerWeek,
+                     minutesPerSession: quiz.minutesPerSession,
                      equipment: quiz.allowedEquipment,
                      satisfiesPrerequisites: satisfiesPrerequisites)
     }
@@ -90,25 +96,34 @@ struct MatchContext: Equatable, Sendable {
         }
     }
 
-    /// Maps a free-text sport onto a known program sport token by keyword, or nil.
+    /// Maps a free-text sport onto a known program sport token, or nil.
+    ///
+    /// Matched on whole WORDS rather than substrings. Substring matching quietly said that
+    /// "skipping" is skiing, "underwater basket weaving" is basketball and "mountain biking"
+    /// is hiking (because "mountain" was a hiking key and was tested before the bike words).
+    /// Each of those hands an athlete a training programme for a sport they do not play, so
+    /// the variants are spelled out instead of inferred from a prefix. Anything unrecognised
+    /// returns nil, and the athlete gets general athletic work — the right answer for a sport
+    /// this library does not cover.
     private static func matchCustomSport(_ raw: String) -> String? {
-        let s = raw.lowercased()
-        let known: [(keys: [String], token: String)] = [
-            (["climb", "boulder"], "climbing"),
-            (["golf"], "golf"),
-            (["hike", "hiking", "mountain", "trek"], "hiking"),
-            (["ski", "snowboard"], "skiing"),
-            (["tennis", "padel", "racquet", "racket", "squash"], "tennis_padel"),
-            (["triathlon", "ironman"], "triathlon"),
-            (["run", "marathon", "5k", "10k"], "running"),
-            (["swim"], "swimming"),
-            (["cycl", "bike"], "cycling"),
-            (["box", "mma", "kickbox"], "boxing"),
-            (["basket"], "basketball"),
-            (["volley"], "volleyball"),
-            (["soccer", "football"], "football"),
+        let words = Set(raw.lowercased().split { !$0.isLetter && !$0.isNumber }.map(String.init))
+        guard !words.isEmpty else { return nil }
+        let known: [(keys: Set<String>, token: String)] = [
+            (["climbing", "climb", "bouldering", "boulder"], "climbing"),
+            (["golf", "golfing"], "golf"),
+            (["hiking", "hike", "trekking", "trek", "hillwalking", "mountaineering"], "hiking"),
+            (["skiing", "ski", "snowboarding", "snowboard"], "skiing"),
+            (["tennis", "padel", "paddle", "squash", "racquetball", "badminton"], "tennis_padel"),
+            (["triathlon", "ironman", "duathlon"], "triathlon"),
+            (["running", "run", "runner", "jogging", "jog", "marathon", "5k", "10k"], "running"),
+            (["swimming", "swim", "swimmer"], "swimming"),
+            (["cycling", "cycle", "cyclist", "biking", "bike", "mtb", "spinning"], "cycling"),
+            (["boxing", "box", "mma", "kickboxing", "muaythai", "sparring"], "boxing"),
+            (["basketball", "hoops"], "basketball"),
+            (["volleyball"], "volleyball"),
+            (["football", "soccer", "futsal"], "football"),
         ]
-        for entry in known where entry.keys.contains(where: { s.contains($0) }) {
+        for entry in known where !entry.keys.isDisjoint(with: words) {
             return entry.token
         }
         return nil
@@ -164,10 +179,13 @@ enum ProgramMatcher {
     /// the program.
     static func score(_ program: WorkoutProgram, for context: MatchContext) -> ProgramMatch? {
         // ---- Hard gates ----
+        // A program with no day templates cannot become a plan: the builder resolves zero
+        // workouts and the whole thing silently falls through to the legacy split generator,
+        // leaving the athlete with a plan that is not the program they were shown.
+        guard !program.days.isEmpty else { return nil }
         guard equipmentSatisfied(program, by: context.equipment) else { return nil }
         guard program.audience.admits(age: context.age) else { return nil }
         guard sportGatePasses(program, for: context) else { return nil }
-        if program.prerequisite != nil && !context.satisfiesPrerequisites { return nil }
 
         // ---- Soft scoring ----
         var score = 0.0
@@ -193,14 +211,45 @@ enum ProgramMatcher {
             reasons.append("Matches your \(context.goal.shortName.lowercased()) goal.")
         }
 
-        // Days-per-week fit: full marks on an exact match, tapering with distance.
+        // Days-per-week fit. The athlete named a number; a program two or more days away
+        // from it is a different commitment, so the distance now carries a real penalty
+        // rather than merely forfeiting a bonus.
         let dayGap = abs(program.daysPerWeek - context.daysPerWeek)
-        let dayScore = max(0, 20 - dayGap * 7)
-        score += Double(dayScore)
+        score += dayFitScore(gap: dayGap)
         if dayGap == 0 {
             reasons.append("Fits your \(context.daysPerWeek) days/week.")
         } else if dayGap == 1 {
             reasons.append("Close to your \(context.daysPerWeek) days/week (\(program.daysPerWeek)).")
+        }
+
+        // Session-length fit. This is the term whose absence handed an athlete with 85
+        // minutes a 20-minute hotel-room circuit: nothing in the scoring could tell the
+        // difference, so goal words and an exact day count carried a maintenance program
+        // past every real training program in the library.
+        let fit = sessionFitScore(programMinutes: program.sessionMinutes,
+                                  athleteMinutes: context.minutesPerSession)
+        score += fit
+        if let reason = sessionFitReason(programMinutes: program.sessionMinutes,
+                                         athleteMinutes: context.minutesPerSession) {
+            reasons.append(reason)
+        }
+
+        // Prerequisite: a caution, not a wall.
+        //
+        // It used to be a hard gate keyed on a single boolean that is ALWAYS false during
+        // onboarding — which is the one moment the app generates a plan. Every endurance
+        // sport in the library declares a prerequisite ("Can run 5K continuously"), so a
+        // runner, cyclist, swimmer or triathlete could never be given their own sport's
+        // programme at all; they got generic athletic work instead. The same boolean was
+        // simultaneously too loose afterwards: any logged history at all flipped it true and
+        // unlocked all twelve, whatever each one actually asks for.
+        //
+        // As a penalty it does the job the gate was meant to do — an equivalent programme
+        // with no entry requirement is preferred — while still being reachable when it is
+        // the only thing that serves the athlete. What it expects is on its detail screen.
+        if program.prerequisite != nil && !context.satisfiesPrerequisites {
+            score -= 25
+            reasons.append("Assumes some training already behind you — check what it expects.")
         }
 
         // Experience fit.
@@ -215,26 +264,103 @@ enum ProgramMatcher {
             reasons.append(bonus.reason)
         }
 
+        // Auto-pickable is the app's existing "never chosen FOR the athlete" channel. An
+        // adjunct belongs in it for the same reason a disclaimer programme does: it is not
+        // a complete plan, so it must not become somebody's entire programme by winning a
+        // score. Both remain in the ranking, and both stay browsable.
         return ProgramMatch(program: program,
                             score: score,
-                            autoPickable: !program.requiresDisclaimerAcknowledgement,
+                            autoPickable: !program.requiresDisclaimerAcknowledgement && program.isStandalone,
                             reasons: reasons)
+    }
+
+    // MARK: Fit scoring
+
+    /// How well a program's weekly frequency matches the athlete's answer.
+    ///
+    /// Exact is worth more than any single goal keyword, because "three days a week" is a
+    /// promise about the athlete's life rather than a preference about training style.
+    static func dayFitScore(gap: Int) -> Double {
+        switch gap {
+        case 0:  return 30
+        case 1:  return 14
+        case 2:  return 0
+        default: return -22
+        }
+    }
+
+    /// How well a program's session length matches the time the athlete set aside.
+    ///
+    /// Scored as a RATIO rather than a difference, so it behaves the same for someone with
+    /// 20 minutes and someone with 90: half the time you have is half the time you have.
+    /// A missing figure on either side scores neutral rather than guessing.
+    ///
+    /// The two directions are not symmetric, because the mistakes are not symmetric. A
+    /// program that needs MORE time than the athlete has cannot be finished — it is close to
+    /// disqualifying. A program that needs less merely leaves time on the table, so it is
+    /// penalised on a smooth slope instead of a cliff: bucketing scored a 20-minute and a
+    /// 40-minute program identically against a 90-minute athlete, which let the shorter one
+    /// win on unrelated points. Continuity is what makes "closest available" actually mean
+    /// closest, whatever the library happens to contain.
+    static func sessionFitScore(programMinutes: Int, athleteMinutes: Int) -> Double {
+        guard programMinutes > 0, athleteMinutes > 0 else { return 0 }
+        let ratio = Double(programMinutes) / Double(athleteMinutes)
+        if ratio > 1.35 { return -60 }                       // will not fit in the time they have
+        if ratio >= 0.75 { 
+            return ratio <= 1.15 ? 26                        // fits the slot
+                                 : 26 - (ratio - 1.15) * 120 // slightly over, tapering
+        }
+        // Under-use, straight-line from "fine" at 0.75 down to "barely a session" at 0.
+        return -45 + 49 * (ratio / 0.75)
+    }
+
+    /// The plain-language reason attached to a session-length verdict, or nil when the fit
+    /// is unremarkable enough not to be worth a line in the report.
+    static func sessionFitReason(programMinutes: Int, athleteMinutes: Int) -> String? {
+        guard programMinutes > 0, athleteMinutes > 0 else { return nil }
+        let ratio = Double(programMinutes) / Double(athleteMinutes)
+        if ratio >= 0.75 && ratio < 1.16 {
+            return "Built for the ~\(athleteMinutes) minutes you have."
+        }
+        return nil
+    }
+
+    /// Whether a program is a defensible answer for this athlete at all — as opposed to
+    /// merely the least bad thing the library happens to hold.
+    ///
+    /// Ranking always produces a winner, even when every candidate is wrong: with 90 minutes
+    /// and nothing but bodyweight, the library's best offer is a 40-minute program, and
+    /// "best available" quietly became "half the session you asked for". When nothing fits,
+    /// the caller is better off building a plan from the catalog to the athlete's own time
+    /// and days than dressing a mismatch up as a recommendation. As the library grows this
+    /// answers true more often; it needs no maintenance to stay correct.
+    static func fitsTheAthlete(_ program: WorkoutProgram, for context: MatchContext) -> Bool {
+        guard program.sessionMinutes > 0, context.minutesPerSession > 0 else { return true }
+        let ratio = Double(program.sessionMinutes) / Double(context.minutesPerSession)
+        return ratio >= 0.5 && ratio <= 1.35
     }
 
     // MARK: Sport gate
 
-    /// When training for a sport, exclude programs built for a *different* specific sport
-    /// (a runner shouldn't be handed the golf program); general and sport-agnostic programs
-    /// stay eligible as fallbacks. Non-sport goals don't apply this gate.
+    /// A program written for one sport is for that sport's athletes, and nobody else.
+    ///
+    /// The gate used to open with `guard context.goal == .sport else { return true }`, which
+    /// let all 17 sport-specific programs through for every OTHER goal. Nothing downstream
+    /// says a basketball block is not a hypertrophy plan — its goals (`power`, `vertical_jump`,
+    /// `speed`) simply score zero overlap — so it could win on day count and session length
+    /// alone and be handed to someone who never mentioned basketball. That is exactly what
+    /// happened. The sport question is asked first now, whatever the goal:
+    ///
+    ///  • sport-agnostic and general/GPP programs: eligible for everyone;
+    ///  • a specific sport's program: only for an athlete training for THAT sport.
+    ///
+    /// This gates recommendation, not access — the Programs tab still lists all 62, and an
+    /// athlete who wants the basketball block can pick it themselves.
     private static func sportGatePasses(_ program: WorkoutProgram, for context: MatchContext) -> Bool {
-        guard context.goal == .sport else { return true }
         guard let programSport = program.sport?.lowercased(),
               programSport != "general" else { return true }   // agnostic / GPP: always eligible
-        // A sport-specific program is eligible only if it's the athlete's sport.
-        guard let token = context.sportToken else {
-            // Unrecognised custom sport → keep only general/agnostic programs.
-            return false
-        }
+        // A sport-specific program is only ever right for someone training for that sport.
+        guard context.goal == .sport, let token = context.sportToken else { return false }
         return programSport == token.lowercased()
     }
 
@@ -267,7 +393,10 @@ enum ProgramMatcher {
             return ["weight_loss", "fat_loss", "conditioning", "work_capacity",
                     "energy", "endurance"]
         case .recomp:
-            return ["muscle_building", "muscle_retention", "maintenance", "weight_loss",
+            // "maintenance" is deliberately absent: holding what you have is the opposite of
+            // recomposition, and counting it here is what let a hotel-room maintenance
+            // circuit score as a match for someone trying to change their body.
+            return ["muscle_building", "muscle_retention", "weight_loss",
                     "recomp", "strength_hypertrophy", "general_fitness"]
         case .sport:
             return ["general_athleticism", "athletic_base", "power", "speed", "conditioning",
@@ -295,14 +424,22 @@ enum ProgramMatcher {
 
     // MARK: Sex focus
 
-    /// A small, never-exclusionary ranking nudge when a program's sex focus aligns with the
-    /// athlete. `female` and `female_focused` programs stay available to everyone.
+    /// A ranking nudge when a program's sex focus aligns with the athlete — and a push in
+    /// the other direction when it is aimed squarely at someone else.
+    ///
+    /// Never a gate: a program stays reachable whoever the athlete is, and the Programs tab
+    /// still lists every one of them. But an alignment bonus alone is not symmetric — it
+    /// left "Women's Upper Strength" as the top recommendation for a male athlete, which
+    /// reads as the app not having looked at the answers it just collected. The penalty is
+    /// smaller than a day-count mismatch, so a genuinely better-fitting program still wins.
     private static func sexFocusBonus(_ program: WorkoutProgram, gender: Gender) -> (points: Double, reason: String)? {
         switch (program.audience.sex, gender) {
         case (.female, .female), (.femaleFocused, .female):
             return (15, "Designed with women in mind.")
         case (.maleFocused, .male):
             return (8, "Emphasis suited to your profile.")
+        case (.female, .male), (.femaleFocused, .male), (.maleFocused, .female):
+            return (-20, "Written for a different athlete, but still open to you.")
         default:
             return nil
         }
@@ -326,8 +463,15 @@ enum ProgramMatcher {
         }
         switch key {
         // Always available: bodyweight & near-universal staples.
+        //
+        // `medicine_ball` sits here rather than in the strict bucket below because the
+        // onboarding chip grid renders `Equipment.selectable`, which does not offer it —
+        // so `allowedEquipment` could never contain it for ANY athlete, and the three
+        // programmes requiring one (boxing, tennis/padel, golf) were gated out for 100% of
+        // users, including the athletes they were written for. A boxer got generic GPP
+        // instead. Gating on gear the quiz never asks about can only ever return false.
         case "body_only", "bodyweight", "pull_up_bar", "backpack", "backpack_for_load",
-             "open_space", "sandbag":
+             "open_space", "sandbag", "medicine_ball":
             return true
         // App-modeled strength gear — strict gate.
         case "barbell", "trap_bar":       return owned.contains(.barbell)
@@ -336,7 +480,6 @@ enum ProgramMatcher {
         case "cable":                     return owned.contains(.cable)
         case "kettlebell", "kettlebells": return owned.contains(.kettlebells)
         case "bands":                     return owned.contains(.bands)
-        case "medicine_ball":             return owned.contains(.medicineBall)
         // Cardio gear the app doesn't model — stay permissive (can't disprove ownership).
         case "bike", "trainer", "rower", "elliptical", "pool", "treadmill":
             return true

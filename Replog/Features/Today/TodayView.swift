@@ -23,6 +23,11 @@ struct TodayView: View {
     @State private var path = NavigationPath()
     @State private var selectedStat: StatKind?
     @State private var showingBodyweightSheet = false
+    /// True while the Recent Highlight's detail sheet is up.
+    @State private var showingHighlight = false
+    /// The session already in progress when the athlete tapped Start on a *different*
+    /// workout. Non-nil while the "finish what you started" dialog is up.
+    @State private var blockingSession: ActiveSession?
     /// The workout awaiting the readiness check before its session begins.
     @State private var pendingWorkout: Workout?
     /// The day the hero card is showing. Nil = follow today, so the screen re-anchors
@@ -41,6 +46,7 @@ struct TodayView: View {
     init() {
         #if DEBUG
         if DebugSeed.wantsBodyweightSheet { _showingBodyweightSheet = State(initialValue: true) }
+        if DebugSeed.opensHighlightSheet { _showingHighlight = State(initialValue: true) }
         #endif
     }
 
@@ -184,6 +190,16 @@ struct TodayView: View {
                 if phase == .active { reanchorIfNeeded() }
             }
             .planNavigationDestinations()
+            .confirmationDialog("Finish what you started?",
+                                isPresented: Binding(get: { blockingSession != nil },
+                                                     set: { if !$0 { blockingSession = nil } }),
+                                titleVisibility: .visible,
+                                presenting: blockingSession) { session in
+                Button("Continue \(session.name)") { resume(session) }
+                Button("Not now", role: .cancel) {}
+            } message: { session in
+                Text("\(session.name) is still in progress. Replog keeps one workout at a time, so pick that one back up — or finish it — before starting another.")
+            }
             .sheet(item: $pendingWorkout) { workout in
                 ReadinessCheckInSheet { readiness in
                     beginSession(workout, readiness: readiness)
@@ -199,6 +215,11 @@ struct TodayView: View {
                 ) { kg in
                     context.logBodyweight(kg)
                     try? context.save()
+                }
+            }
+            .sheet(isPresented: $showingHighlight) {
+                if let highlight {
+                    RecentHighlightSheet(highlight: highlight, units: units, catalog: catalog)
                 }
             }
             .sheet(item: $selectedStat) { kind in
@@ -373,28 +394,38 @@ struct TodayView: View {
         activeSession?.workoutId == workout.id
     }
 
-    private var recentHighlight: (some View)? {
-        // One resolution per entry, cached — `max(by:)` would otherwise call e1rm twice
-        // per comparison on a list that grows with every workout.
+    /// The athlete's heaviest estimated 1RM, with the session around it. Nil until there
+    /// is any history at all.
+    private var highlight: RecentHighlight? {
         let load = LoadResolver.live(catalog: catalog, bodyweightEntries: bodyweightEntries)
-        let scored = history.map { (entry: $0, e1rm: load.e1rm($0)) }
-        guard let top = scored.max(by: { $0.e1rm < $1.e1rm }),
-              case let best = top.entry,
-              let ex = catalog.exercise(id: best.exId) else { return Optional<AnyView>.none }
+        return RecentHighlight.best(in: history) { load.e1rm($0) }
+    }
+
+    private var recentHighlight: (some View)? {
+        guard let highlight, let ex = catalog.exercise(id: highlight.exId) else {
+            return Optional<AnyView>.none
+        }
         return AnyView(
             VStack(alignment: .leading, spacing: 8) {
                 SectionHeader(title: "Recent Highlight")
-                HStack(spacing: 12) {
-                    ExerciseThumbnail(exercise: ex, size: 48, cornerRadius: 12)
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(ex.name).font(.cardTitle).foregroundStyle(Color.textPrimary)
-                        Text("\(top.e1rm) est. 1RM").font(.rounded(13, .bold)).foregroundStyle(Color.accent)
+                Button { showingHighlight = true } label: {
+                    HStack(spacing: 12) {
+                        ExerciseThumbnail(exercise: ex, size: 48, cornerRadius: 12)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(ex.name).font(.cardTitle).foregroundStyle(Color.textPrimary)
+                            Text("\(highlight.e1rm) est. 1RM")
+                                .font(.rounded(13, .bold)).foregroundStyle(Color.accent)
+                        }
+                        Spacer()
+                        Image(systemName: "trophy.fill").foregroundStyle(Color.accent)
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 12, weight: .bold)).foregroundStyle(Color.text3)
                     }
-                    Spacer()
-                    Image(systemName: "trophy.fill").foregroundStyle(Color.accent)
+                    .padding(14)
+                    .cardSurface()
+                    .contentShape(Rectangle())
                 }
-                .padding(14)
-                .cardSurface()
+                .buttonStyle(.plain)
             }
         )
     }
@@ -419,6 +450,13 @@ struct TodayView: View {
     private func start(_ workout: Workout) {
         // One session at a time: resume the in-progress one rather than starting a second.
         if let existing = activeSession {
+            // Resuming the workout they asked for needs no explanation. Resuming a
+            // DIFFERENT one does: tapping Start on Leg Day and landing in Wednesday's
+            // half-finished Push Day reads as the app losing track of what was tapped.
+            guard existing.workoutId == workout.id else {
+                blockingSession = existing
+                return
+            }
             resume(existing)
         } else {
             // A brand-new session is a write, so it needs the gate. The readiness check comes

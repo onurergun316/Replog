@@ -6,6 +6,8 @@
 //  Driven by launch environment variables (never used in Release):
 //    REPLOG_SEED=1     -> seed a demo plan + history and mark onboarding done
 //    REPLOG_TAB=<name> -> initial tab (today|plans|library|progress|profile)
+//    REPLOG_BADGE=1    -> raise the badge unlock celebration at launch
+//    REPLOG_SHEET=<x>  -> open a detail sheet at launch (highlight|insight)
 //
 
 import Foundation
@@ -24,6 +26,18 @@ enum DebugSeed {
         ProcessInfo.processInfo.environment["REPLOG_BODYWEIGHT"] == "1"
     }
 
+    /// REPLOG_SHEET=highlight|insight -> opens a detail sheet at launch.
+    ///
+    /// Same reasoning as `wantsBodyweightSheet`: there is no UI automation here, so a sheet
+    /// that only exists behind a tap can only be checked by launching into it.
+    static var opensHighlightSheet: Bool {
+        ProcessInfo.processInfo.environment["REPLOG_SHEET"] == "highlight"
+    }
+
+    static var opensFirstInsight: Bool {
+        ProcessInfo.processInfo.environment["REPLOG_SHEET"] == "insight"
+    }
+
     /// REPLOG_ACCESS=locked|freeday|premium -> forces `PremiumGate`'s answer.
     ///
     /// The read-only state is otherwise only reachable by waiting for midnight, and the
@@ -36,6 +50,19 @@ enum DebugSeed {
         case "premium": return .premium
         default: return nil
         }
+    }
+
+    /// REPLOG_BADGE=1 -> raise the badge unlock celebration at launch, optionally on a
+    /// specific badge (`REPLOG_BADGE=<badge id>`) or on two at once (`REPLOG_BADGE=2`).
+    ///
+    /// The celebration only fires when a badge is genuinely earned, which is not something
+    /// that can be arranged on demand — so without this the one moment in the app that has
+    /// to feel right could only ever be checked by accident.
+    static var sampleUnlockedBadges: [Badge]? {
+        guard let value = ProcessInfo.processInfo.environment["REPLOG_BADGE"] else { return nil }
+        if let badge = BadgeCatalog.badge(id: value) { return [badge] }
+        let count = Int(value) ?? 1
+        return Array(BadgeCatalog.all.prefix(max(1, count)))
     }
 
     static var initialTab: MainTabView.Tab? {
@@ -143,8 +170,11 @@ enum DebugSeed {
         ReportScheduler.runOnActivation(context: context)
         let ctx = CoachContextBuilder.todayContext(
             profile: profile, settings: context.appSettings(), plans: context.allPlans(), context: context)
-        if let top = CoachEngine.topInsight(ctx) {
-            CoachContextBuilder.recordDailyCard(top, context: context)
+        // The *top* insight for this seed is the seeded plateau, and stall alerts are owned
+        // by `StallDetector` — `recordDailyCard` refuses them, which left the Coach Insights
+        // section empty in the very seed that exists to populate it.
+        if let recordable = CoachEngine.insights(ctx).first(where: { $0.kind != .stallAlert }) {
+            CoachContextBuilder.recordDailyCard(recordable, context: context)
         }
         try? context.save()
     }

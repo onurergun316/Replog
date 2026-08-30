@@ -56,7 +56,12 @@ struct Exercise: Identifiable, Hashable, Sendable {
 
 /// One displayable exercise photo — a bundled HEIC resource or user-supplied image data.
 /// Lets every image view and carousel treat catalog and custom exercises identically.
-enum ExercisePhoto: Hashable, Sendable, Identifiable {
+///
+/// `nonisolated` like the rest of the catalog's value types: the module defaults to MainActor
+/// isolation, which would isolate this pure enum's `Hashable`/`Equatable` conformance too — and
+/// a MainActor-isolated conformance can't be used from a nonisolated context, which is a warning
+/// today and an error under the Swift 6 language mode.
+nonisolated enum ExercisePhoto: Hashable, Sendable, Identifiable {
     case bundled(String)
     case data(Data)
 

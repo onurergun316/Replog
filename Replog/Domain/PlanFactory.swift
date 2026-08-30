@@ -84,6 +84,9 @@ enum PlanFactory {
             set.item = item
             context.insert(set)
         }
+        // One plan, one prescription per movement: if another day of this plan already
+        // benches, this one opens on those numbers rather than a generic 20 kg x 10.
+        PlanExerciseSync.adoptPlanPrescription(item, context: context)
         return item
     }
 

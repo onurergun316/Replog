@@ -3,7 +3,7 @@
 //  Replog
 //
 //  Reader-facing detail for a bundled library program: who it's for, the science behind it,
-//  the evidence it draws on, what to expect, and its cautions. A medical disclaimer, when
+//  the principles it is built on, what to expect, and its cautions. A medical disclaimer, when
 //  present, is shown as a prominent must-acknowledge banner. Reachable from the onboarding
 //  result screen and from a plan's detail screen.
 //
@@ -30,8 +30,8 @@ struct ProgramDetailView: View {
                 if !program.scienceRationale.isEmpty {
                     section("The science", body: program.scienceRationale)
                 }
-                if !program.evidence.isEmpty {
-                    evidenceSection
+                if !program.principles.isEmpty {
+                    principlesSection
                 }
                 if !program.expectedResults.isEmpty {
                     section("What to expect", body: program.expectedResults)
@@ -86,10 +86,10 @@ struct ProgramDetailView: View {
         }
     }
 
-    private var evidenceSection: some View {
+    private var principlesSection: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("Evidence").font(.rounded(18, .black)).foregroundStyle(Color.textPrimary)
-            ForEach(Array(program.evidence.enumerated()), id: \.offset) { _, item in
+            Text("What it's built on").font(.rounded(18, .black)).foregroundStyle(Color.textPrimary)
+            ForEach(Array(program.principles.enumerated()), id: \.offset) { _, item in
                 HStack(alignment: .top, spacing: 8) {
                     Circle().fill(Color.accent).frame(width: 6, height: 6).padding(.top, 7)
                     Text(item).font(.rounded(14, .semibold)).foregroundStyle(Color.text2)

@@ -73,6 +73,9 @@ struct PlanGenerator {
         let priority = priorityMuscles(answers)
 
         var workouts: [GeneratedWorkout] = []
+        // A 4- or 6-day split runs its templates twice, so the names repeat. Numbering the
+        // repeats is what keeps "Upper, Lower, Upper, Lower" from reading as a duplicate.
+        var timesSeen: [String: Int] = [:]
         for (index, template) in split.dayTemplates.enumerated() {
             let items = buildItems(
                 for: template,
@@ -82,7 +85,10 @@ struct PlanGenerator {
                 avoidMuscles: avoid,
                 answers: answers
             )
-            workouts.append(GeneratedWorkout(name: template.name, day: days[index], items: items))
+            let occurrence = (timesSeen[template.name] ?? 0) + 1
+            timesSeen[template.name] = occurrence
+            let name = occurrence == 1 ? template.name : "\(template.name) (\(occurrence))"
+            workouts.append(GeneratedWorkout(name: name, day: days[index], items: items))
         }
 
         return GeneratedPlan(

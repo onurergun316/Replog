@@ -180,4 +180,21 @@ struct CoachingLogTests {
         #expect(ctx.coachingLogs().isEmpty)
         #expect(try ctx.fetch(FetchDescriptor<Plan>()).count == 1) // untouched
     }
+
+    // MARK: Kind identity & copy
+
+    @Test func everyCoachingKindHasAnIdentityAndADisplayName() {
+        for kind in CoachingKind.allCases {
+            #expect(kind.id == kind.rawValue)
+            #expect(!kind.displayName.isEmpty)
+        }
+        #expect(CoachingKind.weeklyReport.displayName == "Weekly report")
+        #expect(CoachingKind.coachInsight.displayName == "Coach")
+    }
+
+    @Test func aPayloadMetricIsReadableBySubscript() {
+        let payload = CoachingPayload(metrics: ["prCount": 2], tags: [])
+        #expect(payload[metric: "prCount"] == 2)
+        #expect(payload[metric: "missing"] == nil)
+    }
 }

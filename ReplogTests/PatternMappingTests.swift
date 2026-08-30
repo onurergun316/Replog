@@ -13,8 +13,7 @@ import Foundation
 struct PatternMappingTests {
 
     private let catalog = ExerciseCatalog(bundle: .main)
-    private let fullGym: Set<Equipment> = [.barbell, .dumbbell, .machine, .cable, .bodyOnly,
-                                           .bands, .kettlebells, .medicineBall]
+    private let fullGym: Set<Equipment> = EquipmentAccess.fullGym.allowedEquipment.intersection(Set(Equipment.selectable))
 
     // MARK: - Totality
 

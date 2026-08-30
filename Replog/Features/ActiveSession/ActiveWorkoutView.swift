@@ -6,6 +6,10 @@
 //  finance-style trend arrows, inline editors, swipe-to-delete, spring reorder of
 //  finished exercises, and Finish.
 //
+//  Finish ends here: badges and debrief insights are handed to `onFinished` and this screen
+//  dismisses. It does not celebrate anything itself — finishing deletes the session this
+//  view is presented from, so it is gone before an overlay could be seen (`SessionCompletion`).
+//
 
 import SwiftUI
 import SwiftData
@@ -17,6 +21,11 @@ struct ActiveWorkoutView: View {
     @Query private var profiles: [UserProfile]
     @Query private var settingsList: [AppSettings]
     @Bindable var session: ActiveSession
+    /// Handed everything the finished session earned, for whoever is still on screen to
+    /// celebrate. Finishing deletes the session and this view is presented *from* that
+    /// session, so nothing raised here would survive long enough to be seen — see
+    /// `SessionCompletion`.
+    var onFinished: (_ badges: [Badge], _ insights: [CoachInsight]) -> Void = { _, _ in }
 
     @State private var expandedSetID: UUID?
     @State private var restTimer = RestTimerModel()
@@ -24,11 +33,9 @@ struct ActiveWorkoutView: View {
     @State private var showFinishConfirm = false
     @State private var showCelebration = false
     @State private var didCelebrate = false
-    @State private var debriefInsights: [CoachInsight] = []
-    @State private var showDebrief = false
     @State private var showAddExercise = false
-    @State private var unlockedBadges: [Badge] = []
-    @State private var showBadgeUnlock = false
+    /// Bumped when a rest countdown reaches zero, so the end of rest is felt.
+    @State private var restEndedTick = 0
     /// What this session added beyond the plan, held while the athlete decides whether to
     /// keep it. Non-nil means the "save to the plan?" dialog is up.
     @State private var pendingAdditions: TemplateWriteBack.Additions?
@@ -81,6 +88,9 @@ struct ActiveWorkoutView: View {
         }
         .hideKeyboardOnTap()
         .background(Color.bg.ignoresSafeArea())
+        // Rest ending is the one moment in a session the athlete is deliberately not
+        // looking at the phone. It used to pass in silence — the bar simply vanished.
+        .sensoryFeedback(.success, trigger: restEndedTick)
         .sheet(item: $detailRef) { ref in
             NavigationStack { ExerciseDetailView(exId: ref.id, showProgress: true) }
         }
@@ -95,12 +105,6 @@ struct ActiveWorkoutView: View {
             Button("Just this time") { finish(saveAdditions: false) }
         } message: {
             Text(additionsPromptMessage)
-        }
-        // The debrief hands over to the badge sheet when something was earned, so the two
-        // never fight over the screen and the workout is only dismissed once.
-        .sheet(isPresented: $showDebrief,
-               onDismiss: { if unlockedBadges.isEmpty { dismiss() } else { showBadgeUnlock = true } }) {
-            NavigationStack { CoachDebriefView(insights: debriefInsights) }
         }
         .confirmationDialog("Finish workout?", isPresented: $showFinishConfirm, titleVisibility: .visible) {
             Button("Finish anyway", role: .destructive) { requestFinish() }
@@ -117,17 +121,6 @@ struct ActiveWorkoutView: View {
                     onFinish: { showCelebration = false; requestFinish() },
                     onKeepGoing: { withAnimation(.snappy) { showCelebration = false } }
                 )
-                .transition(.opacity)
-            }
-        }
-        // A badge is rarer than a finished session, so it gets the louder moment — and it
-        // comes last, after the debrief, so the two never compete for the screen.
-        .overlay {
-            if showBadgeUnlock {
-                BadgeCelebrationOverlay(badges: unlockedBadges) {
-                    withAnimation(.snappy) { showBadgeUnlock = false }
-                    dismiss()
-                }
                 .transition(.opacity)
             }
         }
@@ -260,7 +253,14 @@ struct ActiveWorkoutView: View {
             }
             .padding(.horizontal, 12).padding(.vertical, 8)
             .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(Color.accentSoft))
-            .onChange(of: remaining) { _, new in if new == 0 { restTimer.skip() } }
+            .onChange(of: remaining) { previous, new in
+                guard new == 0 else { return }
+                // Ticking down to zero is rest ending. Landing on zero from the middle of
+                // a countdown is the app coming back from the background long after it
+                // ended — buzzing then is a phantom alert, not a cue.
+                if previous <= 2 { restEndedTick += 1 }
+                restTimer.skip()
+            }
         }
     }
 
@@ -408,16 +408,15 @@ struct ActiveWorkoutView: View {
         NotificationCoordinator.refresh(context: context)
 
         // Anything this session just earned, stamped with what was being trained.
-        unlockedBadges = BadgeAwarding.award(context: context, catalog: catalog,
-                                             planName: planName, workoutName: workoutName)
+        let badges = BadgeAwarding.award(context: context, catalog: catalog,
+                                         planName: planName, workoutName: workoutName)
         try? context.save()
 
-        if insights.isEmpty {
-            if unlockedBadges.isEmpty { dismiss() } else { showBadgeUnlock = true }
-        } else {
-            debriefInsights = insights
-            showDebrief = true   // dismissing the debrief dismisses the workout
-        }
+        // Handed over rather than shown here: this screen is about to be torn down with the
+        // session it was presented from. `RootView` plays the badge, then the debrief, once
+        // the cover is out of the way.
+        onFinished(badges, insights)
+        dismiss()
     }
 
     /// The deload rule of the program this session's workout belongs to, if program-driven.

@@ -5,6 +5,11 @@
 //  Decides between onboarding and the main app, applies the user's color scheme,
 //  and presents the active workout full-screen when one is in progress.
 //
+//  It also plays back what a finished session earned — the badge celebration, then the
+//  coach's debrief. That lives here rather than in the workout screen because finishing
+//  DELETES the session the cover is bound to, so the workout view is being torn down at
+//  the exact moment it would have celebrated (`SessionCompletion`).
+//
 //  It also keeps `PremiumGate` fed and owns the app's single paywall sheet. The gate
 //  deliberately does not read SwiftData or StoreKit itself — this is the one view that already
 //  has both, so this is where the two values are copied across. One sheet, at the root, means
@@ -23,6 +28,17 @@ struct RootView: View {
     @Query private var profiles: [UserProfile]
     @Query private var settings: [AppSettings]
     @Query private var activeSessions: [ActiveSession]
+
+    /// What a just-finished session still has to show. Owned here, and not in the workout
+    /// screen, because finishing deletes the session the cover below is bound to: the
+    /// celebration has to outlive the screen that earned it.
+    @State private var completion = SessionCompletion()
+
+    #if DEBUG
+    /// One-shot guard for the `REPLOG_BADGE` preview: `onAppear` can fire more than once,
+    /// and re-raising the celebration every time is not what "show me the moment" means.
+    @State private var didPreviewBadges = false
+    #endif
 
     // Read-only: the singletons are bootstrapped in ReplogApp.init, so body never mutates the context.
     private var onboardingDone: Bool { profiles.first?.onboardingDone ?? false }
@@ -51,9 +67,31 @@ struct RootView: View {
                 // Cover dismissed (e.g. swipe) → pause the session, don't destroy it.
                 if newValue == nil { activeSessions.first(where: \.isOpen)?.isOpen = false }
             }
-        ), onDismiss: requestReviewIfEarned) { session in
-            ActiveWorkoutView(session: session)
+        ), onDismiss: workoutCoverDismissed) { session in
+            ActiveWorkoutView(session: session) { badges, insights in
+                completion.finished(badges: badges, insights: insights)
+            }
+            .preferredColorScheme(darkMode ? .dark : .light)
+        }
+        // The badge lands first, the instant the workout screen is out of the way: it is the
+        // rarer thing, and it is what the athlete just tapped Finish for. The coach's debrief
+        // is the calm read that follows it.
+        .overlay {
+            if completion.stage == .badges {
+                BadgeCelebrationOverlay(badges: completion.badges) {
+                    withAnimation(.snappy) { completion.advance() }
+                }
+                .transition(.opacity)
+            }
+        }
+        .sheet(isPresented: Binding(get: { completion.stage == .debrief },
+                                    set: { if !$0 { completion.advance() } })) {
+            NavigationStack { CoachDebriefView(insights: completion.insights) }
                 .preferredColorScheme(darkMode ? .dark : .light)
+        }
+        // The rating ask waits for the whole sequence, never lands on top of it.
+        .onChange(of: completion.stage) { previous, current in
+            if previous != .idle, current == .idle { requestReviewIfEarned() }
         }
         // The two shared objects are handed to the sheet explicitly rather than left to
         // inherit. Presented content is hosted outside this view's hierarchy, and on
@@ -86,7 +124,13 @@ struct RootView: View {
         #if DEBUG
         .onAppear {
             DebugSeed.seedIfNeeded(context)
+            DebugPlanImport.addIfNeeded(context)
             gate.debugOverride = DebugSeed.accessOverride
+            if !didPreviewBadges, let badges = DebugSeed.sampleUnlockedBadges {
+                didPreviewBadges = true
+                completion.finished(badges: badges, insights: [])
+                completion.presentPending()
+            }
         }
         #endif
     }
@@ -113,6 +157,14 @@ struct RootView: View {
               !gate.allowsFinishing(sessionStartedAt: open.startedAt) else { return }
         open.isOpen = false
         try? context.save()
+    }
+
+    /// The workout cover has gone. Anything the session earned is raised now — and only
+    /// now, because presenting into a hierarchy that is mid-dismissal is exactly how the
+    /// badge moment used to be lost. With nothing to celebrate, this is the calm moment the
+    /// rating ask was always meant to use.
+    private func workoutCoverDismissed() {
+        if !completion.presentPending() { requestReviewIfEarned() }
     }
 
     /// Asks for a rating once the athlete has three real training days behind them.

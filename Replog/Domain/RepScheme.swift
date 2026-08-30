@@ -37,8 +37,9 @@ enum RepScheme {
     private static let repBounds = 1...50
     private static let timeBounds = 1...600   // up to 10 minutes, in seconds
 
-    /// Parses a slot's `reps` string into a `RepTarget`.
-    static func parse(reps raw: String) -> RepTarget {
+    /// Parses a slot's `reps` string into a `RepTarget`. `pattern` lets a distance be
+    /// expressed as the time it takes — a 200 m swim is not a 200 m sprint.
+    static func parse(reps raw: String, pattern: MovementPattern? = nil) -> RepTarget {
         let s = raw.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
         guard !s.isEmpty else { return .fallback }
 
@@ -51,7 +52,12 @@ enum RepScheme {
         }
 
         if let unit = timeUnit(in: s) {
-            let seconds = unit == .minutes ? first * 60 : first
+            let seconds: Int
+            switch unit {
+            case .minutes: seconds = first * 60
+            case .seconds: seconds = first
+            case .metres:  seconds = Int((Double(first) * secondsPerMetre(for: pattern)).rounded())
+            }
             return RepTarget(reps: clamp(seconds, timeBounds), isTimed: true, isPerSide: isPerSide)
         }
         return RepTarget(reps: clamp(first, repBounds), isTimed: false, isPerSide: isPerSide)
@@ -79,7 +85,7 @@ enum RepScheme {
     static func sets(for slot: ProgramSlot, startingWeightKg: Double,
                      defaultRPE: Int = 8, estimated: Bool = false) -> [GeneratedSet] {
         let count = max(1, min(slot.sets, 8))
-        let target = parse(reps: slot.reps)
+        let target = parse(reps: slot.reps, pattern: slot.pattern)
         let rpe = parseRPE(intensity: slot.intensity) ?? defaultRPE
         return Array(repeating: GeneratedSet(weightKg: startingWeightKg, reps: target.reps,
                                              rpe: rpe, estimated: estimated),
@@ -95,17 +101,59 @@ enum RepScheme {
 
     // MARK: - Number & unit extraction
 
-    private enum TimeUnit { case seconds, minutes }
+    private enum TimeUnit { case seconds, minutes, metres }
 
-    /// Detects a time unit attached to the first number ("30s", "30-60s", "3 min", "30m").
+    /// Detects the unit attached to the first number ("30s", "30-60s", "3 min", "200m").
+    ///
+    /// A bare `m` is METRES. It used to be read as minutes, which turned a 20-metre farmer's
+    /// carry into a 20-minute one, a 200-metre swim into 200 minutes, and a 20-metre sprint
+    /// into a 10-minute sprint — all then clamped to the 600s ceiling, so 32 slots across the
+    /// library reached the athlete's plan as ten-minute sets. Minutes must say "min".
     private static func timeUnit(in s: String) -> TimeUnit? {
-        // Minutes: "min", or a lone "m" used as minutes ("3 min", "3m", "20 min hard").
-        if s.contains("min") { return .minutes }
-        // Seconds: "s"/"sec" following digits, e.g. "30s", "45 sec", "30-60s".
-        if rangeOfDigitThenUnit(in: s, units: ["sec", "s"]) { return .seconds }
-        // Bare "m" as minutes only when it trails a number and isn't part of a word.
-        if rangeOfDigitThenUnit(in: s, units: ["m"]) { return .minutes }
+        // The unit has to belong to the quantity we are actually prescribing — the first one.
+        // Matching a unit ANYWHERE in the string made "6 x 30m shuttle, 20s between reps,
+        // 3 min between sets" a six-MINUTE set, because the string mentions minutes at all.
+        // And "10-12 or 30m" is a rep scheme with a distance alternative: the reps win.
+        for unit in ["min", "sec", "s", "m"] where unitFollowsFirstQuantity(in: s, unit: unit) {
+            switch unit {
+            case "min":         return .minutes
+            case "sec", "s":    return .seconds
+            default:            return .metres
+            }
+        }
         return nil
+    }
+
+    /// How long a metre takes, by what the athlete is doing with it. A loaded carry is
+    /// roughly 0.8 m/s; a sprint is not. Used to express a distance as the seconds it
+    /// occupies, because `SetTemplate` stores no distance.
+    static func secondsPerMetre(for pattern: MovementPattern?) -> Double {
+        switch pattern {
+        case .carry:                   return 1.25
+        case .swim:                    return 1.5
+        case .rowErg:                  return 0.35
+        case .run:                     return 0.30
+        case .plyometric:              return 0.20
+        case .bike:                    return 0.10
+        default:                       return 0.5
+        }
+    }
+
+    /// True when `unit` trails the first QUANTITY — a number or a range like "30-60", whose
+    /// unit is written once at the end.
+    private static func unitFollowsFirstQuantity(in s: String, unit: String) -> Bool {
+        let chars = Array(s)
+        guard let start = chars.firstIndex(where: { $0.isNumber }) else { return false }
+        var j = start
+        while j < chars.count, chars[j].isNumber { j += 1 }
+        // A range carries its unit after the upper bound: "30-60s", "8-12 min".
+        if j < chars.count, chars[j] == "-" || chars[j] == "\u{2013}" {
+            var k = j + 1
+            while k < chars.count, chars[k].isNumber { k += 1 }
+            if k > j + 1 { j = k }
+        }
+        while j < chars.count, chars[j] == " " { j += 1 }
+        return matches(chars, at: j, unit: unit)
     }
 
     /// True if the string contains a digit immediately followed (allowing one space) by any

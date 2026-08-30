@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "notes": "Replog program library — full merged set (batches 1-5). Original structured syntheses of established, freely-documented training methodologies; evidence cited by author/year. Not medical advice.",
+  "notes": "Replog program library — full merged set (batches 1-5). Original structured syntheses of established, freely-documented training methodologies; principles stated in plain language. Not medical advice.",
   "programs": [
     {
       "id": "beginner_full_body_3d",
@@ -141,9 +141,9 @@
       },
       "scienceRationale": "Novices adapt session-to-session, so per-session load increments capture the fastest possible strength curve. Full-body 3x/week gives each muscle ~9 hard sets and 3 weekly exposures, above the minimum-effective volume threshold and at a frequency shown to benefit strength. Compound-first ordering maximizes skill practice on the highest-value lifts.",
       "evidence": [
-        "Schoenfeld et al. 2017 (dose-response of weekly sets)",
-        "Ralston et al. 2017 (>=6 weekly sets superior for multijoint strength)",
-        "Pelland et al. 2024 meta-regression (strength rises with frequency)"
+        "Weekly hard sets and muscle growth rise together",
+        "Multi-joint strength takes off once a muscle gets at least six hard sets a week",
+        "Strength improves when the same volume is spread over more sessions"
       ],
       "expectedResults": "Most beginners add 40-80% to squat/deadlift working weights in 12 weeks alongside visible muscle gain.",
       "cautions": "Form before load: film sets or get a coach check in weeks 1-2.",
@@ -358,11 +358,11 @@
         "rule": "Work up within the rep range; when the top of the range is hit on all sets, add load next session.",
         "deload": "Every 6th week halve set count at same loads."
       },
-      "scienceRationale": "Twice-weekly frequency per muscle with 10-16 weekly hard sets sits in the volume band meta-analyses associate with superior hypertrophy while keeping per-session volume recoverable. Mixed rep bands cover both mechanical-tension-dominant and metabolite-dominant stimulus ranges.",
+      "scienceRationale": "Twice-weekly frequency per muscle with 10-16 weekly hard sets sits in the volume band associated with superior hypertrophy while keeping per-session volume recoverable. Mixed rep bands cover both mechanical-tension-dominant and metabolite-dominant stimulus ranges.",
       "evidence": [
-        "Schoenfeld, Ogborn & Krieger 2016 (frequency meta-analysis)",
-        "Baz-Valle et al. 2022 (12-20 weekly sets optimal band)",
-        "Pelland et al. 2024 (volume dose-response, diminishing returns)"
+        "Training a muscle twice a week beats once for the same weekly volume",
+        "12-20 hard sets per muscle per week is the productive band for growth",
+        "Growth rises with weekly sets, but each added set returns a little less"
       ],
       "expectedResults": "Steady measurable size gains and continued strength PRs over the 10 weeks.",
       "cautions": "Volume-bias days should never be to failure on compounds.",
@@ -537,9 +537,9 @@
       },
       "scienceRationale": "Splitting by movement function lets each muscle be trained hard twice weekly with 15-20+ weekly sets — the upper end of the productive volume range — while distributing systemic fatigue across six shorter sessions. High-set approaches show the strongest hypertrophy returns in trained lifters, with diminishing returns managed by the built-in deload.",
       "evidence": [
-        "Baz-Valle et al. 2022 (12-20 sets band; triceps favored higher volume)",
-        "Schoenfeld et al. 2019 (higher volume -> greater hypertrophy in trained men)",
-        "Pelland et al. 2024 (dose-response with diminishing returns)"
+        "12-20 hard sets per muscle per week is the productive band, with smaller muscles favouring its top end",
+        "Trained lifters need higher weekly volume to keep growing",
+        "Growth rises with weekly sets, but each added set returns a little less"
       ],
       "expectedResults": "Peak-rate muscle gain for recovered intermediates; strength maintained or slowly built.",
       "cautions": "The first sign of accumulating fatigue (sleep, joints, motivation) means pull volume back ~20%.",
@@ -683,9 +683,9 @@
       },
       "scienceRationale": "Submaximal percentage waves with a monthly progression cadence match the slower adaptation rate of intermediates; planned deloads manage accumulated fatigue, and AMRAP sets autoregulate load prescription against daily readiness. Strength responds strongly to frequency and specificity of heavy practice on the target lifts.",
       "evidence": [
-        "Pelland et al. 2024 (strength gains scale with frequency)",
-        "Ralston et al. 2017 (moderate-high weekly sets for multijoint strength)",
-        "classic periodization literature (Matveyev-style wave loading, widely replicated)"
+        "Strength improves when the same volume is spread over more sessions",
+        "Moderate-to-high weekly set counts build multi-joint strength best",
+        "Waves of rising load followed by a lighter week outperform a flat grind"
       ],
       "expectedResults": "5-15kg added to each big-lift 1RM over 12 weeks for a typical intermediate.",
       "cautions": "Never max out during the program; the AMRAP is the test.",
@@ -823,8 +823,8 @@
       },
       "scienceRationale": "In a deficit, resistance training is the primary muscle-retention signal — full-body coverage keeps every muscle above the minimum effective weekly dose while circuit density raises session energy cost. Fat loss itself is driven by the diet-side deficit; training's job is protecting lean mass and adding expenditure, which this format does time-efficiently.",
       "evidence": [
-        "Schoenfeld et al. 2017 (>=5-9 weekly sets minimum effective band)",
-        "resistance training during energy restriction preserves lean mass (Longland et al. 2016 and related literature)"
+        "Five to nine hard sets a week per muscle is the minimum effective band",
+        "Lifting during a calorie deficit is what keeps the weight lost from being muscle"
       ],
       "expectedResults": "With a sensible deficit and protein at ~1.6-2.2 g/kg: 0.5-1% bodyweight lost weekly with muscle largely preserved.",
       "cautions": "Do not chase soreness; performance maintenance is the goal in a deficit.",
@@ -965,8 +965,8 @@
       },
       "scienceRationale": "Separating strength and cardio onto different days minimizes the interference effect on strength adaptations while the added aerobic work enlarges the weekly deficit. Heavy low-rep work in a cut is the strongest retention signal for both strength and mass.",
       "evidence": [
-        "Wilson et al. 2012 (concurrent training interference meta-analysis)",
-        "resistance training + protein preserves lean mass in deficit (Longland et al. 2016)"
+        "Cardio and lifting interfere most when hard sessions sit on top of each other",
+        "Training with enough protein preserves lean mass while fat comes off"
       ],
       "expectedResults": "Fat loss with strength held within ~5% of baseline for most.",
       "cautions": "If lifts drop >10%, the deficit is too aggressive.",
@@ -1159,9 +1159,9 @@
       },
       "scienceRationale": "Glutes receive ~16-20 weekly sets across three frequency exposures — the high end of the productive volume band — via a mix of hip-thrust (high glute activation at short muscle length) and squat/hinge patterns (long-length loading), a combination associated with more complete regional hypertrophy. Upper body held at ~6 weekly sets per pattern, enough to maintain.",
       "evidence": [
-        "Contreras et al. (hip thrust EMG/activation line of research)",
-        "Baz-Valle et al. 2022 (volume band)",
-        "Schoenfeld 2016 (frequency)"
+        "The hip thrust loads the glutes in their shortened position better than squatting alone",
+        "12-20 hard sets per muscle per week is the productive band for growth",
+        "Training a muscle twice a week beats once for the same weekly volume"
       ],
       "expectedResults": "Visible lower-body development in 10 weeks with upper body maintained.",
       "cautions": "Lower-back pump on thrusts means bracing needs work — reduce load, re-learn.",
@@ -1388,9 +1388,9 @@
       },
       "scienceRationale": "Once-weekly frequency per muscle is hypertrophically viable when weekly per-muscle volume is matched — meta-analytic evidence shows volume, more than frequency, drives growth. The format trades the small frequency advantage for very high per-session focus and simple adherence, which for lifters who love it is the deciding real-world variable.",
       "evidence": [
-        "Schoenfeld, Grgic & Krieger 2019 (frequency matters little when volume equated)",
-        "Pelland et al. 2024 (hypertrophy-frequency effect compatible with negligible)",
-        "Baz-Valle 2022 (volume band)"
+        "Once weekly volume is matched, how it is split across days matters far less",
+        "Once weekly volume is equal, spreading it over more days changes little for growth",
+        "12-20 hard sets per muscle per week is the productive band for growth"
       ],
       "expectedResults": "Comparable growth to higher-frequency splits at matched volume, given consistent attendance.",
       "cautions": "Missed days don't get made up — consistency is the whole bet.",
@@ -1476,8 +1476,8 @@
       },
       "scienceRationale": "Walk-run interval progression builds aerobic capacity while capping impact exposure, the main driver of beginner running injuries — tissue tolerance (tendon, bone) adapts slower than cardiovascular fitness, so mileage ramps conservatively. Conversational intensity keeps sessions in the moderate domain where adherence and adaptation are both high.",
       "evidence": [
-        "walk-run progression injury-mitigation literature (Buist et al. 2008, GRONORUN trial)",
-        "ACSM aerobic progression guidelines"
+        "A walk-run progression gets beginners running with far fewer injuries",
+        "Established aerobic progression guidelines"
       ],
       "expectedResults": "Run 5K without stopping by week 9-11 (repeats included).",
       "cautions": "Sharp localized pain (shin, knee, achilles) = stop and regress a week, don't push through.",
@@ -1489,6 +1489,7 @@
     },
     {
       "id": "mobility_flexibility_4w",
+   "standalone": false,
       "name": "Move Free: Daily Mobility & Flexibility",
       "category": "mobility",
       "goals": [
@@ -1651,8 +1652,8 @@
       },
       "scienceRationale": "Meaningful range-of-motion gains require consistent near-daily exposure — total weekly stretch time matters more than any single session — and static holds of 30-60s at mild-moderate intensity are the best-evidenced dose. Adding light end-range isometrics (PNF-style) accelerates gains and builds usable strength in the new range.",
       "evidence": [
-        "Thomas et al. 2018 (weekly stretching time-dose and ROM)",
-        "PNF/contract-relax superiority literature (Sharman et al. 2006)"
+        "Range of motion follows total weekly stretching time more than the length of any one session",
+        "Contract-relax stretching gains range of motion faster than holding a stretch alone"
       ],
       "expectedResults": "Noticeably deeper squat, better overhead reach, and reduced desk stiffness within 4 weeks.",
       "cautions": "Stretch to mild-moderate tension, never sharp pain or numbness/tingling.",
@@ -1665,6 +1666,7 @@
     },
     {
       "id": "return_to_training_generic_6wk",
+   "standalone": false,
       "name": "Rebuild: Graded Return to Training",
       "category": "return_to_activity",
       "goals": [
@@ -1795,8 +1797,8 @@
       },
       "scienceRationale": "Graded exposure with generous rep ranges and machine-first choices rebuilds tissue tolerance and confidence while capping spinal and joint shear. The volume-before-load rule and 24-hour symptom gate mirror standard progressive-loading principles used in late-stage rehab literature, applied conservatively for the post-discharge gap most gym programs ignore.",
       "evidence": [
-        "progressive loading / graded activity principles (Blanchard & Glasgow 2014)",
-        "pain-monitoring model in loading programs (Thomee 1997 line of research)"
+        "Graded, progressive loading is what rebuilds tolerance after a layoff",
+        "Loading through mild pain is safe when it is monitored against a clear rule"
       ],
       "expectedResults": "Restored baseline work capacity and readiness to enter a normal beginner/novice program by week 7.",
       "cautions": "This program is subordinate to clinical advice in every case of conflict.",
@@ -1922,9 +1924,9 @@
       },
       "scienceRationale": "Resistance training in older adults counters sarcopenia, preserves bone mineral density, and combined strength-plus-balance work is among the best-evidenced interventions for fall risk reduction. Two quality sessions capture the large majority of the dose-response benefit at an adherence-friendly commitment; power through the sit-to-stand and step-up patterns preserves the fast-twitch capacity that declines steepest with age.",
       "evidence": [
-        "Fragala et al. 2019 (NSCA position stand, resistance training for older adults)",
-        "Sherrington et al. 2019 Cochrane (exercise and fall prevention)",
-        "Fiatarone et al. 1994 (high-intensity training in elderly)"
+        "Resistance training is the primary defence against age-related muscle loss",
+        "Balance and strength training together are what prevent falls",
+        "Even in the ninth decade, progressive resistance training builds strength and independence"
       ],
       "expectedResults": "Easier stairs, chairs, and carrying within 6-8 weeks; measurable strength gains through week 12.",
       "cautions": "Breathe continuously through reps (no breath-holding/Valsalva with blood pressure concerns).",
@@ -2059,8 +2061,8 @@
       },
       "scienceRationale": "Hypertrophy at low external loads is achievable when sets approach failure — light-load training to near-failure produces growth comparable to heavy loads. Because bodyweight reps inflate quickly, progression here is mechanical (harder leverage variants) rather than purely rep-based, keeping sets in an effective proximity-to-failure zone.",
       "evidence": [
-        "Schoenfeld et al. 2017 (light vs heavy load hypertrophy when effort matched)",
-        "effort/proximity-to-failure literature (Grgic et al. 2021)"
+        "Light and heavy loads build similar muscle when the effort matches",
+        "How close a set comes to failure is what determines its stimulus"
       ],
       "expectedResults": "Visible muscle and big rep-strength gains in 8 weeks with zero equipment.",
       "cautions": "Rows are the weak link at home — a sturdy table or bands are worth securing for back balance.",
@@ -2162,8 +2164,8 @@
       },
       "scienceRationale": "Polarized-leaning distribution (mostly easy, one weekly threshold session) reflects the best-evidenced intensity split for developing aerobic capacity while containing injury risk, which in runners tracks with rapid mileage spikes. Strides add neuromuscular speed at negligible fatigue cost.",
       "evidence": [
-        "Seiler 2010 (intensity distribution in endurance athletes)",
-        "Nielsen et al. 2012 (training-volume ramp and running injury)"
+        "Endurance athletes progress fastest on mostly-easy work with a small hard fraction",
+        "Running injuries track sudden jumps in weekly volume more than volume itself"
       ],
       "expectedResults": "Complete 10K comfortably; typical novices race it at close to their 5K pace + 15-25 s/km.",
       "cautions": "Persistent localized pain -> replace one run with cycling for a week.",
@@ -2267,8 +2269,8 @@
       },
       "scienceRationale": "5K performance is dominated by VO2max and running economy; interval bouts of ~3 minutes near VO2max pace are the classic highest-leverage stimulus, while the tempo session raises lactate threshold and easy volume maintains the aerobic floor.",
       "evidence": [
-        "Billat 2001 (interval training at vVO2max)",
-        "Seiler 2010 (80/20 distribution)"
+        "Intervals at the pace that maximises oxygen uptake drive aerobic gains fastest",
+        "Roughly 80% easy and 20% hard beats training everything in the middle"
       ],
       "expectedResults": "Typical 30-90 s 5K improvement for an intermediate over 6 weeks.",
       "cautions": "Intervals feel productive — resist adding a third hard day; that's how shins break.",
@@ -2365,8 +2367,8 @@
       },
       "scienceRationale": "Sustainable power tracks lactate threshold, which responds strongly to accumulated time in the sweet-spot/threshold band; the surrounding zone-2 volume drives the mitochondrial and capillary adaptations underpinning it. Time-at-intensity progression raises training load without the injury/burnout profile of constant intensity increases.",
       "evidence": [
-        "Seiler 2010 (intensity distribution)",
-        "sweet-spot/threshold periodization literature (Coggan & Allen framework, widely replicated)"
+        "Endurance improves most on mostly-easy work with a small hard fraction",
+        "Sustained work just below threshold gives the best return per hour on the bike"
       ],
       "expectedResults": "5-12% FTP improvement is typical for non-veterans over 8 weeks.",
       "cautions": "Fuel interval days; under-eating around threshold work wrecks quality.",
@@ -2499,8 +2501,8 @@
       },
       "scienceRationale": "In swimming, drag reduction (technique) outweighs fitness for novices — energy cost differences between swimmers are dominated by technique — so a third of all training time stays on drills. Interval lengthening builds continuous-swim capacity in controlled steps, and short sprints maintain feel-for-water and stroke power.",
       "evidence": [
-        "Toussaint & Beek 1992 (propelling efficiency/economy in front crawl)",
-        "interval-to-continuous progression per standard swim-coaching methodology (widely documented)"
+        "In front crawl, efficiency through the water beats raw power",
+        "Swim distance is built by turning intervals into continuous swimming"
       ],
       "expectedResults": "Comfortable 1500m continuous swim by week 8 with a visibly longer stroke.",
       "cautions": "Shoulder niggles = check catch mechanics early; swimmer's shoulder starts as a technique fault.",
@@ -2660,9 +2662,9 @@
       },
       "scienceRationale": "Hamstring eccentric strength work (nordic pattern) roughly halves hamstring injury risk in football, adductor/Copenhagen work targets the sport's other signature injury, and maximal-velocity sprint exposure both improves speed and acts as a vaccine against sprint-related strains. Repeat-sprint shuttles mirror the sport's demand profile better than steady cardio.",
       "evidence": [
-        "van Dyk et al. 2019 (nordic hamstring meta-analysis, ~50% injury reduction)",
-        "Harøy et al. 2019 (Copenhagen adductor programme)",
-        "Malone et al. 2017 (sprint exposure and hamstring injury)"
+        "Nordic hamstring curls roughly halve hamstring injury rates",
+        "A simple adductor-strengthening protocol substantially reduces groin injuries",
+        "Regular exposure to high-speed running is what protects the hamstrings"
       ],
       "expectedResults": "Faster 20m times, later-game legs, and materially lower soft-tissue injury risk.",
       "cautions": "Nordics cause savage soreness at first — start with 2 sets of 4.",
@@ -2831,9 +2833,9 @@
       },
       "scienceRationale": "Vertical jump improves most from combining heavy strength work with high-intent plyometrics — the mix outperforms either alone. Slow heavy tempo work builds patellar tendon capacity (the sport's chronic weak point), and deliberate landing mechanics training reduces knee injury risk, particularly relevant for female athletes given documented higher risk profiles.",
       "evidence": [
-        "Sáez de Villarreal et al. 2010 (plyometric + strength combination for jump height)",
-        "Kongsgaard/Malliaras line (tendon loading via heavy slow resistance)",
-        "Hewett et al. (landing-mechanics and knee-injury-prevention research)"
+        "Combining strength work with jump training raises vertical jump more than either alone",
+        "Tendons remodel under heavy, slow, progressive load",
+        "Coaching a controlled landing is what protects the knee"
       ],
       "expectedResults": "5-10cm vertical improvement over 8 weeks is common alongside a sharper first step.",
       "cautions": "Quality over quantity on every jump — tired plyos are worthless and risky.",
@@ -2985,9 +2987,9 @@
       },
       "scienceRationale": "Punching force is driven bottom-up — leg and trunk contributions dominate force generation in skilled punches — so lower-body max strength plus rotational med-ball power transfer directly. Round-structured intervals condition the exact work:rest signature of the ring, and 4-way neck isometrics build the musculature associated with better head-impact tolerance.",
       "evidence": [
-        "Filimonov et al. 1985 (leg drive contribution to punching force, replicated since)",
-        "Lenetsky et al. 2013 (S&C for combat striking review)",
-        "neck strength and head-impact kinematics literature (Collins et al. 2014)"
+        "Most punching force comes from the legs and trunk, not the arm",
+        "Striking power comes from rate of force development, not maximal strength alone",
+        "A stronger neck reduces the head acceleration an impact produces"
       ],
       "expectedResults": "Harder punching power markers, later-round freshness, sturdier neck and grip.",
       "cautions": "Total weekly load includes sparring — cut here, never at boxing practice.",
@@ -3155,10 +3157,10 @@
       },
       "scienceRationale": "Spike-approach-specific jump training plus heavy strength is the highest-transfer combination for volleyball verticals, while jumper's knee — the sport's signature overuse issue — is managed proactively via heavy-slow tendon loading and a hard cap on weekly jump volume. Overhead athletes' shoulders depend on posterior cuff endurance and pull-dominant balance, addressed with the 2:1 pull bias.",
       "evidence": [
-        "Sáez de Villarreal et al. 2010 (combined training for jump)",
-        "Lian et al. 2005 (jumper's knee prevalence in volleyball)",
-        "Kongsgaard et al. (heavy slow resistance for patellar tendinopathy)",
-        "overhead-athlete cuff conditioning literature (Cools et al. 2015)"
+        "Combining strength work with jump training raises vertical jump more than either alone",
+        "Jumper's knee is the volleyball player's occupational injury, and managing jump load prevents it",
+        "Heavy, slow loading is the treatment of choice for a stubborn patellar tendon",
+        "Overhead athletes need dedicated rotator-cuff and scapular conditioning"
       ],
       "expectedResults": "Higher block/spike touch and a shoulder that tolerates full spiking loads.",
       "cautions": "Never stack this jump day the day after a match.",
@@ -3325,9 +3327,9 @@
       },
       "scienceRationale": "Groundstroke and serve power are kinetic-chain products — hip/trunk rotation contributes the major share of racquet-head speed — so med-ball rotational work in sport-specific patterns is the highest-transfer power tool. Court movement is dominated by 1-4m lateral first steps, trained here reactively. Wrist-extensor eccentrics and posterior cuff endurance target the sport's two overuse hot spots.",
       "evidence": [
-        "Kibler 2004 (kinetic chain in tennis)",
-        "Fernandez-Fernandez et al. 2016 (tennis movement demands + training)",
-        "Tyler et al. 2010 (eccentric wrist extensor training for tennis elbow)"
+        "The serve is a kinetic chain — force starts at the ground and arrives at the racket",
+        "Tennis is repeated short sprints and direction changes, and training should mirror that",
+        "Eccentric wrist-extensor work resolves tennis elbow"
       ],
       "expectedResults": "Noticeably quicker to wide balls, heavier serve, resilient elbow/shoulder through the season.",
       "cautions": "Racquet sports are one-side dominant — do all rotational work both directions.",
@@ -3499,8 +3501,8 @@
       },
       "scienceRationale": "Concurrent development of strength, speed, power, and both energy systems is manageable at 3 days when high-neural work (sprints, jumps) leads sessions fresh and interference is contained by day separation. This GPP breadth is the standard base layer under any later specialization.",
       "evidence": [
-        "Wilson et al. 2012 (concurrent training interference and its management)",
-        "GPP/preparation-phase periodization literature (Bompa framework, widely replicated)"
+        "Running and lifting interfere when stacked carelessly; separating and sequencing them manages it",
+        "A general preparation phase builds the base that later specific work is spent from"
       ],
       "expectedResults": "Simultaneous improvements in sprint, jump, lifts, and conditioning for non-specialized athletes.",
       "cautions": "This is a base — deep in-season sport demands should replace, not stack on, this plan.",
@@ -3621,8 +3623,8 @@
       },
       "scienceRationale": "Trekking capacity is uphill aerobic work plus eccentric quad tolerance for descents — the under-trained half that causes most post-hike wreckage — so slow step-downs deliberately precondition eccentric load (repeated-bout effect). Progressive pack loading and single-leg balance work address the load-carriage and ankle-sprain realities of uneven terrain.",
       "evidence": [
-        "repeated-bout effect on eccentric exercise damage (McHugh 2003)",
-        "load-carriage physiology literature (Knapik et al. 2004)"
+        "The first hard session is the sorest — one exposure protects against the next",
+        "Carrying load well is a trainable adaptation, not just raw strength"
       ],
       "expectedResults": "Comfortable 5-7h mountain days with a loaded pack and quads that work the day after.",
       "cautions": "Break in the actual boots on the long days — the program can't fix blisters.",
@@ -3785,9 +3787,9 @@
       },
       "scienceRationale": "Clubhead speed correlates strongly with rotational power output and thoracic/hip rotation range — the X-factor stretch depends on hip-shoulder separation, trained here via loaded chops, high-intent throws in the swing pattern, and targeted thoracic/hip-IR mobility. Bilateral throw work and anti-rotation strength protect the lead-side low back, golf's most common complaint.",
       "evidence": [
-        "Hellström 2009 (physical determinants of golf performance review)",
-        "Lephart et al. 2007 (golf-specific conditioning and swing speed)",
-        "Cheetham et al. (X-factor stretch research)"
+        "Leg and trunk strength and power are the physical determinants of golf performance",
+        "Golf-specific conditioning raises club-head speed",
+        "Separating hip and shoulder rotation is what generates club-head speed"
       ],
       "expectedResults": "3-8 mph clubhead speed gains commonly reported from 8-week rotational programs; easier full turn.",
       "cautions": "Throw both directions every session — one-sided rotation is how golf backs break.",
@@ -3962,8 +3964,8 @@
       },
       "scienceRationale": "Once-weekly frequency per muscle grows muscle effectively when weekly volume is sufficient — meta-analytic evidence shows frequency matters little at matched volume — and ~12-16 sets per function per week lands in the productive band. The trade is a slightly lower ceiling than higher frequencies for a structure many lifters simply enjoy and stick to, and adherence beats optimization.",
       "evidence": [
-        "Schoenfeld, Grgic & Krieger 2019 (frequency at matched volume)",
-        "Baz-Valle et al. 2022 (volume band)"
+        "Once weekly volume is matched, how it is split across days matters far less",
+        "12-20 hard sets per muscle per week is the productive band for growth"
       ],
       "expectedResults": "Steady hypertrophy and strength gains at a very sustainable schedule.",
       "cautions": "Don't turn each day into a 2-hour marathon — the listed volume is the productive part.",
@@ -4151,8 +4153,8 @@
       },
       "scienceRationale": "Low-rep top sets develop maximal strength via specificity while backoff and accessory volume supplies the 10+ weekly sets per muscle that drive hypertrophy — the two adaptations coexist happily when intensity and volume are assigned to separate slots rather than blended. Strength gains show pronounced diminishing returns from extra volume, so the heavy work stays minimal-effective.",
       "evidence": [
-        "Pelland et al. 2024 (strength: steep diminishing returns with volume; hypertrophy scales further)",
-        "Schoenfeld et al. 2017 (weekly-set dose for growth)"
+        "Strength plateaus with added volume sooner than growth does",
+        "Weekly hard sets and muscle growth rise together"
       ],
       "expectedResults": "PRs on the big four alongside visible muscle gain over 10 weeks.",
       "cautions": "The top-set RPE 8 cap is the program — grinding RPE 10 singles wrecks the week.",
@@ -4267,9 +4269,9 @@
       },
       "scienceRationale": "The first weekly sets deliver a disproportionate share of total possible gains — dose-response curves rise steeply then flatten — so ~6 hard sets per pattern per week captures a large fraction of the benefit at a fraction of the time. For strength and health outcomes, low-dose resistance training is dramatically better than none, and a plan that survives a busy life beats an optimal plan that doesn't.",
       "evidence": [
-        "Pelland et al. 2024 (steep initial dose-response, diminishing returns)",
-        "Schoenfeld 2017 (<5 weekly sets still produces growth)",
-        "Momma et al. 2022 (30-60 min/wk resistance training and health outcomes)"
+        "The first few hard sets per muscle do most of the work; each one after adds less",
+        "Even under five hard sets a week still produces real growth",
+        "As little as 30-60 minutes of lifting a week improves long-term health outcomes"
       ],
       "expectedResults": "Real strength progress and maintained/slowly growing muscle on 90 min/week.",
       "cautions": "Every set counts at this dose — no phoned-in sessions.",
@@ -4469,8 +4471,8 @@
       },
       "scienceRationale": "Dumbbells cover every movement pattern, and unilateral variants solve the classic home problem of coarse load jumps by doubling the load per limb without new equipment. Higher rep ranges near failure produce equivalent hypertrophy to heavier loads, which is exactly the adaptation lever when maximum load is capped.",
       "evidence": [
-        "Schoenfeld et al. 2017 (load-independent hypertrophy when effort matched)",
-        "unilateral training literature (Botton et al. 2016)"
+        "Light and heavy loads build similar muscle when the effort matches",
+        "Single-limb work exposes and corrects side-to-side imbalances"
       ],
       "expectedResults": "Full-body muscle growth rivaling gym training up to the point your dumbbells run out.",
       "cautions": "Adjustable dumbbells to at least 24-32kg are the difference between 10 weeks and a year of usefulness.",
@@ -4606,9 +4608,9 @@
       },
       "scienceRationale": "The volume-day stress / recovery-day maintenance / intensity-day expression structure operationalizes the fitness-fatigue model at a weekly cadence — appropriate when adaptation slows past the novice stage. High-specificity heavy fives with big rests target maximal strength while total weekly volume stays in the moderate band that strength (unlike hypertrophy) responds to efficiently.",
       "evidence": [
-        "fitness-fatigue model (Bannister framework, standard in periodization literature)",
-        "Pelland et al. 2024 (strength: frequency helps, volume plateaus early)",
-        "Ralston et al. 2017"
+        "Performance is fitness minus fatigue, so fatigue is managed rather than merely accumulated",
+        "For strength, frequency keeps helping while added volume plateaus early",
+        "Multi-joint strength takes off once a muscle gets at least six hard sets a week"
       ],
       "expectedResults": "Weekly PRs for 8-16 weeks — a typical full intermediate cycle — adding 10-25kg to squat 5RM.",
       "cautions": "Volume day is brutally hard done honestly; don't add accessories on top.",
@@ -4789,9 +4791,9 @@
       },
       "scienceRationale": "Strength-skill hybrids respond best to frequent, submaximal, high-quality practice — motor learning improves with distributed practice at low fatigue — so skills lead sessions fresh and strength sets keep reps in reserve. Mechanical progression ladders (harder leverages) function as bodyweight's loading mechanism, keeping intensity in the strength zone.",
       "evidence": [
-        "motor learning / distributed practice literature (Schmidt & Lee, standard reference)",
-        "Grgic et al. 2021 (proximity to failure and strength)",
-        "Schoenfeld 2017 (load-independent hypertrophy)"
+        "Skill is built by frequent, spaced practice rather than long occasional sessions",
+        "Strength does not require training to failure — getting close is enough",
+        "Light and heavy loads build similar muscle when sets are taken close to failure"
       ],
       "expectedResults": "Typical 12-week outcomes from the stated baseline: 5-10 clean pull-ups, solid dips, 60s chest-to-wall handstand.",
       "cautions": "Wrists adapt slower than muscles — never skip the prep work.",
@@ -4944,9 +4946,9 @@
       },
       "scienceRationale": "Peaking exploits the fitness-fatigue model: heavy specific practice raises preparedness while the pre-test volume taper sheds accumulated fatigue faster than fitness decays, producing peak expressed strength on the day. Taper research consistently shows performance gains from ~40-60% volume reductions over 1-2 weeks with intensity maintained.",
       "evidence": [
-        "Bosquet et al. 2007 (taper meta-analysis)",
-        "Pritchard et al. 2015 (strength taper review)",
-        "fitness-fatigue model literature"
+        "A planned taper before a test raises performance on the day",
+        "Cutting volume while holding intensity sharpens strength for a test",
+        "Performance is fitness minus fatigue, so fatigue is managed rather than merely accumulated"
       ],
       "expectedResults": "Well-executed peaks typically express 2-5% above training-cycle projections.",
       "cautions": "The most common peaking error is testing PRs in week 3-4 — the PR belongs on test day only.",
@@ -5136,9 +5138,9 @@
       },
       "scienceRationale": "Specialization concentrates volume where growth is wanted: arms receive ~20+ direct weekly sets (upper end of the productive band, plus indirect work) while other muscles hold at maintenance doses, which preserve size at a fraction of building volume. Long-muscle-length loading (incline curls, overhead extensions) is emphasized per emerging evidence of superior lengthened-position hypertrophy.",
       "evidence": [
-        "Baz-Valle 2022 (triceps responded to higher volumes)",
-        "maintenance-volume literature (Bickel et al. 2011)",
-        "lengthened-partial/long-length training research (Maeo et al. 2021, Pedrosa et al. 2022)"
+        "Smaller muscles like the triceps reward the higher end of the volume band",
+        "Keeping muscle takes roughly a third of the volume it took to build it",
+        "Training a muscle in its stretched position produces more growth per set"
       ],
       "expectedResults": "Measurable arm circumference gains (0.5-1.5cm) in 8 weeks for intermediates.",
       "cautions": "Elbow tendons adapt slower than biceps — the RPE 9 cap is load management, respect it.",
@@ -5332,9 +5334,9 @@
       },
       "scienceRationale": "The visual V is lat width plus delt cap over a stable waist, so lats and side delts get 16-20 weekly sets at the top of the productive band while legs hold at the well-evidenced maintenance dose (roughly a third of building volume preserves size). Rear-delt volume is high because the posterior shoulder both completes the cap and balances all the pressing.",
       "evidence": [
-        "Baz-Valle 2022 (volume band)",
-        "Bickel et al. 2011 (maintenance dose ~1/3 of acquisition)",
-        "Schoenfeld 2016 (frequency)"
+        "12-20 hard sets per muscle per week is the productive band for growth",
+        "Keeping muscle takes roughly a third of the volume it took to build it",
+        "Training a muscle twice a week beats once for the same weekly volume"
       ],
       "expectedResults": "Visibly wider frame in 10 weeks; strength up on presses and pulls.",
       "cautions": "Legs at maintenance is a temporary emphasis, not a lifestyle.",
@@ -5508,9 +5510,9 @@
       },
       "scienceRationale": "Distributing 9-12 weekly sets per pattern across three exposures keeps every set high-quality (first sets of a session outperform the sixth), and thrice-weekly muscle protein synthesis stimulation suits the 24-48h MPS window. Per-session volume stays low enough that sessions end inside an hour with intensity intact.",
       "evidence": [
-        "Schoenfeld 2016 (frequency meta-analysis)",
-        "MPS time-course literature (Damas et al. 2016)",
-        "Baz-Valle 2022"
+        "Training a muscle twice a week beats once for the same weekly volume",
+        "Muscle stays primed to grow for roughly two days after a session",
+        "12-20 hard sets per muscle per week is the productive band for growth"
       ],
       "expectedResults": "Growth comparable to splits at equal volume, with shorter, fresher sessions.",
       "cautions": "Every session touches legs — manage soreness expectations in week 1-2.",
@@ -5650,9 +5652,9 @@
       },
       "scienceRationale": "The pull-up responds to high practice frequency at low fatigue — the grease-the-groove principle — combined with eccentric-emphasized strength work, since eccentric capacity precedes concentric in movements you can't yet perform. Submaximal volume builds the lat/arm tissue while avoiding the failure-chasing that stalls most pull-up attempts.",
       "evidence": [
-        "eccentric preceding concentric strength (negatives methodology, standard S&C practice)",
-        "distributed practice / frequency literature",
-        "Grgic 2021 (not training to failure preserves performance quality)"
+        "You can lower more than you can lift, and training the lowering builds the lift",
+        "Practice spread across more days beats the same practice crammed into fewer",
+        "Stopping a rep or two short preserves the quality of every set that follows"
       ],
       "expectedResults": "From 0: first strict rep by week 4-6, 3-6 by week 8. From 3: typically 8-10 by week 8.",
       "cautions": "Full range every rep — chin over bar, full hang — or the reps you count won't count.",
@@ -5814,9 +5816,9 @@
       },
       "scienceRationale": "Loaded carries train trunk stiffness, grip, and hip stability under moving load — qualities strongly tied to real-world function and low transferable injury risk — while the hinge/squat/press/pull base supplies conventional strength. Grip strength itself is a notable longitudinal marker of health outcomes, and carries are its most scalable trainer.",
       "evidence": [
-        "McGill et al. (carry/core stiffness research line)",
-        "Leong et al. 2015 (grip strength and health outcomes, PURE study)",
-        "standard strongman-training literature (Winwood et al.)"
+        "Loaded carries build the trunk stiffness that transfers to every other lift",
+        "Grip strength is one of the strongest simple predictors of long-term health",
+        "Strongman events build strength in awkward, real-world positions"
       ],
       "expectedResults": "Grip, trunk, and everyday-strength gains that show up outside the gym within 6-8 weeks.",
       "cautions": "Set the weights down with a hinge, not a drop-and-dodge.",
@@ -5964,9 +5966,9 @@
       },
       "scienceRationale": "Ballistic hip-hinge work (swings) trains posterior-chain power and elevates heart rate into productive conditioning zones simultaneously — kettlebell interval protocols produce meaningful VO2 and strength adaptations in the same sessions. Single-arm loading adds anti-rotation trunk demand to every rep, buying core training for free.",
       "evidence": [
-        "Farrar et al. 2010 (KB swing metabolic/cardiovascular demand)",
-        "Lake & Lauder 2012 (swing training improves both strength and power)",
-        "Manocchia et al. 2013 (KB transfer to strength)"
+        "The kettlebell swing carries a real cardiovascular cost alongside its strength work",
+        "Swing training builds strength and power at the same time",
+        "Kettlebell work transfers to barbell strength"
       ],
       "expectedResults": "Concurrent strength, conditioning, and body-comp improvements on ~2 hours/week.",
       "cautions": "The swing is a hinge, not a squat, and the bell floats — never lift it with your arms.",
@@ -6071,9 +6073,9 @@
       },
       "scienceRationale": "High-intensity interval training produces VO2max improvements comparable to or exceeding much longer moderate-intensity programs — the interval stimulus drives central cardiovascular adaptation time-efficiently — while the two easy days preserve the polarized distribution that keeps the hard days actually hard.",
       "evidence": [
-        "Gibala et al. 2012 (low-volume HIIT physiological adaptations)",
-        "Milanović et al. 2015 (HIIT vs continuous training VO2max meta-analysis)",
-        "Seiler 2010"
+        "Short, hard intervals produce aerobic adaptations out of proportion to their time cost",
+        "Intervals raise aerobic capacity at least as much as steady work, in less time",
+        "Endurance improves most on mostly-easy work with a small hard fraction"
       ],
       "expectedResults": "Measurable VO2/pace improvements inside 4 weeks; pairs well before or after a strength block.",
       "cautions": "HIIT quality collapses if every day becomes hard — the easy days are load-bearing.",
@@ -6214,9 +6216,9 @@
       },
       "scienceRationale": "Walking is the highest-adherence, lowest-injury exercise available and its energy cost scales with bodyweight, making it disproportionately effective for heavier individuals; step-count and walking-volume increases show robust dose-response relationships with health outcomes. The strength ladder preserves lean mass in the deficit and rebuilds joint confidence, and adherence-first design reflects the strongest predictor of long-term weight-management success: consistency, not intensity.",
       "evidence": [
-        "Paluch et al. 2022 (steps and all-cause outcomes, pooled cohorts)",
-        "Longland et al. 2016 (resistance training preserves lean mass in deficit)",
-        "adherence literature in weight management (Middleton et al. 2013)"
+        "Daily steps track closely with long-term health, with most of the benefit well before 10,000",
+        "Training with enough protein preserves lean mass while fat comes off",
+        "Adherence, not the particular diet or split, is what predicts the result"
       ],
       "expectedResults": "With a moderate calorie deficit: sustainable fat loss, visibly easier daily movement by week 6, real strength by week 12.",
       "cautions": "Shoes matter more here than in any other plan — replace worn-out soles before week 1.",
@@ -6229,6 +6231,7 @@
     },
     {
       "id": "postnatal_rebuild_8wk",
+   "standalone": false,
       "name": "Rebuild: Postnatal Return to Strength",
       "category": "return_to_activity",
       "goals": [
@@ -6383,10 +6386,10 @@
       },
       "scienceRationale": "Postnatal tissue (abdominal wall, pelvic floor) remodels for months; graded, symptom-gated loading with breathing-led core re-engagement is the consensus approach across postnatal exercise guidance, and early resumption of moderate activity benefits both physical recovery and mood. Diastasis management favors progressive tension over avoidance, with midline doming as the regression cue.",
       "evidence": [
-        "ACOG postpartum exercise guidance",
-        "Dufour et al. 2019 (diastasis recti consensus on progressive loading)",
-        "Goom, Donnelly & Brockwell 2019 (return-to-running postnatal guidelines)",
-        "postnatal exercise and mood literature (Poyatos-León et al. 2017)"
+        "Established postpartum return-to-exercise guidance",
+        "Progressive loading, not avoidance, is the consensus approach to abdominal separation",
+        "Postnatal return to running follows a staged progression gated on real criteria, not a calendar",
+        "Postnatal exercise measurably improves mood"
       ],
       "expectedResults": "Restored core function and confidence, baseline strength, and readiness for normal beginner programming by week 9+.",
       "cautions": "Symptoms outrank the plan, always. This program never competes with a pelvic health professional's advice.",
@@ -6583,9 +6586,9 @@
       },
       "scienceRationale": "Women's relative strength gap versus men is concentrated in the upper body, which is precisely the argument for prioritized upper volume — muscle tissue responds to training equally by sex on a relative basis, and women often tolerate volume and recover between sets well. Upper-body work receives ~2x lower-body volume here while the lower maintenance dose preserves existing strength.",
       "evidence": [
-        "Roberts et al. 2020 (sex differences in training response — relative gains equivalent)",
-        "Bickel et al. 2011 (maintenance dosing)",
-        "upper/lower-body strength dimorphism literature (Miller et al. 1993)"
+        "Men and women gain strength and muscle at the same relative rate",
+        "Keeping muscle takes roughly a third of the volume it took to build it",
+        "The strength gap between sexes is far wider in the upper body than the lower"
       ],
       "expectedResults": "First strict pull-up (or several) for most within the 10 weeks; visible shoulder/back development; pressing PRs.",
       "cautions": "The pull-up ladder rewards patience — assistance drops beat grinding failures.",
@@ -6766,9 +6769,9 @@
       },
       "scienceRationale": "Body recomposition — simultaneous fat loss and muscle gain — is well-documented in untrained and returning adults including middle age, given sufficient protein and progressive resistance training. Anabolic resistance of aging is offset by slightly higher protein and consistent mechanical tension, and 8-12 rep moderate loads deliver the stimulus with lower joint stress than maximal work.",
       "evidence": [
-        "Barakat et al. 2020 (recomposition review)",
-        "Morton et al. 2018 (protein dose meta-analysis)",
-        "Churchward-Venne et al. (anabolic resistance and protein in aging)"
+        "Gaining muscle while losing fat is achievable, especially earlier in training",
+        "Protein returns flatten out around 1.6 g per kg of bodyweight a day",
+        "Older muscle needs a bigger protein dose and a harder stimulus to respond"
       ],
       "expectedResults": "Over 12 weeks: waist down, strength up, scale possibly unimpressed — the mirror and the belt tell the real story.",
       "cautions": "Recovery is programming too now: sleep short-changed = one fewer set, not one more coffee.",
@@ -6870,8 +6873,8 @@
       },
       "scienceRationale": "Machines produce comparable hypertrophy and strength to free weights when effort is matched, while removing balance and setup demands — which lowers the perceived-competence barrier that drives early gym dropout. A fixed, repeated routine builds self-efficacy, the strongest psychological predictor of exercise adherence in new exercisers.",
       "evidence": [
-        "Schwanbeck et al. 2020 (machine vs free-weight adaptations)",
-        "Bandura self-efficacy and exercise adherence literature (McAuley et al.)"
+        "Machines and free weights build strength and muscle comparably",
+        "Confidence built from small, repeatable wins is what sustains training"
       ],
       "expectedResults": "Real strength and visible tone in 8 weeks — and a person who walks into the gym like they belong, because they do.",
       "cautions": "Graduation path: after week 8, swap one machine per week for its free-weight cousin if desired.",
@@ -7023,9 +7026,9 @@
       },
       "scienceRationale": "Fat loss requires an energy deficit, not impact — cycling, swimming, and elliptical work produce equivalent cardiovascular and caloric outcomes to running at matched effort, minus the joint loading. The strength half preserves lean mass through the deficit, and pain-free strength work around sensitive joints typically improves rather than threatens them.",
       "evidence": [
-        "cross-modality cardio equivalence at matched intensity (standard exercise-physiology finding)",
-        "Longland et al. 2016 (lean-mass preservation)",
-        "exercise therapy in knee OA literature (Fransen et al. 2015 Cochrane) — loading helps joints"
+        "At matched intensity, any cardio modality delivers much the same aerobic benefit",
+        "Training with enough protein preserves lean mass while fat comes off",
+        "In knee osteoarthritis, progressive loading reduces pain — joints do better used than spared"
       ],
       "expectedResults": "Steady fat loss with zero impact-related flare-ups; joints commonly feel better by week 8, not worse.",
       "cautions": "\"Pain-free depth\" is a moving target that usually improves — chase it gradually.",
@@ -7185,9 +7188,9 @@
       },
       "scienceRationale": "Bone adapts to high-magnitude loading: heavy resistance training plus brief impact exposure improved bone density and stature outcomes in postmenopausal women with low bone mass in the LIFTMOR trial, overturning the light-weights convention. Estrogen decline also accelerates muscle and power loss; heavy lifting plus intentional fast concentric work addresses both, and balance work attacks the fall half of the fracture equation.",
       "evidence": [
-        "Watson et al. 2018 (LIFTMOR randomized trial)",
-        "Fragala et al. 2019 (NSCA position, older adults)",
-        "Sherrington et al. 2019 (balance + strength for falls)"
+        "Heavy, supervised lifting improves bone density in postmenopausal women",
+        "Resistance training is the primary defence against age-related muscle loss",
+        "Balance work combined with strength training reduces falls"
       ],
       "expectedResults": "Strength gains within weeks; bone adaptation is slower — the 12 weeks establish the loading habit that pays over years.",
       "cautions": "Spinal flexion under load is the one pattern kept out — hinge with a set back, always.",
@@ -7383,9 +7386,9 @@
       },
       "scienceRationale": "Short aggressive deficits in trained lifters preserve muscle when protein is very high and heavy mechanical tension is maintained — retention tracks with training intensity more than volume, so volume is trimmed and load defended. Hard-capping the phase at 6 weeks limits the adaptive fatigue and adherence decay that erode longer aggressive diets.",
       "evidence": [
-        "Helms et al. (contest-prep protein recommendations, 2.3-3.1 g/kg FFM)",
-        "Murphy & Koehler 2021 (energy deficits and training adaptation)",
-        "Longland et al. 2016 (high protein + training in large deficits)"
+        "Very lean athletes need protein at the top of the range to hold on to muscle",
+        "Too steep an energy deficit blunts the adaptation the training is meant to buy",
+        "High protein plus hard training preserves — and can even add — muscle in a steep deficit"
       ],
       "expectedResults": "Typically 3-5% bodyweight lost over 6 weeks with strength substantially intact.",
       "cautions": "The end date is a feature — mini-cuts that become maxi-cuts surrender the muscle they were protecting.",
@@ -7529,9 +7532,9 @@
       },
       "scienceRationale": "Paired (antagonist/non-competing) sets cut session time roughly in half with no strength or hypertrophy penalty versus traditional rest — recovery of one movement happens during the other's set. Total weekly hard sets stay above minimum-effective thresholds, and supersetting research shows equivalent adaptations at substantially reduced session duration.",
       "evidence": [
-        "Iversen et al. 2021 (time-efficient training review)",
-        "paired-set research (Robbins et al. 2010)",
-        "Schoenfeld 2017 (minimum effective volume)"
+        "Meaningful gains are available from short, well-structured sessions",
+        "Pairing non-competing exercises halves session time without costing results",
+        "There is a low but real minimum weekly dose that still grows muscle"
       ],
       "expectedResults": "Comparable results to hour-long sessions at this volume tier — the limiting factor was never the clock.",
       "cautions": "The 60s pair-rest is real rest — phone stays in the pocket or the math breaks.",
@@ -7685,9 +7688,9 @@
       },
       "scienceRationale": "Concurrent training's interference effect is real but modest and largely manageable through scheduling — separating quality run stimulus from lower-body lifting by 24h+ preserves most strength adaptation, and the effect runs one direction (endurance blunts strength/power, not vice versa; lifting actively improves running economy). Calf loading doubles as achilles tendon protection against the added mileage.",
       "evidence": [
-        "Wilson et al. 2012 (interference meta-analysis)",
-        "Rønnestad & Mujika 2014 (strength training improves running/cycling economy)",
-        "Blagrove et al. 2018 (strength training and distance-running performance)"
+        "Cardio and lifting interfere most when hard sessions sit on top of each other",
+        "Strength training improves running and cycling economy",
+        "Strength training improves distance-running performance without adding bulk"
       ],
       "expectedResults": "Simultaneous progress on 5K pace and big-lift numbers — slower than specializing in either, better than either alone.",
       "cautions": "Adding a sixth day is the classic hybrid mistake — the recovery day is what makes five work.",
@@ -7871,9 +7874,9 @@
       },
       "scienceRationale": "\"Posture correction\" is less about stretching into a shape and more about building capacity in the neglected pulling and hip-extension patterns plus breaking up sedentary time — prolonged uninterrupted sitting shows dose-response links with musculoskeletal complaints, and regular activity breaks plus strengthening reduce neck/shoulder pain in office workers in controlled trials. The 2:1 pull bias rebalances the pressing-and-hunching default.",
       "evidence": [
-        "Andersen et al. 2011 (strength training reduces neck/shoulder pain in office workers)",
-        "Louw et al. 2017 (exercise and neck pain review)",
-        "sedentary-interruption literature (Dunstan et al.)"
+        "Strength training reduces neck and shoulder pain in desk workers",
+        "Exercise is the most reliable treatment for persistent neck pain",
+        "Breaking up long stretches of sitting matters independently of the workout itself"
       ],
       "expectedResults": "Less end-of-day stiffness within 2-3 weeks; visibly better standing posture by week 8 — because the muscles that hold it finally can.",
       "cautions": "The hourly movement snack outperforms any 40-minute session you follow with 9 frozen hours.",
@@ -8060,9 +8063,9 @@
       },
       "scienceRationale": "Position statements from pediatric sports-medicine bodies endorse supervised resistance training for adolescents as safe and beneficial — injury rates are low and lower than most field sports — with technique competence gating load. Adolescence is also a high-payoff window for motor-skill breadth and jumping/landing mechanics, which is why variety and landing quality get dedicated slots.",
       "evidence": [
-        "Lloyd et al. 2014 (international consensus, youth resistance training)",
-        "Faigenbaum et al. 2009 (NSCA youth position statement)",
-        "Myer et al. (youth landing mechanics/injury prevention)"
+        "The international consensus is that supervised youth resistance training is safe and valuable",
+        "Supervised resistance training is safe and beneficial for young athletes",
+        "Coaching landing mechanics early prevents knee injuries later"
       ],
       "expectedResults": "A teenager who moves well, has baseline strength, and — the real outcome — likes training enough to keep going.",
       "cautions": "The one hard rule: no maxing out. Rep buffers stay, full stop.",
@@ -8161,8 +8164,8 @@
       },
       "scienceRationale": "Muscle and strength are far cheaper to keep than to build — maintenance requires roughly a third (or less) of building volume, and short-term detraining losses in 1-2 weeks are minimal and mostly fluid. Three brief near-failure full-body exposures a week comfortably clear the retention threshold, so the trip costs nothing.",
       "evidence": [
-        "Bickel et al. 2011 (maintenance dose)",
-        "detraining time-course literature (Mujika & Padilla 2000)"
+        "Keeping muscle takes roughly a third of the volume it took to build it",
+        "Strength holds for weeks without training; conditioning fades sooner"
       ],
       "expectedResults": "Come home at the strength you left with, minus the usual travel guilt.",
       "cautions": "Doorframe rows: test the door's swing direction before trusting it with your bodyweight.",
@@ -8327,8 +8330,8 @@
       },
       "scienceRationale": "Elastic-resistance training produces strength and hypertrophy gains comparable to conventional resistance in beginners and intermediates when effort is matched — the muscle registers tension near failure, not the tool providing it. Bands' ascending resistance even biases the easier joint angles harder, and high-rep near-failure sets sit squarely in the load-independent hypertrophy evidence.",
       "evidence": [
-        "Lopes et al. 2019 (elastic vs conventional resistance meta-analysis)",
-        "Schoenfeld et al. 2017 (load-independent hypertrophy)"
+        "Bands build strength comparably to free weights when the effort matches",
+        "Light and heavy loads build similar muscle when sets are taken close to failure"
       ],
       "expectedResults": "Beginner/novice gains fully comparable to dumbbells for the first months; lower body outgrows bands first.",
       "cautions": "Inspect bands for nicks — a snapped band at face height is the sport's only real injury.",
@@ -8482,9 +8485,9 @@
       },
       "scienceRationale": "Shift work degrades recovery via circadian disruption and sleep debt, which argues for autoregulation over fixed loading — RPE-capped sessions after night shifts respect measurably reduced neuromuscular readiness while keeping the training frequency that protects fitness. Rotation-based structure removes the adherence-killing mismatch between a Monday/Wednesday/Friday plan and a life without Mondays.",
       "evidence": [
-        "shift work, sleep and performance literature (Åkerstedt reviews)",
-        "autoregulation/RPE-based loading research (Helms et al. 2016)",
-        "sleep restriction and training adaptation (Knowles et al. 2018)"
+        "Shift work disrupts sleep, and training has to be planned around it rather than through it",
+        "Loading by felt effort fits the session to the day you actually turned up with",
+        "Short sleep blunts recovery and the adaptation training has earned"
       ],
       "expectedResults": "Consistent progress despite an inconsistent life — slower on paper than a fixed plan, infinitely faster than the fixed plan you kept abandoning.",
       "cautions": "The RPE 7 post-nights cap is load management, not weakness — fatigue misjudges weights.",
@@ -8497,6 +8500,7 @@
     },
     {
       "id": "recovery_week_template",
+   "standalone": false,
       "name": "Down Week: Active Recovery Template",
       "category": "recovery",
       "goals": [
@@ -8637,9 +8641,9 @@
       },
       "scienceRationale": "Planned volume reductions dissipate accumulated neuromuscular and perceptual fatigue while fitness barely moves — the taper literature shows performance typically rises after 40-60% volume cuts — and light activity beats full rest for soreness and mood. A deload spends one week to buy the next block's quality.",
       "evidence": [
-        "Bosquet et al. 2007 (taper meta-analysis)",
-        "active vs passive recovery literature",
-        "fitness-fatigue model"
+        "A planned taper before a test raises performance on the day",
+        "Light movement clears fatigue better than complete rest",
+        "Performance is fitness minus fatigue, so fatigue is managed rather than merely accumulated"
       ],
       "expectedResults": "Week after: weights feel lighter, motivation returns, small PRs are common.",
       "cautions": "The urge to sneak in one hard set on Thursday is the test. Pass it.",
@@ -8791,9 +8795,9 @@
       },
       "scienceRationale": "Trunk function is mostly anti-motion — resisting extension, rotation, and lateral flexion under load — so the program is organized around those categories rather than crunch volume, per the spine-stability research tradition. Loaded carries and integration lifts convert isolated capacity into usable stiffness, and the rectus still gets direct flexion work because it's a muscle like any other and responds to progressive overload.",
       "evidence": [
-        "McGill (trunk stability/anti-motion research line)",
-        "Schoenfeld & Contreras (core training reviews)",
-        "progressive overload applied to trunk flexion (standard hypertrophy evidence)"
+        "The trunk's real job is resisting motion, not creating it",
+        "Trained directly and progressively, the core responds like any other muscle group",
+        "The abs grow from progressive overload like any other muscle"
       ],
       "expectedResults": "Noticeably stronger bracing under squats/deadlifts, sturdier single-leg balance, and a trunk that looks like it trains.",
       "cautions": "Visible abs are made in the kitchen; this builds what the deficit reveals.",
@@ -8896,9 +8900,9 @@
       },
       "scienceRationale": "Half-marathon performance rides on lactate threshold and fatigue-resistant aerobic volume: cruise intervals and tempos push the threshold ceiling while the progressively longer long run — with goal-pace finishing segments — builds the specific endurance and fueling practice the distance demands. The 80%-easy distribution and scheduled down-weeks manage the injury risk that rises with half-marathon mileage.",
       "evidence": [
-        "Seiler 2010 (distribution)",
-        "threshold-training literature (Daniels' framework, widely replicated)",
-        "Nielsen et al. 2012 (volume ramp and injury)"
+        "Roughly 80% easy and 20% hard beats training everything in the middle",
+        "Threshold work is the highest-value running intensity per hour spent",
+        "Running injuries track sudden jumps in weekly volume more than volume itself"
       ],
       "expectedResults": "A completed half at even pace — or for repeat racers, typically minutes off the previous time.",
       "cautions": "Nothing new on race day: shoes, breakfast, and gels all get rehearsed on long-run Sundays first.",
@@ -9063,9 +9067,9 @@
       },
       "scienceRationale": "Test performance is a skill of specific repeatability: high-frequency sub-failure calisthenics volume (grease-the-groove) reliably outgrows test-to-failure training for push-up and pull-up scores, interval work at exactly test pace develops the specific speed-endurance the run scores demand, and biweekly mocks give pacing calibration plus objective progression data.",
       "evidence": [
-        "distributed sub-failure practice literature",
-        "specificity of training principle (foundational)",
-        "Grgic 2021 (failure avoidance and performance quality)"
+        "Frequent, sub-maximal practice builds skill faster than occasional all-out efforts",
+        "You get good at what you practise — training has to resemble the goal",
+        "Stopping a rep or two short preserves the quality of every set that follows"
       ],
       "expectedResults": "Typical 8-week outcomes: +20-40% push-up/pull-up scores and a materially faster test run versus baseline mock.",
       "cautions": "Rucking progresses load OR distance, never both in the same week — hips and feet keep the receipts.",
@@ -9230,9 +9234,9 @@
       },
       "scienceRationale": "Skiing is quasi-isometric and eccentric quad work in fatigue — hence tempo eccentrics and wall-sit ladders — and its signature injury is the ACL, whose prevention evidence centers on landing mechanics, lateral control, and hamstring strength, all given dedicated slots. Interval conditioning buys altitude and full-day tolerance.",
       "evidence": [
-        "ACL prevention program meta-analyses (Webster & Hewett 2018)",
-        "eccentric/isometric demand analyses of alpine skiing (Berg & Eiken 1999)",
-        "repeated-bout effect (McHugh 2003)"
+        "Structured neuromuscular warm-ups measurably cut ACL injuries",
+        "Skiing is mostly eccentric and isometric leg work, so the training should be too",
+        "The first hard session is the sorest — one exposure protects against the next"
       ],
       "expectedResults": "Day-one legs that last to last lift, faster recovery between ski days, meaningfully lowered knee-injury risk profile.",
       "cautions": "The plan ends before the trip on purpose — arriving fresh beats arriving trained-and-trashed.",
@@ -9375,9 +9379,9 @@
       },
       "scienceRationale": "Climbing overdevelops pulling and finger flexion, and the sport's chronic elbow and shoulder complaints track that imbalance — antagonist strengthening (pushing, wrist extension, external rotation) is the standard evidence-informed countermeasure. Leg and hip work is climbing's cheapest performance upgrade: strong high-steps and hip mobility unload the fingers directly.",
       "evidence": [
-        "climbing injury epidemiology (Schöffl et al.)",
-        "antagonist training in climbers (standard sports-medicine recommendation literature)",
-        "Vagy (climbing injury-prevention framework)"
+        "Climbing injuries concentrate in the finger pulleys and shoulders",
+        "Climbers need pushing work to balance a sport made entirely of pulling",
+        "Climbing injuries are prevented by training the antagonists the wall never works"
       ],
       "expectedResults": "Quieter elbows and shoulders, sturdier shoulders on gastons and mantles, and better footwork strength inside 10 weeks.",
       "cautions": "This program never touches a hangboard — finger loading belongs in your climbing plan, not stacked here.",
@@ -9496,9 +9500,9 @@
       },
       "scienceRationale": "Sprint-distance success for novices is about frequency across three disciplines at mostly easy intensity plus the bike-to-run transition adaptation — the brick — which trains the well-documented neuromuscular and perceptual awkwardness of running off the bike. Open-water skills (sighting, contact, wetsuit swimming) are practiced because race-day swim anxiety, not fitness, is the novice's biggest documented stressor.",
       "evidence": [
-        "multisport training-distribution literature (Mujika 2014, triathlon reviews)",
-        "bike-to-run transition research (Millet & Vleck 2000)",
-        "open-water swim safety literature"
+        "Multisport hours are distributed by the demands of each discipline, not split evenly",
+        "The bike-to-run transition is a trainable skill in its own right",
+        "Open water demands its own safety skills before any distance is added"
       ],
       "expectedResults": "Cross the line running, not surviving — and probably hooked.",
       "cautions": "Never swim open water alone in training. No exceptions.",
@@ -9511,6 +9515,7 @@
     },
     {
       "id": "morning_15_daily",
+   "standalone": false,
       "name": "Daily Fifteen: Morning Movement Habit",
       "category": "general_fitness",
       "goals": [
@@ -9602,9 +9607,9 @@
       },
       "scienceRationale": "Habit formation research favors identical cues, identical routines, and low activation cost — a same-time same-sequence morning routine exploits exactly that, and consistency beats intensity for the health returns of daily movement. Morning light and brief activity also support circadian phase and mood, and 15 daily minutes clears meaningful minimum-activity thresholds on its own.",
       "evidence": [
-        "Lally et al. 2010 (habit formation)",
-        "Gardner et al. 2012 (habit-based interventions)",
-        "morning light/activity and circadian literature"
+        "A new habit takes roughly two months of repetition before it runs itself",
+        "Habit-based routines outlast motivation-based ones",
+        "Morning light and movement anchor the body clock and lift mood"
       ],
       "expectedResults": "A 28-day chain, better mornings, and the platform habit other training gets built on.",
       "cautions": "The rule that saves it: a bad version of the routine always beats a skipped one.",

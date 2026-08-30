@@ -11,21 +11,30 @@ SwiftUI, iOS 26.5, on-device only (no backend, no network).
   (This line used to read "never commit, the owner commits" — that was wrong, and it cost a
   session's work being handed over as one unreviewable pile of uncommitted edits.)
 - Work only on the **`development`** branch.
-- Write professional unit tests alongside code; keep the **logic layer ≥80% covered**.
+- Write professional unit tests alongside code; keep the **logic layer ≥90% covered**
+  (raised from 80% on 2026-08-29, when it reached ~91%).
+- **Never name a scientific paper anywhere the athlete can see.** No author, year, journal,
+  trial or position-stand name in program copy, plan reports, coach text or prompts — the
+  science shapes the wording, it is never cited (owner's rule, 2026-08-30). The 170 citations
+  that used to ship were rewritten as plain-language principles; `WorkoutProgram.principles`
+  (JSON key stays `evidence`) is named for what it holds. `ContentCitationTests` walks every
+  string in every bundled program and comparison by reflection and fails if one reappears.
+  Citations are still fine in `WeightComparison.source`, which is never decoded into copy.
 - The product spec is the source of truth: `../README.md` and `../design_handoff_replog/`
   (per-screen notes + `screenshots/`). The bundled HTML prototype is **reference only**.
-- **Build clean** (0 errors / 0 warnings) and run the tests on **iPhone 17** before calling
-  anything done. (The mid-edit "Cannot find type … in scope" SourceKit diagnostics are cross-file
+- **Build clean** (0 errors / 0 warnings) and run the tests on the one simulator below before
+  calling anything done. (The mid-edit "Cannot find type … in scope" SourceKit diagnostics are cross-file
   indexing noise; trust `xcodebuild`, not the live diagnostics.)
-- **No simulator device exists on this machine** — only the iOS 26.5 *runtime*. `-destination
-  'platform=iOS Simulator,name=iPhone 17'` therefore fails until one is created. Create exactly
-  one, use it in a single session, then `xcrun simctl delete <udid>` and purge the test clones
-  (`xcrun simctl --set testing delete all`); device data lands on the tight internal SSD. The
-  zero-write `swiftc -typecheck` recipe below needs no device and catches every compile error.
-- **Four tests fail on `development` and did so before this session** — `WeeklyReportTests
-  .volumeRendersInDisplayUnits`, `ProgramCatalogTests.couchTo5kUsesWeeklyStructure`,
-  `ActiveSessionTests.startPrefillsPreviousFromHistory`, `OnboardingViewModelTests
-  .generateProducesPlanAndReportViaFallback`. Baseline against a stash before blaming your diff.
+- **One simulator, and it already exists.** The machine has a single iOS 26.5 runtime and a
+  single device, `CapaCam-iPhone17Pro` (`0099037A-7A35-4AB6-9982-6950D9A63928`) — it belongs to
+  another project, so **use it, never delete it, and never install a second runtime or device**
+  (the owner's disk is tight). There is no device *named* "iPhone 17", so target it by id:
+  `-destination 'platform=iOS Simulator,id=0099037A-7A35-4AB6-9982-6950D9A63928'`. Purge test
+  clones afterwards (`xcrun simctl --set testing delete all`) and keep result bundles off the
+  project disk. The zero-write `swiftc -typecheck` recipe below still needs no device at all.
+- **The suite is green on `development`** (900 cases, 0 failures) and the logic layer sits at
+  ~92%. The four long-standing failures this file used to list were fixed on 2026-08-29; a red
+  test now is almost certainly yours. Baseline against a stash before concluding otherwise.
 
 ## ⚙️ Delivery standard — the 4-pass method (apply to every numbered task list)
 Whenever the owner hands over a **numbered** list of bugfixes/improvements (1, 2, 3, … n), take each
@@ -72,7 +81,16 @@ numbered the request.
 - **Persistence: SwiftData** (the spec says "Core Data"; we use its modern successor).
 - **AI planner: on-device Apple Intelligence** (`FoundationModels`), in `Domain/AI/`, now
   **program-driven**. `ProgramMatcher` first narrows the bundled 62-program library to a gated + scored
-  shortlist for the athlete. Then two-stage, genuinely model-driven & non-deterministic (temperature
+  shortlist for the athlete. **It scores the athlete's own answers**: session length as a ratio
+  (needing more time than they have is near-disqualifying; needing far less runs down a smooth
+  slope), frequency outweighing any single goal keyword, and symmetric sex focus. Programs with no
+  day templates are gated out (they cannot become a plan). A shortlist where nothing fits the
+  session length falls back to `PlanGenerator`, which sizes sessions from the athlete's minutes.
+  **A program's `days` are its session TEMPLATES, not its week** — 10 of the 62 declare more
+  sessions per week than they have templates — so `ProgramPlanBuilder.weeklySchedule` cycles them
+  into the week, numbering repeats ("Push (2)") and resolving each template once. The session count
+  comes from the ATHLETE's `daysPerWeek`. `PlanShapeSweepTests` asserts these invariants over all
+  648 answer combinations. Then two-stage, genuinely model-driven & non-deterministic (temperature
   1.0): a **framing** call picks ONE program from that shortlist (disclaimer programs excluded) + writes
   the report sections, then **per-day** calls fill each `ProgramSlot` with a specific exercise from a
   numbered list of real catalog candidates (filtered to the user's equipment/injuries via
@@ -87,7 +105,9 @@ numbered the request.
   check-in prompts) — every recommendation carries a plain-language REASON from the deterministic
   engines. `CoachVoice` may reword an insight into coach voice (fallback = verbatim); it never invents
   the decision. Surfaced as a post-Finish debrief sheet, one dismissible Today "Coach" card/day, and a
-  Profile "Coach Insights" list. Weekly/monthly narrative reports (`WeeklyReportComposer`/
+  Profile "Coach Insights" list — **every row of which opens `CoachInsightDetailSheet`**, built by
+  the pure `CoachInsightDetail` (metrics in a fixed order, weights in the athlete's units, catalog
+  ids in the tags resolved to lift names, the insight's own kind not repeated back as a chip). Weekly/monthly narrative reports (`WeeklyReportComposer`/
   `MonthlyReportComposer`, triggered on activation) list under Profile "Training Reports". Optional
   readiness check-in at session start modulates volume (`ReadinessModulator`). Capped, respectful local
   notifications (`NotificationPlanner`: ≤1/day, quiet hours, per-kind toggles, encouraging copy).
@@ -185,8 +205,17 @@ flags a computed starting-load seed (see Key formulas) so the live log renders i
   and doesn't count.
 
 ## Project layout (`Replog/`)
-- `App/` — entry, `RootView` (onboarding vs main + dark mode + active-session cover), `MainTabView`,
-  navigation, environment, `DebugSeed` (DEBUG-only launch-env seeding — see below).
+- `App/` — entry, `RootView` (onboarding vs main + dark mode + active-session cover **+ the
+  post-session celebration**), `MainTabView`, navigation, environment, `DebugSeed` (DEBUG-only
+  launch-env seeding — see below).
+  - **Finishing a workout celebrates from `RootView`, not from the workout screen.** Finishing
+    DELETES the `ActiveSession`, and the workout is a `fullScreenCover(item:)` bound to that very
+    session — so anything the workout view presented for itself was torn down mid-flight, which is
+    why the badge moment used to be invisible. `ActiveWorkoutView` now hands what it earned to
+    `onFinished`; `SessionCompletion` (a plain, fully-tested state machine in
+    `Features/ActiveSession/`) holds it until the cover has gone; `RootView` then plays **the badge
+    celebration first** (it is the rare thing, and it is what the athlete just tapped Finish for)
+    and the coach's debrief after it. The rating ask waits for the whole sequence.
 - `DesignSystem/` — color tokens (`Theme`), SF Rounded typography, reusable components
   (Pill, StepperControl, `NumericStepperField` (typeable +/- field), TrendArrow, SegmentedToggle,
   WeekStripView, Sparkline, FlowLayout, `DragToReorder` (reorder commit haptic + a11y move
@@ -203,7 +232,15 @@ flags a computed starting-load seed (see Key formulas) so the live log renders i
   `Scheduling` (incl. `WeekBrowser`), `SessionBuilder`, `SessionFinisher`, `BodyweightTracker`,
   `Reordering`, `CalendarMath`/`CalendarStats` (calendar grid math + range statistics),
   `ProgressAnalytics` (weekly volume buckets, muscle shares, rep-range mix, adherence, PR
-  events, relative strength — the Progress dashboard's derivations).
+  events, relative strength — the Progress dashboard's derivations), `RecentHighlight` (the
+  heaviest logged est. 1RM plus the session around it — Today's highlight card and its sheet),
+  `CoachInsightDetail` (a recorded coaching log opened up: ordered metrics, lift names, notes).
+  - **One plan, one prescription per movement:** `PlanExerciseSync` mirrors an edit to a
+    `PlanItem`'s sets (weight / reps / RPE / set count) onto every *other* workout in the SAME
+    plan that prescribes that movement, occurrence-matched, and never across plans. The Workout
+    Editor routes all three of its writes through it (`syncAcrossPlan`), and `PlanFactory
+    .addExercise` adopts the plan's existing numbers instead of a generic 20 kg x 10. The logged
+    half of the same rule is `TemplateWriteBack.propagateWithinPlan`.
   - **Program-driven planning:** `ProgramMatcher` (hard-gated + soft-scored program selection from
     `QuizAnswers`), `PatternMapping` (slot `MovementPattern` → catalog facets → real candidates),
     `RepScheme` (parses slot reps/intensity into `SetTemplate` targets — ranges→lower bound,
@@ -222,13 +259,19 @@ flags a computed starting-load seed (see Key formulas) so the live log renders i
     `CoachContextBuilder` (store glue) + `CoachVoice` (optional reword, fallback verbatim),
     `AthleteContext`, `CoachingKnowledge`. The pure resolvers/composers/planner/coach are fully tested;
     the live model calls are non-deterministic seams (not unit-tested) — verified on-device.
-- `Features/` — `Onboarding` (quiz: **first name only, asked last**; `Gender` (default `.male`),
+- `Features/` — `Badges` (`BadgeCelebrationOverlay`: the medal tumbles in from above and SINKS
+  slowly into place under a tightening ladder of soft haptics, strikes with a heavy tap + shockwave,
+  then stays alive — a slow 3D tilt, a few points of vertical drift, and a halo breathing in the
+  medal's own palette. All drawn, no assets; Reduce Motion keeps the medal, the copy and the success
+  haptic and moves none of it), `Onboarding` (quiz: **first name only, asked last**; `Gender` (default `.male`),
   goal (no emojis), sport when goal is Sport (running/swimming/football/basketball/cycling/boxing/
   volleyball/**Other + free-text** `customSport`), height, weight, equipment-type multi-select that
   restricts the plan; real AI "Building your plan" + result/report — each generated day on the result
   screen opens a read-only `GeneratedWorkoutPreview`), `Today` (streak flame is an orange SF Symbol;
   "Add another" cards tap through to the workout; the three stat cards open `StatDetailSheet` history
-  sheets), `Plans` (list/detail/editor/picker; native swipe-to-delete), `Library` (search + a
+  sheets; **the Recent Highlight card opens `RecentHighlightSheet`** — the set that produced the best
+  est. 1RM, the rest of that session with its top set marked, the plan/day it belonged to, what it
+  beat, the lift's line since, and a link through to full progress), `Plans` (list/detail/editor/picker; native swipe-to-delete), `Library` (search + a
   multi-facet `LibraryFilter`/`LibraryFilterSheet` — level, equipment, force, type, mechanic, muscles;
   the **muscles facet is AND** (must train every selected muscle) with a **scope toggle**
   (`MuscleScope`: primary-only vs primary+secondary), the rest OR-within/AND-across;
@@ -265,9 +308,15 @@ names** `<id>__<n>.heic` (every exercise has `0.jpg`/`1.jpg` → would collide a
 `Exercise.imageResourceNames` reconstructs these; `ExerciseImageView` resolves via `Bundle.main`.
 
 ## Testing
-- Framework: **Swift Testing** (`import Testing`), in `ReplogTests/`. No UI tests (owner's call).
-- Logic layer (`Domain`/`Models`/`Catalog`/view models) is the coverage target (~80%); SwiftUI
-  views are intentionally not unit-tested.
+- Framework: **Swift Testing** (`import Testing`), in `ReplogTests/`. **No UI tests** (owner's
+  call) — the template `ReplogUITests` target was removed from the project on 2026-08-29, so
+  `ReplogTests` is the only test target. Anything visual is checked by launching a DEBUG-seeded
+  build (below), never by UI automation.
+- Logic layer (`Domain`/`Models`/`Catalog`/view models) is the coverage target (**≥90%**, ~91%
+  today); SwiftUI views are intentionally not unit-tested. What is left uncovered there is the
+  set of framework seams that cannot be exercised in a unit test — StoreKit (`SubscriptionStore`),
+  `UNUserNotificationCenter` (`NotificationScheduler`) and FoundationModels (`AIPlanService`,
+  `CoachVoice`) — plus the SwiftUI views themselves.
 - Persistence/session tests use `ReplogSchema.inMemoryContainer()` and are `@MainActor`
   (models are MainActor-isolated under the project's default actor isolation).
 
@@ -275,14 +324,14 @@ names** `<id>__<n>.heic` (every exercise has `0.jpg`/`1.jpg` → would collide a
 ```bash
 # Build
 xcodebuild -project Replog.xcodeproj -scheme Replog \
-  -destination 'platform=iOS Simulator,name=iPhone 17' build
+  -destination 'platform=iOS Simulator,id=0099037A-7A35-4AB6-9982-6950D9A63928' build
 
 # Test with coverage (logic suites)
 xcodebuild test -project Replog.xcodeproj -scheme Replog \
-  -destination 'platform=iOS Simulator,name=iPhone 17' \
+  -destination 'platform=iOS Simulator,id=0099037A-7A35-4AB6-9982-6950D9A63928' \
   -enableCodeCoverage YES -only-testing:ReplogTests
 ```
-There is no "iPhone 16" simulator installed here; use **iPhone 17**.
+There is no simulator *named* "iPhone 16" or "iPhone 17" here — target the one device by id.
 
 ### Verifying without a build (when disk is tight)
 `xcodebuild` writes DerivedData; `swiftc -typecheck` writes **nothing** and still catches every
@@ -316,6 +365,10 @@ execute. Note `zsh` doesn't word-split a plain `$FLAGS`; use an array or inline 
 ### DEBUG visual checks (no UI automation available)
 Launch envs (DEBUG only, via `SIMCTL_CHILD_*`): `REPLOG_SEED=1` seeds a demo PPL plan + history +
 marks onboarding done; `REPLOG_TAB=today|plans|library|progress|profile` picks the initial tab ("calendar" → progress);
-`REPLOG_ACTIVE=1` drops into a live workout. Example:
+`REPLOG_ACTIVE=1` drops into a live workout (`REPLOG_COMPLETE=1` with it = every set done, so the
+completion celebration is up); `REPLOG_BADGE=1|2|<badge id>` raises the badge unlock celebration;
+`REPLOG_SHEET=highlight|insight` opens Today's Recent Highlight sheet / Profile's top Coach Insight
+sheet. The last two exist because a badge unlock and a sheet behind a tap cannot otherwise be seen
+at all without UI automation. Example:
 `SIMCTL_CHILD_REPLOG_SEED=1 SIMCTL_CHILD_REPLOG_TAB=progress xcrun simctl launch <sim> test.Replog`
 (uninstall first for a deterministic, empty store).

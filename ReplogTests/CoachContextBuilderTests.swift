@@ -86,4 +86,56 @@ struct CoachContextBuilderTests {
         #expect(CoachContextBuilder.recordDailyCard(stall, context: context) == nil)
         #expect(context.coachingLogs(kind: .coachInsight).isEmpty)
     }
+
+    // MARK: - The debrief context
+
+    @Test func theDebriefContextCarriesTheSessionAndTheAthleteIntoTheEngine() throws {
+        let context = ModelContext(ReplogSchema.inMemoryContainer())
+        let older = Date(timeIntervalSince1970: 1_749_000_000)
+        context.insert(HistoryEntry(exId: "A", date: older, topW: 90, topR: 5, e1rm: 100,
+                                    sets: [RecordedSet(w: 90, r: 5)]))
+        let session = makeSession(context: context)
+        let a = try #require(session.orderedExercises.first { $0.exId == "A" })
+        let b = try #require(session.orderedExercises.first { $0.exId == "B" })
+        markDone(a, w: 100, r: 5)
+        markDone(b, w: 50, r: 5)
+        try context.save()
+
+        let outcome = CoachContextBuilder.sessionOutcome(from: session, context: context)
+        let profile = context.userProfile()
+        profile.goal = .loseWeight
+        profile.streak = 4
+        profile.weekStreak = 2
+        let settings = context.appSettings()
+        settings.units = .lb
+
+        let ctx = CoachContextBuilder.debriefContext(
+            outcome: outcome, profile: profile, settings: settings,
+            programDeloadRule: "Drop 10% and rebuild", context: context)
+
+        #expect(ctx.justFinished == outcome)
+        #expect(ctx.goal == .loseWeight)
+        #expect(ctx.units == .lb)
+        #expect(ctx.workoutStreak == 4)
+        #expect(ctx.weekStreak == 2)
+        #expect(ctx.programDeloadRule == "Drop 10% and rebuild")
+        // Every finished lift arrives named, with its own trail attached.
+        #expect(Set(ctx.exerciseNames.keys) == ["A", "B"])
+        #expect(ctx.historyByExercise["A"]?.count == 1)
+        // Somebody who just finished a session is by definition not a fresh user.
+        #expect(!ctx.isFreshUser)
+    }
+
+    @Test func aDebriefWithNoLiftsCarriesNoHistory() {
+        let context = ModelContext(ReplogSchema.inMemoryContainer())
+        let outcome = SessionOutcome(lifts: [], totalVolumeKg: 0,
+                                     previousTotalVolumeKg: nil, isFullyComplete: false)
+        let ctx = CoachContextBuilder.debriefContext(
+            outcome: outcome, profile: context.userProfile(), settings: context.appSettings(),
+            programDeloadRule: nil, context: context)
+
+        #expect(ctx.historyByExercise.isEmpty)
+        #expect(ctx.exerciseNames.isEmpty)
+        #expect(ctx.programDeloadRule == nil)
+    }
 }

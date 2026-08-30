@@ -114,6 +114,22 @@ struct CoachInsightRow: View {
 /// between when an insight happened and what kind it was, so a long history stays navigable.
 struct CoachInsightsListView: View {
     let logs: [CoachingLog]
+    /// The athlete's display units, for the numbers on the detail sheet.
+    var units: Units = .kg
+
+    @Environment(\.exerciseCatalog) private var catalog
+    /// The row whose detail sheet is up.
+    @State private var opened: CoachingLog?
+
+    init(logs: [CoachingLog], units: Units = .kg) {
+        self.logs = logs
+        self.units = units
+        #if DEBUG
+        // REPLOG_SHEET=insight launches straight into the top insight's sheet — there is no
+        // UI automation here, so a sheet behind a tap is otherwise unverifiable.
+        if DebugSeed.opensFirstInsight { _opened = State(initialValue: logs.first) }
+        #endif
+    }
 
     enum Grouping: String, CaseIterable, Identifiable {
         case period, kind
@@ -157,7 +173,8 @@ struct CoachInsightsListView: View {
                     ForEach(sections) { section in
                         Section {
                             ForEach(section.items) { log in
-                                CoachInsightLogRow(log: log)
+                                Button { opened = log } label: { CoachInsightLogRow(log: log) }
+                                    .buttonStyle(.plain)
                             }
                         } header: {
                             Text(section.title)
@@ -178,6 +195,9 @@ struct CoachInsightsListView: View {
             }
             .frame(height: visibleHeight)
             .scrollIndicators(.visible)
+        }
+        .sheet(item: $opened) { log in
+            CoachInsightDetailSheet(detail: log.detail(units: units, catalog: catalog))
         }
     }
 
@@ -214,7 +234,11 @@ struct CoachInsightsListView: View {
     }
 }
 
-/// One recorded insight in the Profile feed.
+/// One recorded insight in the Profile feed. Tapping it opens the full read-out.
+///
+/// The reason is clamped here rather than run in full: a debrief body is several sentences,
+/// and at full length two of them filled the whole section. The chevron is what says the
+/// rest of it — and the numbers behind it — is a tap away.
 struct CoachInsightLogRow: View {
     let log: CoachingLog
 
@@ -229,15 +253,116 @@ struct CoachInsightLogRow: View {
                     .font(.rounded(15, .heavy)).foregroundStyle(Color.textPrimary)
                 if let body = log.bodyMarkdown, !body.isEmpty {
                     Text(body).font(.rounded(13, .semibold)).foregroundStyle(Color.text2)
+                        .lineLimit(3)
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 Text(log.date.formatted(.relative(presentation: .named)))
                     .font(.rounded(11, .semibold)).foregroundStyle(Color.text3)
             }
             Spacer(minLength: 0)
+            Image(systemName: "chevron.right")
+                .font(.system(size: 12, weight: .bold)).foregroundStyle(Color.text3)
+                .padding(.top, 2)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(14).cardSurface()
+        .contentShape(Rectangle())
+    }
+}
+
+// MARK: - Detail sheet
+
+/// The full read-out of one recorded insight: what the coach said, when, which lifts it
+/// was about, and the numbers it reasoned from.
+///
+/// Dismiss-only via the grabber, like the app's other read-only sheets — there is nothing
+/// on it to confirm.
+struct CoachInsightDetailSheet: View {
+    let detail: CoachInsightDetail
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 18) {
+                    headline
+                    if !detail.body.isEmpty {
+                        Text(detail.body)
+                            .font(.rounded(16, .semibold)).foregroundStyle(Color.text2)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    if !detail.facts.isEmpty { factsCard }
+                    if !detail.exercises.isEmpty {
+                        pills(title: "Lifts", items: detail.exercises)
+                    }
+                    if !detail.notes.isEmpty {
+                        pills(title: "The coach's call", items: detail.notes)
+                    }
+                    Text(detail.date.formatted(date: .complete, time: .shortened))
+                        .font(.rounded(12, .semibold)).foregroundStyle(Color.text3)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(20)
+            }
+            .background(Color.bg.ignoresSafeArea())
+            .navigationTitle(detail.kind.groupTitle)
+            .navigationBarTitleDisplayMode(.inline)
+        }
+        .presentationDetents([.medium, .large])
+        .presentationDragIndicator(.visible)
+        .presentationBackground(Color.bg)
+    }
+
+    private var headline: some View {
+        HStack(alignment: .top, spacing: 12) {
+            Image(systemName: detail.kind.symbol)
+                .font(.system(size: 20, weight: .bold))
+                .foregroundStyle(detail.kind.tint)
+                .frame(width: 44, height: 44)
+                .background(Circle().fill(detail.kind.tint.opacity(0.14)))
+            VStack(alignment: .leading, spacing: 3) {
+                Text(detail.date.formatted(.relative(presentation: .named))).eyebrow()
+                Text(detail.title)
+                    .font(.rounded(22, .black)).foregroundStyle(Color.textPrimary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: 0)
+        }
+    }
+
+    /// The numbers the insight was reasoned from — the explainable half of the coach.
+    private var factsCard: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            SectionHeader(title: "Behind this")
+            VStack(spacing: 0) {
+                ForEach(Array(detail.facts.enumerated()), id: \.element.id) { index, fact in
+                    HStack {
+                        Text(fact.label)
+                            .font(.rounded(14, .semibold)).foregroundStyle(Color.text2)
+                        Spacer(minLength: 12)
+                        Text(fact.value)
+                            .font(.rounded(15, .heavy)).foregroundStyle(Color.textPrimary)
+                            .tabularNumbers()
+                    }
+                    .padding(.horizontal, 14).padding(.vertical, 12)
+                    if index < detail.facts.count - 1 { Divider().padding(.leading, 14) }
+                }
+            }
+            .cardSurface()
+        }
+    }
+
+    private func pills(title: String, items: [String]) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            SectionHeader(title: title)
+            FlowLayout(spacing: 8) {
+                ForEach(items, id: \.self) { item in
+                    Text(item)
+                        .font(.rounded(13, .heavy)).foregroundStyle(Color.textPrimary)
+                        .padding(.horizontal, 12).padding(.vertical, 7)
+                        .background(Capsule().fill(Color.surface2))
+                }
+            }
+        }
     }
 }
 

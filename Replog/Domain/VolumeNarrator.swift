@@ -23,7 +23,12 @@
 import Foundation
 
 /// A chosen comparison, ready to drop into a sentence.
-struct VolumeComparison: Equatable, Sendable {
+///
+/// `nonisolated` like `WeightComparison`, and for the same reason: the module defaults to
+/// MainActor isolation, which would isolate this pure value type's `Equatable` conformance
+/// too — and a MainActor-isolated conformance cannot be used from a nonisolated context,
+/// which is a warning today and an error under the Swift 6 language mode.
+nonisolated struct VolumeComparison: Equatable, Sendable {
     /// The reference that was picked.
     var id: String
     /// How many of it, rounded to something sayable.

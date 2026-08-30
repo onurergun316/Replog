@@ -28,18 +28,88 @@ enum ProgramPlanBuilder {
         var notes: [ExerciseNote]
     }
 
+    /// One session in the program's week: which template it runs, which time round it is,
+    /// and what to call it.
+    struct ScheduledDay: Equatable, Sendable {
+        /// Index into `program.days` — the template this session runs.
+        var templateIndex: Int
+        var day: ProgramDay
+        /// 1-based: how many times this template has come round so far this week.
+        var occurrence: Int
+        /// Disambiguated workout name: "Push", then "Push (2)".
+        var name: String
+    }
+
+    /// The program's WEEK, expanded from its templates.
+    ///
+    /// `days` holds a program's distinct session TEMPLATES, not its week, and the two are
+    /// routinely different: ten of the bundled programs declare more sessions per week than
+    /// they have templates — a 3-day full-body program written as one template, a 6-day PPL
+    /// written as three. Building one workout per template silently under-delivered every
+    /// one of them, most visibly as "3 days/week" arriving as a plan with a single Monday.
+    ///
+    /// The week is the templates cycled, capped at seven because that is how many days a
+    /// week has. A program with no templates has no week — the caller falls back rather
+    /// than inventing one.
+    ///
+    /// `sessions` is how many workouts the week should contain. Callers pass the athlete's
+    /// own answer, because that is the number the athlete was asked for and the number they
+    /// will count: the library has only two 6-day programs and three 2-day ones, so binding
+    /// the plan to the program's declared frequency means anyone at the edges of that
+    /// distribution is quietly given a different week than the one they chose. Cycling a
+    /// rotation to fit is how these programs are run in practice anyway — a three-day
+    /// rotation trained six times is that rotation twice. Defaults to the program's own
+    /// frequency when the caller has no athlete to ask.
+    static func weeklySchedule(for program: WorkoutProgram, sessions requested: Int? = nil) -> [ScheduledDay] {
+        schedule(program.days,
+                 sessions: requested ?? max(program.daysPerWeek, program.days.count))
+    }
+
+    /// Lays an explicit list of templates across `sessions` days, cycling and numbering
+    /// repeats. Callers pass the templates that are usable for THIS athlete, which is not
+    /// always all of them: a knee rules out every candidate on a leg day, and that session
+    /// cannot be built for them at any price.
+    static func schedule(_ templates: [ProgramDay], sessions requested: Int) -> [ScheduledDay] {
+        guard !templates.isEmpty else { return [] }
+        let sessions = min(max(requested, 1), 7)
+        var timesSeen: [String: Int] = [:]
+        return (0..<sessions).map { index in
+            let templateIndex = index % templates.count
+            let day = templates[templateIndex]
+            let trimmed = day.name.trimmingCharacters(in: .whitespaces)
+            let base = trimmed.isEmpty ? "Day \(templateIndex + 1)" : trimmed
+            let occurrence = (timesSeen[base] ?? 0) + 1
+            timesSeen[base] = occurrence
+            return ScheduledDay(templateIndex: templateIndex, day: day, occurrence: occurrence,
+                                name: occurrence == 1 ? base : "\(base) (\(occurrence))")
+        }
+    }
+
     // MARK: - Deterministic plan (fallback path)
 
     /// Builds a full plan from a program with no model input (top candidate per slot).
     static func plan(from program: WorkoutProgram, answers: QuizAnswers, catalog: ExerciseCatalog) -> GeneratedPlan {
-        let weekdays = PlanGenerator.weekdays(count: max(program.days.count, 1))
-        var workouts: [GeneratedWorkout] = []
-        for (index, day) in program.days.enumerated() {
+        // Resolve each distinct template ONCE, and keep only the ones that produce exercises
+        // for this athlete. A session can come back empty — a knee injury removes every
+        // candidate from a leg day — and the old code skipped it, which silently handed the
+        // athlete fewer training days than they asked for. The week is built from what can
+        // actually be trained, so five days requested is five days delivered.
+        var usable: [ProgramDay] = []
+        var resolutions: [Int: DayResolution] = [:]
+        for day in program.days {
             let resolved = resolveDay(day, answers: answers, catalog: catalog)
             guard !resolved.items.isEmpty else { continue }
+            resolutions[usable.count] = resolved
+            usable.append(day)
+        }
+
+        let schedule = schedule(usable, sessions: answers.daysPerWeek)
+        let weekdays = PlanGenerator.weekdays(count: max(schedule.count, 1))
+        var workouts: [GeneratedWorkout] = []
+        for (index, scheduled) in schedule.enumerated() {
+            guard let resolved = resolutions[scheduled.templateIndex] else { continue }
             let weekday = index < weekdays.count ? weekdays[index] : Weekday.allCases[index % 7]
-            let name = day.name.trimmingCharacters(in: .whitespaces).isEmpty ? "Day \(index + 1)" : day.name
-            workouts.append(GeneratedWorkout(name: name, day: weekday, items: resolved.items))
+            workouts.append(GeneratedWorkout(name: scheduled.name, day: weekday, items: resolved.items))
         }
         return GeneratedPlan(
             name: program.name,
@@ -119,7 +189,14 @@ enum ProgramPlanBuilder {
             : program.scienceRationale
 
         // Per-day notes come from the resolved plan (names + slot reasons already computed).
-        let perDay: [PerDayNote] = plan.workouts.map { workout in
+        //
+        // One note per distinct session, not per slot in the week: a program that runs the
+        // same full-body day three times would otherwise explain the same six exercises
+        // three times over. Matches what the AI path writes, which reports first occurrences.
+        var explained: Set<[String]> = []
+        let perDay: [PerDayNote] = plan.workouts.compactMap { workout in
+            let signature = workout.items.map(\.exId)
+            guard explained.insert(signature).inserted else { return nil }
             let notes = workout.items.map { item -> ExerciseNote in
                 ExerciseNote(name: ReportComposer.prettyName(item.exId), reason: itemReason(item))
             }
@@ -132,8 +209,8 @@ enum ProgramPlanBuilder {
         if !program.progression.type.isEmpty && program.progression.type != "none" {
             science += "Progression: \(progressionSentence(program.progression)) "
         }
-        if !program.evidence.isEmpty {
-            science += "This approach draws on: \(program.evidence.joined(separator: "; "))."
+        if !program.principles.isEmpty {
+            science += program.principles.joined(separator: ". ") + "."
         }
         if science.isEmpty {
             science = "Progress by adding a little load or a rep whenever a set beats its target — small, steady overload compounds."
