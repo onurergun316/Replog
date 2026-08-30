@@ -72,8 +72,21 @@ struct BadgeCelebrationOverlay: View {
                 .allowsHitTesting(false)
             }
 
-            if let badge { card(badge) }
+            if let badge {
+                // The card fits every current badge at the largest accessibility text size,
+                // but "fits today" is not a guarantee: one longer `meaning`, one smaller
+                // device, and the button that ends the celebration is off-screen with no
+                // way to scroll to it. The scrolling copy is used only when it has to be.
+                ViewThatFits(in: .vertical) {
+                    card(badge)
+                    ScrollView { card(badge) }.scrollIndicators(.hidden)
+                }
+            }
         }
+        // The celebration owns the screen, so VoiceOver should not be able to wander into
+        // the Today screen behind the scrim — sighted users cannot, and the scrim swallows
+        // their taps.
+        .accessibilityAddTraits(.isModal)
         .task(id: index) { await runSequence() }
         .sensoryFeedback(.impact(flexibility: .soft, intensity: 0.7), trigger: softTick)
         .sensoryFeedback(.impact(weight: .heavy, intensity: 1.0), trigger: heavyTick)
@@ -207,6 +220,14 @@ struct BadgeCelebrationOverlay: View {
     /// Runs the entrance: fireworks, the medal sinking in and striking, the shake, the glint
     /// and the copy, with the haptics timed to the beats rather than fired all at once.
     private func runSequence() async {
+        // No badge means a scrim with no card and no button: nothing to dismiss it with.
+        // `SessionCompletion` never raises this stage empty, but a component that can trap
+        // the athlete is a bug regardless of what its callers happen to do today.
+        guard badge != nil else {
+            onDone()
+            return
+        }
+
         resetForNewBadge()
 
         guard !reduceMotion else {
