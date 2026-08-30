@@ -28,18 +28,72 @@ enum ProgramPlanBuilder {
         var notes: [ExerciseNote]
     }
 
+    /// One session in the program's week: which template it runs, which time round it is,
+    /// and what to call it.
+    struct ScheduledDay: Equatable, Sendable {
+        /// Index into `program.days` — the template this session runs.
+        var templateIndex: Int
+        var day: ProgramDay
+        /// 1-based: how many times this template has come round so far this week.
+        var occurrence: Int
+        /// Disambiguated workout name: "Push", then "Push (2)".
+        var name: String
+    }
+
+    /// The program's WEEK, expanded from its templates.
+    ///
+    /// `days` holds a program's distinct session TEMPLATES, not its week, and the two are
+    /// routinely different: ten of the bundled programs declare more sessions per week than
+    /// they have templates — a 3-day full-body program written as one template, a 6-day PPL
+    /// written as three. Building one workout per template silently under-delivered every
+    /// one of them, most visibly as "3 days/week" arriving as a plan with a single Monday.
+    ///
+    /// The week is the templates cycled, capped at seven because that is how many days a
+    /// week has. A program with no templates has no week — the caller falls back rather
+    /// than inventing one.
+    ///
+    /// `sessions` is how many workouts the week should contain. Callers pass the athlete's
+    /// own answer, because that is the number the athlete was asked for and the number they
+    /// will count: the library has only two 6-day programs and three 2-day ones, so binding
+    /// the plan to the program's declared frequency means anyone at the edges of that
+    /// distribution is quietly given a different week than the one they chose. Cycling a
+    /// rotation to fit is how these programs are run in practice anyway — a three-day
+    /// rotation trained six times is that rotation twice. Defaults to the program's own
+    /// frequency when the caller has no athlete to ask.
+    static func weeklySchedule(for program: WorkoutProgram, sessions requested: Int? = nil) -> [ScheduledDay] {
+        guard !program.days.isEmpty else { return [] }
+        let wanted = requested ?? max(program.daysPerWeek, program.days.count)
+        let sessions = min(max(wanted, 1), 7)
+        var timesSeen: [String: Int] = [:]
+        return (0..<sessions).map { index in
+            let templateIndex = index % program.days.count
+            let day = program.days[templateIndex]
+            let trimmed = day.name.trimmingCharacters(in: .whitespaces)
+            let base = trimmed.isEmpty ? "Day \(templateIndex + 1)" : trimmed
+            let occurrence = (timesSeen[base] ?? 0) + 1
+            timesSeen[base] = occurrence
+            return ScheduledDay(templateIndex: templateIndex, day: day, occurrence: occurrence,
+                                name: occurrence == 1 ? base : "\(base) (\(occurrence))")
+        }
+    }
+
     // MARK: - Deterministic plan (fallback path)
 
     /// Builds a full plan from a program with no model input (top candidate per slot).
     static func plan(from program: WorkoutProgram, answers: QuizAnswers, catalog: ExerciseCatalog) -> GeneratedPlan {
-        let weekdays = PlanGenerator.weekdays(count: max(program.days.count, 1))
+        let schedule = weeklySchedule(for: program, sessions: answers.daysPerWeek)
+        let weekdays = PlanGenerator.weekdays(count: max(schedule.count, 1))
+        // A repeated template is the SAME session run again, so it is resolved once and
+        // reused: two Push days in a PPL week must not quietly pick different exercises.
+        var resolutions: [Int: DayResolution] = [:]
         var workouts: [GeneratedWorkout] = []
-        for (index, day) in program.days.enumerated() {
-            let resolved = resolveDay(day, answers: answers, catalog: catalog)
+        for (index, scheduled) in schedule.enumerated() {
+            let resolved = resolutions[scheduled.templateIndex]
+                ?? resolveDay(scheduled.day, answers: answers, catalog: catalog)
+            resolutions[scheduled.templateIndex] = resolved
             guard !resolved.items.isEmpty else { continue }
             let weekday = index < weekdays.count ? weekdays[index] : Weekday.allCases[index % 7]
-            let name = day.name.trimmingCharacters(in: .whitespaces).isEmpty ? "Day \(index + 1)" : day.name
-            workouts.append(GeneratedWorkout(name: name, day: weekday, items: resolved.items))
+            workouts.append(GeneratedWorkout(name: scheduled.name, day: weekday, items: resolved.items))
         }
         return GeneratedPlan(
             name: program.name,
