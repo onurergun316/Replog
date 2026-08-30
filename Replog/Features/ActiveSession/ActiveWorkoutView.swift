@@ -34,6 +34,8 @@ struct ActiveWorkoutView: View {
     @State private var showCelebration = false
     @State private var didCelebrate = false
     @State private var showAddExercise = false
+    /// Bumped when a rest countdown reaches zero, so the end of rest is felt.
+    @State private var restEndedTick = 0
     /// What this session added beyond the plan, held while the athlete decides whether to
     /// keep it. Non-nil means the "save to the plan?" dialog is up.
     @State private var pendingAdditions: TemplateWriteBack.Additions?
@@ -86,6 +88,9 @@ struct ActiveWorkoutView: View {
         }
         .hideKeyboardOnTap()
         .background(Color.bg.ignoresSafeArea())
+        // Rest ending is the one moment in a session the athlete is deliberately not
+        // looking at the phone. It used to pass in silence — the bar simply vanished.
+        .sensoryFeedback(.success, trigger: restEndedTick)
         .sheet(item: $detailRef) { ref in
             NavigationStack { ExerciseDetailView(exId: ref.id, showProgress: true) }
         }
@@ -248,7 +253,14 @@ struct ActiveWorkoutView: View {
             }
             .padding(.horizontal, 12).padding(.vertical, 8)
             .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(Color.accentSoft))
-            .onChange(of: remaining) { _, new in if new == 0 { restTimer.skip() } }
+            .onChange(of: remaining) { previous, new in
+                guard new == 0 else { return }
+                // Ticking down to zero is rest ending. Landing on zero from the middle of
+                // a countdown is the app coming back from the background long after it
+                // ended — buzzing then is a phantom alert, not a cue.
+                if previous <= 2 { restEndedTick += 1 }
+                restTimer.skip()
+            }
         }
     }
 
