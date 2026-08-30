@@ -81,7 +81,16 @@ numbered the request.
 - **Persistence: SwiftData** (the spec says "Core Data"; we use its modern successor).
 - **AI planner: on-device Apple Intelligence** (`FoundationModels`), in `Domain/AI/`, now
   **program-driven**. `ProgramMatcher` first narrows the bundled 62-program library to a gated + scored
-  shortlist for the athlete. Then two-stage, genuinely model-driven & non-deterministic (temperature
+  shortlist for the athlete. **It scores the athlete's own answers**: session length as a ratio
+  (needing more time than they have is near-disqualifying; needing far less runs down a smooth
+  slope), frequency outweighing any single goal keyword, and symmetric sex focus. Programs with no
+  day templates are gated out (they cannot become a plan). A shortlist where nothing fits the
+  session length falls back to `PlanGenerator`, which sizes sessions from the athlete's minutes.
+  **A program's `days` are its session TEMPLATES, not its week** — 10 of the 62 declare more
+  sessions per week than they have templates — so `ProgramPlanBuilder.weeklySchedule` cycles them
+  into the week, numbering repeats ("Push (2)") and resolving each template once. The session count
+  comes from the ATHLETE's `daysPerWeek`. `PlanShapeSweepTests` asserts these invariants over all
+  648 answer combinations. Then two-stage, genuinely model-driven & non-deterministic (temperature
   1.0): a **framing** call picks ONE program from that shortlist (disclaimer programs excluded) + writes
   the report sections, then **per-day** calls fill each `ProgramSlot` with a specific exercise from a
   numbered list of real catalog candidates (filtered to the user's equipment/injuries via
