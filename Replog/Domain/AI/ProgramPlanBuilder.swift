@@ -61,13 +61,21 @@ enum ProgramPlanBuilder {
     /// rotation trained six times is that rotation twice. Defaults to the program's own
     /// frequency when the caller has no athlete to ask.
     static func weeklySchedule(for program: WorkoutProgram, sessions requested: Int? = nil) -> [ScheduledDay] {
-        guard !program.days.isEmpty else { return [] }
-        let wanted = requested ?? max(program.daysPerWeek, program.days.count)
-        let sessions = min(max(wanted, 1), 7)
+        schedule(program.days,
+                 sessions: requested ?? max(program.daysPerWeek, program.days.count))
+    }
+
+    /// Lays an explicit list of templates across `sessions` days, cycling and numbering
+    /// repeats. Callers pass the templates that are usable for THIS athlete, which is not
+    /// always all of them: a knee rules out every candidate on a leg day, and that session
+    /// cannot be built for them at any price.
+    static func schedule(_ templates: [ProgramDay], sessions requested: Int) -> [ScheduledDay] {
+        guard !templates.isEmpty else { return [] }
+        let sessions = min(max(requested, 1), 7)
         var timesSeen: [String: Int] = [:]
         return (0..<sessions).map { index in
-            let templateIndex = index % program.days.count
-            let day = program.days[templateIndex]
+            let templateIndex = index % templates.count
+            let day = templates[templateIndex]
             let trimmed = day.name.trimmingCharacters(in: .whitespaces)
             let base = trimmed.isEmpty ? "Day \(templateIndex + 1)" : trimmed
             let occurrence = (timesSeen[base] ?? 0) + 1
@@ -81,17 +89,25 @@ enum ProgramPlanBuilder {
 
     /// Builds a full plan from a program with no model input (top candidate per slot).
     static func plan(from program: WorkoutProgram, answers: QuizAnswers, catalog: ExerciseCatalog) -> GeneratedPlan {
-        let schedule = weeklySchedule(for: program, sessions: answers.daysPerWeek)
-        let weekdays = PlanGenerator.weekdays(count: max(schedule.count, 1))
-        // A repeated template is the SAME session run again, so it is resolved once and
-        // reused: two Push days in a PPL week must not quietly pick different exercises.
+        // Resolve each distinct template ONCE, and keep only the ones that produce exercises
+        // for this athlete. A session can come back empty — a knee injury removes every
+        // candidate from a leg day — and the old code skipped it, which silently handed the
+        // athlete fewer training days than they asked for. The week is built from what can
+        // actually be trained, so five days requested is five days delivered.
+        var usable: [ProgramDay] = []
         var resolutions: [Int: DayResolution] = [:]
+        for day in program.days {
+            let resolved = resolveDay(day, answers: answers, catalog: catalog)
+            guard !resolved.items.isEmpty else { continue }
+            resolutions[usable.count] = resolved
+            usable.append(day)
+        }
+
+        let schedule = schedule(usable, sessions: answers.daysPerWeek)
+        let weekdays = PlanGenerator.weekdays(count: max(schedule.count, 1))
         var workouts: [GeneratedWorkout] = []
         for (index, scheduled) in schedule.enumerated() {
-            let resolved = resolutions[scheduled.templateIndex]
-                ?? resolveDay(scheduled.day, answers: answers, catalog: catalog)
-            resolutions[scheduled.templateIndex] = resolved
-            guard !resolved.items.isEmpty else { continue }
+            guard let resolved = resolutions[scheduled.templateIndex] else { continue }
             let weekday = index < weekdays.count ? weekdays[index] : Weekday.allCases[index % 7]
             workouts.append(GeneratedWorkout(name: scheduled.name, day: weekday, items: resolved.items))
         }

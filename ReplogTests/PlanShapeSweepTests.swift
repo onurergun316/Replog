@@ -98,6 +98,41 @@ struct PlanShapeSweepTests {
         }
     }
 
+    @Test func aDeclaredInjuryNeverCostsTheAthleteATrainingDay() async {
+        // A knee injury removes every candidate from a leg day, and the builder used to skip
+        // the session it could not fill: five days requested came back as three. The same
+        // missing-days failure the day-template bug caused, reached by a different route.
+        let service = service()
+        var injurySets: [Set<Injury>] = Injury.allCases.map { [$0] }
+        injurySets.append(Set(Injury.allCases))   // everything hurts
+        injurySets.append([])
+
+        for injuries in injurySets {
+            for goal in Goal.allCases {
+                for days in [3, 5] {
+                    for kit in Self.kits where kit.name != "home" {
+                        var answers = QuizAnswers()
+                        answers.goal = goal
+                        answers.daysPerWeek = days
+                        answers.minutesPerSession = 60
+                        answers.equipmentTypes = kit.equipment
+                        answers.injuries = injuries
+                        if goal == .sport { answers.sport = .running }
+
+                        let label = injuries.isEmpty ? "none"
+                            : injuries.map(\.rawValue).sorted().joined(separator: "+")
+                        let plan = await service.generate(answers).plan
+
+                        #expect(plan.workouts.count == days,
+                                "[\(label)] \(goal)/\(days)d/\(kit.name): got \(plan.workouts.count)")
+                        #expect(plan.workouts.allSatisfy { !$0.items.isEmpty },
+                                "[\(label)] \(goal)/\(days)d/\(kit.name): empty workout")
+                    }
+                }
+            }
+        }
+    }
+
     @Test func theReportedCaseIsFixed() async {
         // 3 days a week, 85-minute sessions, full gym. The bug report, as a test.
         var answers = QuizAnswers()

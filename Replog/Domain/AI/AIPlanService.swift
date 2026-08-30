@@ -122,7 +122,13 @@ struct AIPlanService {
         // is three templates run twice — so the model is asked ONCE per template and the
         // answer is reused for its repeats. Asking again would double the calls and could
         // return a different Push day the second time round.
-        let schedule = ProgramPlanBuilder.weeklySchedule(for: chosen, sessions: answers.daysPerWeek)
+        // Only templates that have candidates for THIS athlete can become sessions: an injury
+        // or an equipment gap can empty a whole day, and a dropped day is a day the athlete
+        // asked for and did not get. The week is laid out over what survives.
+        let usable = chosen.days.filter { !slotCandidateEntries(for: $0, answers: answers).isEmpty }
+        guard !usable.isEmpty else { return programFallback(program: chosen, answers: answers) }
+
+        let schedule = ProgramPlanBuilder.schedule(usable, sessions: answers.daysPerWeek)
         let weekdays = PlanGenerator.weekdays(count: max(schedule.count, 1))
         var workouts: [GeneratedWorkout] = []
         var reportDays: [PerDayNote] = []
@@ -160,7 +166,12 @@ struct AIPlanService {
             }
         }
 
-        guard !workouts.isEmpty else { return programFallback(program: chosen, answers: answers) }
+        // The deterministic builder applies the same rules without a model in the loop, so if
+        // the model path came up short of the athlete's week, hand it over rather than ship a
+        // plan with days missing.
+        guard workouts.count == min(max(answers.daysPerWeek, 1), 7) else {
+            return programFallback(program: chosen, answers: answers)
+        }
 
         let headline = framing.headline.trimmingCharacters(in: .whitespaces)
         let plan = GeneratedPlan(
