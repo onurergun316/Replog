@@ -64,10 +64,18 @@ struct RecentHighlight: Equatable, Sendable {
     /// a best is the more interesting of two identical numbers. `e1rm` resolves an entry's
     /// estimated 1RM — for bodyweight movements that needs the athlete's weight on the day,
     /// which is why it is not read off the row.
+    ///
+    /// Entries with no estimable 1RM are ignored, so a log made entirely of timed holds
+    /// has no highlight rather than a highlight of zero.
     static func best(in entries: [HistoryEntry], e1rm resolve: (HistoryEntry) -> Int) -> RecentHighlight? {
         // One resolution per entry, kept: `max(by:)` would call it twice per comparison on
         // a list that grows with every workout.
-        let scored = entries.map { (entry: $0, value: resolve($0)) }
+        //
+        // A zero is not a small highlight, it is the absence of one: a timed hold logs no
+        // reps, and an unloaded movement with no bodyweight credit resolves to nothing to
+        // estimate from. Ranking those would put "0 est. 1RM" on Today as the best thing
+        // the athlete has ever done — worse than showing no card at all.
+        let scored = entries.map { (entry: $0, value: resolve($0)) }.filter { $0.value > 0 }
         guard let best = scored.reduce(nil, { (current: (entry: HistoryEntry, value: Int)?, candidate) in
             guard let current else { return candidate }
             if candidate.value > current.value { return candidate }

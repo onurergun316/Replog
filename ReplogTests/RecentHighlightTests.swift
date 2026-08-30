@@ -50,6 +50,29 @@ struct RecentHighlightTests {
         #expect(RecentHighlight.best(in: [], e1rm: stored) == nil)
     }
 
+    @Test func aLogWithNothingToEstimateFromHasNoHighlight() {
+        // Timed holds: reps are zero, so there is no 1RM to estimate. The card must not
+        // appear at all rather than announce "0 est. 1RM" as the athlete's best moment.
+        let entries = [entry("Plank", daysAgo: 3, e1rm: 0, topW: 0, topR: 0),
+                       entry("Side_Plank", daysAgo: 1, e1rm: 0, topW: 0, topR: 0)]
+
+        #expect(RecentHighlight.best(in: entries, e1rm: stored) == nil)
+    }
+
+    @Test func anUnestimableEntryNeverOutranksARealOne() throws {
+        // The zero rows are skipped entirely: they cannot win, and they cannot appear in
+        // the lift's trail either.
+        let entries = [entry("Plank", daysAgo: 1, e1rm: 0, topW: 0, topR: 0),
+                       entry("Bench", daysAgo: 4, e1rm: 90),
+                       entry("Bench", daysAgo: 2, e1rm: 110)]
+
+        let highlight = try #require(RecentHighlight.best(in: entries, e1rm: stored))
+        #expect(highlight.exId == "Bench")
+        #expect(highlight.e1rm == 110)
+        #expect(highlight.trail.count == 2)
+        #expect(highlight.previousBestE1RM == 90)
+    }
+
     @Test func theResolverDecidesTheRanking() throws {
         // A bodyweight movement's 1RM depends on what the athlete weighed that day, so the
         // stored column is not the answer — whatever the caller resolves is.
