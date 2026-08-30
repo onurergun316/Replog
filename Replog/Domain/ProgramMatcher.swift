@@ -186,7 +186,6 @@ enum ProgramMatcher {
         guard equipmentSatisfied(program, by: context.equipment) else { return nil }
         guard program.audience.admits(age: context.age) else { return nil }
         guard sportGatePasses(program, for: context) else { return nil }
-        if program.prerequisite != nil && !context.satisfiesPrerequisites { return nil }
 
         // ---- Soft scoring ----
         var score = 0.0
@@ -233,6 +232,24 @@ enum ProgramMatcher {
         if let reason = sessionFitReason(programMinutes: program.sessionMinutes,
                                          athleteMinutes: context.minutesPerSession) {
             reasons.append(reason)
+        }
+
+        // Prerequisite: a caution, not a wall.
+        //
+        // It used to be a hard gate keyed on a single boolean that is ALWAYS false during
+        // onboarding — which is the one moment the app generates a plan. Every endurance
+        // sport in the library declares a prerequisite ("Can run 5K continuously"), so a
+        // runner, cyclist, swimmer or triathlete could never be given their own sport's
+        // programme at all; they got generic athletic work instead. The same boolean was
+        // simultaneously too loose afterwards: any logged history at all flipped it true and
+        // unlocked all twelve, whatever each one actually asks for.
+        //
+        // As a penalty it does the job the gate was meant to do — an equivalent programme
+        // with no entry requirement is preferred — while still being reachable when it is
+        // the only thing that serves the athlete. What it expects is on its detail screen.
+        if program.prerequisite != nil && !context.satisfiesPrerequisites {
+            score -= 25
+            reasons.append("Assumes some training already behind you — check what it expects.")
         }
 
         // Experience fit.
@@ -442,8 +459,15 @@ enum ProgramMatcher {
         }
         switch key {
         // Always available: bodyweight & near-universal staples.
+        //
+        // `medicine_ball` sits here rather than in the strict bucket below because the
+        // onboarding chip grid renders `Equipment.selectable`, which does not offer it —
+        // so `allowedEquipment` could never contain it for ANY athlete, and the three
+        // programmes requiring one (boxing, tennis/padel, golf) were gated out for 100% of
+        // users, including the athletes they were written for. A boxer got generic GPP
+        // instead. Gating on gear the quiz never asks about can only ever return false.
         case "body_only", "bodyweight", "pull_up_bar", "backpack", "backpack_for_load",
-             "open_space", "sandbag":
+             "open_space", "sandbag", "medicine_ball":
             return true
         // App-modeled strength gear — strict gate.
         case "barbell", "trap_bar":       return owned.contains(.barbell)
@@ -452,7 +476,6 @@ enum ProgramMatcher {
         case "cable":                     return owned.contains(.cable)
         case "kettlebell", "kettlebells": return owned.contains(.kettlebells)
         case "bands":                     return owned.contains(.bands)
-        case "medicine_ball":             return owned.contains(.medicineBall)
         // Cardio gear the app doesn't model — stay permissive (can't disprove ownership).
         case "bike", "trainer", "rower", "elliptical", "pool", "treadmill":
             return true

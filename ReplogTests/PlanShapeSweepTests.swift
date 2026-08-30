@@ -28,7 +28,7 @@ import Foundation
 struct PlanShapeSweepTests {
 
     private static let kits: [(name: String, equipment: Set<Equipment>)] = [
-        ("full gym", [.barbell, .dumbbell, .machine, .cable, .bodyOnly, .bands, .kettlebells, .medicineBall]),
+        ("full gym", EquipmentAccess.fullGym.allowedEquipment.intersection(Set(Equipment.selectable))),
         ("home", [.dumbbell, .bands, .bodyOnly]),
         ("bodyweight only", [.bodyOnly]),
     ]

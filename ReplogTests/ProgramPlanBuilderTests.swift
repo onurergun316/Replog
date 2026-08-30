@@ -21,7 +21,7 @@ struct ProgramPlanBuilderTests {
     private func fullGymAnswers() -> QuizAnswers {
         var a = QuizAnswers()
         a.goal = .buildMuscle
-        a.equipmentTypes = [.barbell, .dumbbell, .machine, .cable, .bodyOnly, .bands, .kettlebells, .medicineBall]
+        a.equipmentTypes = EquipmentAccess.fullGym.allowedEquipment.intersection(Set(Equipment.selectable))
         return a
     }
 
@@ -156,7 +156,7 @@ struct ProgramWeekTests {
         var a = QuizAnswers()
         a.goal = .buildMuscle
         a.daysPerWeek = days
-        a.equipmentTypes = [.barbell, .dumbbell, .machine, .cable, .bodyOnly, .bands, .kettlebells, .medicineBall]
+        a.equipmentTypes = EquipmentAccess.fullGym.allowedEquipment.intersection(Set(Equipment.selectable))
         return a
     }
 

@@ -136,7 +136,7 @@ struct ContentCitationTests {
         let programs = ProgramCatalog(bundle: .main).all
         var answers = QuizAnswers()
         answers.goal = .buildMuscle
-        answers.equipmentTypes = [.barbell, .dumbbell, .machine, .cable, .bodyOnly, .bands, .kettlebells, .medicineBall]
+        answers.equipmentTypes = EquipmentAccess.fullGym.allowedEquipment.intersection(Set(Equipment.selectable))
 
         for program in programs {
             let plan = ProgramPlanBuilder.plan(from: program, answers: answers, catalog: catalog)

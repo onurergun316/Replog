@@ -17,8 +17,7 @@ import Foundation
 struct AIPlanServiceTests {
 
     private let programs = ProgramCatalog(bundle: .main)
-    private let fullGym: Set<Equipment> = [.barbell, .dumbbell, .machine, .cable, .bodyOnly,
-                                           .bands, .kettlebells, .medicineBall]
+    private let fullGym: Set<Equipment> = EquipmentAccess.fullGym.allowedEquipment.intersection(Set(Equipment.selectable))
 
     private func topCandidates(_ answers: QuizAnswers, limit: Int = 5) -> [ProgramMatch] {
         let ctx = MatchContext.from(answers)

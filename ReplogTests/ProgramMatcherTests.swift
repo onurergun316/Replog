@@ -15,8 +15,7 @@ struct ProgramMatcherTests {
     private let catalog = ProgramCatalog(bundle: .main)
 
     // Common equipment sets.
-    private let fullGym: Set<Equipment> = [.barbell, .dumbbell, .machine, .cable, .bodyOnly,
-                                           .bands, .kettlebells, .medicineBall]
+    private let fullGym: Set<Equipment> = EquipmentAccess.fullGym.allowedEquipment.intersection(Set(Equipment.selectable))
     private let machineOnly: Set<Equipment> = [.machine]
     private let bodyweightOnly: Set<Equipment> = [.bodyOnly]
 
@@ -65,19 +64,24 @@ struct ProgramMatcherTests {
         }
     }
 
-    @Test func prerequisiteProgramsAreGatedForNoHistoryUsersButAllowedWithHistory() throws {
+    @Test func aPrerequisiteCostsScoreWithoutLockingTheAthleteOut() throws {
         // run_10k_8wk requires "Can run 5K continuously".
+        //
+        // This used to be a hard gate, and it excluded the programme for a runner with no
+        // logged history — which is EVERY athlete at onboarding, the one moment a plan is
+        // generated. Since all four endurance sports declare a prerequisite, no runner,
+        // cyclist, swimmer or triathlete could ever be given their own sport's programme.
+        // It is a caution now: reachable either way, preferred once it is met.
         let prereqID = "run_10k_8wk"
         let noHistory = MatchContext(goal: .sport, sport: .running, age: 30,
                                      equipment: fullGym, satisfiesPrerequisites: false)
         let withHistory = MatchContext(goal: .sport, sport: .running, age: 30,
                                        equipment: fullGym, satisfiesPrerequisites: true)
 
-        let gated = ProgramMatcher.rank(noHistory, in: catalog).map(\.id)
-        #expect(!gated.contains(prereqID))
-
-        let allowed = ProgramMatcher.rank(withHistory, in: catalog).map(\.id)
-        #expect(allowed.contains(prereqID))
+        let unproven = try #require(ProgramMatcher.rank(noHistory, in: catalog).first { $0.id == prereqID })
+        let proven = try #require(ProgramMatcher.rank(withHistory, in: catalog).first { $0.id == prereqID })
+        #expect(proven.score > unproven.score)
+        #expect(unproven.reasons.contains { $0.contains("Assumes some training") })
     }
 
     @Test func ageOutsideAudienceBandExcludesTheProgram() throws {
@@ -290,6 +294,59 @@ struct ProgramFitTests {
         #expect(ranked.contains { $0.id == "womens_upper_strength_4d" })
         // ...but it is not what the app opens with for a male athlete.
         #expect(ranked.first?.id != "womens_upper_strength_4d")
+    }
+
+    // MARK: The library must be reachable by real answers
+
+    @Test func noProgramRequiresGearTheQuizNeverAsksAbout() {
+        // A gate on equipment the onboarding chip grid does not offer can only ever return
+        // false. `medicine_ball` was exactly that: `Equipment.selectable` has no medicine
+        // ball, onboarding intersects the athlete's set with it, so the three programmes
+        // requiring one were dropped for 100% of users — a boxer got generic GPP instead of
+        // the boxing programme written for them. Every requirement must be satisfiable by
+        // an athlete who actually went through the quiz.
+        let reachable = EquipmentAccess.allCases.map {
+            $0.allowedEquipment.intersection(Set(Equipment.selectable))
+        }
+        for program in programs.all {
+            let satisfiedSomewhere = reachable.contains { ProgramMatcher.equipmentSatisfied(program, by: $0) }
+            #expect(satisfiedSomewhere,
+                    "\(program.id) requires \(program.equipmentRequired), which no onboarding answer can grant")
+        }
+    }
+
+    @Test func everySportWithAProgramIsReachableByTheAthleteWhoPlaysIt() {
+        // The same defect from the athlete's side: picking your sport must actually reach
+        // your sport's programme, using equipment onboarding can really produce.
+        let gym = EquipmentAccess.fullGym.allowedEquipment.intersection(Set(Equipment.selectable))
+        for sport in Sport.allCases where sport != .other {
+            let ctx = MatchContext(goal: .sport, sport: sport, experience: .intermediate, age: 26,
+                                   daysPerWeek: 3, minutesPerSession: 55, equipment: gym)
+            guard let token = ctx.sportToken,
+                  programs.all.contains(where: { $0.sport?.lowercased() == token }) else { continue }
+            let ranked = ProgramMatcher.rank(ctx, in: programs)
+            #expect(ranked.contains { $0.program.sport?.lowercased() == token },
+                    "\(sport) cannot reach its own programme")
+        }
+    }
+
+    @Test func aPrerequisiteWarnsRatherThanLocksTheAthleteOut() throws {
+        // A brand-new athlete has no history, so the old hard gate excluded all twelve
+        // prerequisite programmes at exactly the moment the first plan is generated.
+        let gym = EquipmentAccess.fullGym.allowedEquipment.intersection(Set(Equipment.selectable))
+        let newRunner = MatchContext(goal: .sport, sport: .running, experience: .beginner, age: 30,
+                                     daysPerWeek: 4, minutesPerSession: 45, equipment: gym,
+                                     satisfiesPrerequisites: false)
+        let ranked = ProgramMatcher.rank(newRunner, in: programs)
+        #expect(ranked.contains { $0.program.sport?.lowercased() == "running" })
+
+        // ...but it still ranks below the same programme once the athlete qualifies.
+        var qualified = newRunner
+        qualified.satisfiesPrerequisites = true
+        let before = try #require(ranked.first { $0.program.prerequisite != nil }?.score)
+        let after = try #require(ProgramMatcher.rank(qualified, in: programs)
+            .first { $0.program.prerequisite != nil }?.score)
+        #expect(after > before)
     }
 
     // MARK: Sport programs reach sport athletes only
