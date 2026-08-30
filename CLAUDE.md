@@ -13,6 +13,13 @@ SwiftUI, iOS 26.5, on-device only (no backend, no network).
 - Work only on the **`development`** branch.
 - Write professional unit tests alongside code; keep the **logic layer ≥90% covered**
   (raised from 80% on 2026-08-29, when it reached ~91%).
+- **Never name a scientific paper anywhere the athlete can see.** No author, year, journal,
+  trial or position-stand name in program copy, plan reports, coach text or prompts — the
+  science shapes the wording, it is never cited (owner's rule, 2026-08-30). The 170 citations
+  that used to ship were rewritten as plain-language principles; `WorkoutProgram.principles`
+  (JSON key stays `evidence`) is named for what it holds. `ContentCitationTests` walks every
+  string in every bundled program and comparison by reflection and fails if one reappears.
+  Citations are still fine in `WeightComparison.source`, which is never decoded into copy.
 - The product spec is the source of truth: `../README.md` and `../design_handoff_replog/`
   (per-screen notes + `screenshots/`). The bundled HTML prototype is **reference only**.
 - **Build clean** (0 errors / 0 warnings) and run the tests on the one simulator below before
@@ -25,8 +32,8 @@ SwiftUI, iOS 26.5, on-device only (no backend, no network).
   `-destination 'platform=iOS Simulator,id=0099037A-7A35-4AB6-9982-6950D9A63928'`. Purge test
   clones afterwards (`xcrun simctl --set testing delete all`) and keep result bundles off the
   project disk. The zero-write `swiftc -typecheck` recipe below still needs no device at all.
-- **The suite is green on `development`** (880+ cases, 0 failures) and the logic layer sits at
-  ~91%. The four long-standing failures this file used to list were fixed on 2026-08-29; a red
+- **The suite is green on `development`** (900 cases, 0 failures) and the logic layer sits at
+  ~92%. The four long-standing failures this file used to list were fixed on 2026-08-29; a red
   test now is almost certainly yours. Baseline against a stash before concluding otherwise.
 
 ## ⚙️ Delivery standard — the 4-pass method (apply to every numbered task list)
