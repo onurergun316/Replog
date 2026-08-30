@@ -351,6 +351,31 @@ struct ProgramFitTests {
         }
     }
 
+    @Test func afreeTextSportIsReadAsWordsNotSubstrings() {
+        // Substring matching handed real athletes the wrong sport's programme: "skipping"
+        // contains "ski", "basket weaving" contains "basket", and "mountain biking" hit the
+        // hiking key before the bike ones.
+        func token(_ text: String) -> String? {
+            var ctx = MatchContext(goal: .sport, sport: .other)
+            ctx.customSport = text
+            return ctx.sportToken
+        }
+
+        #expect(token("mountain biking") == "cycling")
+        #expect(token("trail running") == "running")
+        #expect(token("olympic weightlifting") == nil)
+        #expect(token("skipping rope") == nil)
+        #expect(token("underwater basket weaving") == nil)
+        #expect(token("quidditch") == nil)
+
+        // The real inputs still land.
+        #expect(token("Basketball") == "basketball")
+        #expect(token("open water swimming") == "swimming")
+        #expect(token("Muay Thai kickboxing") == "boxing")
+        #expect(token("padel") == "tennis_padel")
+        #expect(token("half marathon") == "running")
+    }
+
     @Test func aSportWithNoProgramFallsBackToGeneralAthleticWork() {
         // Nothing in the library is built for this, so the athlete gets a general base
         // rather than another sport's block or nothing at all.

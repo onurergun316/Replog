@@ -96,25 +96,34 @@ struct MatchContext: Equatable, Sendable {
         }
     }
 
-    /// Maps a free-text sport onto a known program sport token by keyword, or nil.
+    /// Maps a free-text sport onto a known program sport token, or nil.
+    ///
+    /// Matched on whole WORDS rather than substrings. Substring matching quietly said that
+    /// "skipping" is skiing, "underwater basket weaving" is basketball and "mountain biking"
+    /// is hiking (because "mountain" was a hiking key and was tested before the bike words).
+    /// Each of those hands an athlete a training programme for a sport they do not play, so
+    /// the variants are spelled out instead of inferred from a prefix. Anything unrecognised
+    /// returns nil, and the athlete gets general athletic work — the right answer for a sport
+    /// this library does not cover.
     private static func matchCustomSport(_ raw: String) -> String? {
-        let s = raw.lowercased()
-        let known: [(keys: [String], token: String)] = [
-            (["climb", "boulder"], "climbing"),
-            (["golf"], "golf"),
-            (["hike", "hiking", "mountain", "trek"], "hiking"),
-            (["ski", "snowboard"], "skiing"),
-            (["tennis", "padel", "racquet", "racket", "squash"], "tennis_padel"),
-            (["triathlon", "ironman"], "triathlon"),
-            (["run", "marathon", "5k", "10k"], "running"),
-            (["swim"], "swimming"),
-            (["cycl", "bike"], "cycling"),
-            (["box", "mma", "kickbox"], "boxing"),
-            (["basket"], "basketball"),
-            (["volley"], "volleyball"),
-            (["soccer", "football"], "football"),
+        let words = Set(raw.lowercased().split { !$0.isLetter && !$0.isNumber }.map(String.init))
+        guard !words.isEmpty else { return nil }
+        let known: [(keys: Set<String>, token: String)] = [
+            (["climbing", "climb", "bouldering", "boulder"], "climbing"),
+            (["golf", "golfing"], "golf"),
+            (["hiking", "hike", "trekking", "trek", "hillwalking", "mountaineering"], "hiking"),
+            (["skiing", "ski", "snowboarding", "snowboard"], "skiing"),
+            (["tennis", "padel", "paddle", "squash", "racquetball", "badminton"], "tennis_padel"),
+            (["triathlon", "ironman", "duathlon"], "triathlon"),
+            (["running", "run", "runner", "jogging", "jog", "marathon", "5k", "10k"], "running"),
+            (["swimming", "swim", "swimmer"], "swimming"),
+            (["cycling", "cycle", "cyclist", "biking", "bike", "mtb", "spinning"], "cycling"),
+            (["boxing", "box", "mma", "kickboxing", "muaythai", "sparring"], "boxing"),
+            (["basketball", "hoops"], "basketball"),
+            (["volleyball"], "volleyball"),
+            (["football", "soccer", "futsal"], "football"),
         ]
-        for entry in known where entry.keys.contains(where: { s.contains($0) }) {
+        for entry in known where !entry.keys.isDisjoint(with: words) {
             return entry.token
         }
         return nil
