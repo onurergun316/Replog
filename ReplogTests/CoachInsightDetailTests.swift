@@ -133,6 +133,23 @@ struct CoachInsightDetailTests {
         #expect(result.exercises == ["Custom Zercher Squat"])
     }
 
+    @Test func aDeletedCustomExerciseIsOmittedRatherThanPrintedAsItsID() {
+        // Deleting a custom exercise leaves finished history alone by design, so an insight
+        // can outlive its subject. `custom-<uuid>` prettifies to "Custom-1f2e3d4c…", which
+        // is not a lift name — the chip is dropped instead.
+        let result = detail(exId: "custom-1f2e3d4c-5b6a-7980-a1b2-c3d4e5f60718",
+                            tags: ["custom-1f2e3d4c-5b6a-7980-a1b2-c3d4e5f60718", "deload"])
+
+        #expect(result.exercises.isEmpty)
+        #expect(result.notes == ["Deload"])
+    }
+
+    @Test func aCustomExerciseThatStillExistsKeepsItsName() {
+        let id = "custom-1f2e3d4c-5b6a-7980-a1b2-c3d4e5f60718"
+        let result = detail(exId: id, names: [id: "Zercher Squat"])
+        #expect(result.exercises == ["Zercher Squat"])
+    }
+
     @Test func duplicateTagsAppearOnce() {
         let result = detail(tags: ["deload", "deload", "Bench", "Bench"],
                             names: ["Bench": "Bench Press"])

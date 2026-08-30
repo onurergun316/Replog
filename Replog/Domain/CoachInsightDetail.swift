@@ -55,13 +55,15 @@ struct CoachInsightDetail: Equatable, Sendable {
         var exercises: [String] = []
         var notes: [String] = []
 
-        if let exId { exercises.append(name(exId) ?? readable(exId)) }
+        if let exId, let label = liftName(exId, name) {
+            exercises.append(label)
+        }
         for tag in payload.tags {
             // The kind is already the sheet's heading; repeating it as a chip says nothing.
             if CoachInsightKind(rawValue: tag) != nil { continue }
             if let resolved = name(tag) {
                 if !exercises.contains(resolved) { exercises.append(resolved) }
-            } else {
+            } else if !isDeletedCustomId(tag) {
                 let note = readable(tag)
                 if !notes.contains(note) { notes.append(note) }
             }
@@ -70,6 +72,22 @@ struct CoachInsightDetail: Equatable, Sendable {
         return CoachInsightDetail(
             kind: kind, title: title, body: body, date: date,
             exercises: exercises, facts: facts(from: payload.metrics, units: units), notes: notes)
+    }
+
+    /// What to call a catalog id: its real name, its token prettified, or nothing at all.
+    ///
+    /// Deleting a custom exercise deliberately leaves finished history alone — it is a
+    /// factual record of training that happened — so a recorded insight can outlive the
+    /// exercise it was about. Prettifying `custom-1f2e3d4c-…` produces
+    /// "Custom-1f2e3d4c-…", which is not a lift name and is worth less than an empty row.
+    private static func liftName(_ id: String, _ name: (String) -> String?) -> String? {
+        if let resolved = name(id) { return resolved }
+        return isDeletedCustomId(id) ? nil : readable(id)
+    }
+
+    /// A custom exercise's id, in the `custom-<uuid>` form `CustomExercise` mints.
+    private static func isDeletedCustomId(_ token: String) -> Bool {
+        token.hasPrefix("custom-")
     }
 
     // MARK: - Metrics
