@@ -93,9 +93,10 @@ nonisolated struct WeightComparison: Codable, Hashable, Sendable, Identifiable {
     /// Only meaningful for `strength`: whether the figure is force or a dragged sled load.
     var load: ComparisonLoad
     var confidence: ComparisonConfidence
-    /// A short factual clause a coach could say. May be empty.
+    /// Why this figure was chosen, in editorial voice. Provenance for whoever revisits the
+    /// data — not athlete-facing copy, and it must never name a paper if it becomes so.
     var note: String
-    /// Where the figure came from, kept for provenance.
+    /// Where the figure came from. Provenance only: never rendered, so it may cite freely.
     var source: String
 
     /// "3 city buses" / "1 city bus" — the count already folded into the noun.

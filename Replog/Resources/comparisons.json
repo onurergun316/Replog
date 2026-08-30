@@ -351,8 +351,8 @@
    "singular": "an adult human",
    "plural": "adult humans",
    "kg": 62.0,
-   "note": "Walpole et al., \"The weight of nations: an estimation of adult human biomass,\" BMC Public Health 2012: global average adult body mass was 62 kg (North America highest at 80.7 kg). Global figure chosen so the comparison reads the same for every user regardless of region.",
-   "source": "https://www.sciencedaily.com/releases/2012/06/120618095057.htm",
+   "note": "Global average adult body mass is 62 kg, with North America highest at 80.7 kg. The global figure is used so the comparison reads the same for every user regardless of region.",
+   "source": "https://www.sciencedaily.com/releases/2012/06/120618095057.htm — Walpole et al., \"The weight of nations: an estimation of adult human biomass,\" BMC Public Health 2012",
    "confidence": "measured"
   },
   {
@@ -542,7 +542,7 @@
    "mode": "lift",
    "loadType": "lift",
    "confidence": "measured",
-   "note": "the strongest chimp in a controlled Yale study pulled 221 kilograms, about 4.6 times its own body weight",
+   "note": "the strongest chimpanzee ever measured pulled 221 kilograms, about 4.6 times its own body weight",
    "source": "Finch, G. (1943) Journal of Mammalogy 24(2):224-228"
   },
   {

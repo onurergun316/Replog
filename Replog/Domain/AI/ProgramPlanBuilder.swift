@@ -132,8 +132,8 @@ enum ProgramPlanBuilder {
         if !program.progression.type.isEmpty && program.progression.type != "none" {
             science += "Progression: \(progressionSentence(program.progression)) "
         }
-        if !program.evidence.isEmpty {
-            science += "This approach draws on: \(program.evidence.joined(separator: "; "))."
+        if !program.principles.isEmpty {
+            science += program.principles.joined(separator: ". ") + "."
         }
         if science.isEmpty {
             science = "Progress by adding a little load or a rep whenever a set beats its target — small, steady overload compounds."

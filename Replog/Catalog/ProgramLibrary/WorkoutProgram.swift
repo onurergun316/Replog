@@ -236,7 +236,9 @@ nonisolated struct WorkoutProgram: Identifiable, Equatable, Sendable {
     let schedule: String
     let progression: ProgramProgression
     let scienceRationale: String
-    let evidence: [String]
+    /// Plain-language training principles the program rests on. Deliberately never a
+    /// citation: the science informs the copy, it is not name-dropped at the athlete.
+    let principles: [String]
     let expectedResults: String
     let cautions: String
     let tags: [String]
@@ -264,7 +266,8 @@ extension WorkoutProgram: Decodable {
         case medicalDisclaimer, daysPerWeek, sessionMinutes, durationWeeks
         case equipmentRequired, equipmentOptional, location, days
         case weeklyStructure, monthlyWave, schedule, progression
-        case scienceRationale, evidence, expectedResults, cautions, tags
+        case scienceRationale, expectedResults, cautions, tags
+        case principles = "evidence"
     }
 
     nonisolated init(from decoder: Decoder) throws {
@@ -290,7 +293,7 @@ extension WorkoutProgram: Decodable {
         schedule = (try? c.decodeIfPresent(String.self, forKey: .schedule)) ?? ""
         progression = (try? c.decodeIfPresent(ProgramProgression.self, forKey: .progression)) ?? ProgramProgression()
         scienceRationale = (try? c.decodeIfPresent(String.self, forKey: .scienceRationale)) ?? ""
-        evidence = (try? c.decodeIfPresent([String].self, forKey: .evidence)) ?? []
+        principles = (try? c.decodeIfPresent([String].self, forKey: .principles)) ?? []
         expectedResults = (try? c.decodeIfPresent(String.self, forKey: .expectedResults)) ?? ""
         cautions = (try? c.decodeIfPresent(String.self, forKey: .cautions)) ?? ""
         tags = (try? c.decodeIfPresent([String].self, forKey: .tags)) ?? []
