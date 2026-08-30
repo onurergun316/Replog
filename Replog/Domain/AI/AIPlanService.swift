@@ -71,10 +71,16 @@ struct AIPlanService {
         // Auto-pickable candidates only — disclaimer programs are never auto-selected.
         let candidates = ProgramMatcher.rank(context, in: programCatalog)
             .filter { $0.autoPickable }
+            // A program that cannot fit the athlete's session — or that would use less than
+            // half of it — is not a plan for this athlete. Ranking always yields a winner,
+            // so without this the app would recommend a 40-minute program to someone who set
+            // aside 90 and call it a match. Better to build to their actual time and days.
+            .filter { ProgramMatcher.fitsTheAthlete($0.program, for: context) }
         let shortlist = Array(candidates.prefix(Self.maxCandidates))
 
         guard !shortlist.isEmpty else {
-            // No program matched at all — fall back to the legacy split generator.
+            // Nothing in the library fits: the split generator sizes each session from the
+            // athlete's own minutes and days, which is the honest answer here.
             return Self.legacyFallback(answers: answers, generator: generator)
         }
 
@@ -111,34 +117,47 @@ struct AIPlanService {
         }
 
         // 2) Per-day: the model picks one real exercise per slot.
-        let weekdays = PlanGenerator.weekdays(count: chosen.days.count)
+        //
+        // The week is the program's templates cycled up to its days per week — a 6-day PPL
+        // is three templates run twice — so the model is asked ONCE per template and the
+        // answer is reused for its repeats. Asking again would double the calls and could
+        // return a different Push day the second time round.
+        let schedule = ProgramPlanBuilder.weeklySchedule(for: chosen, sessions: answers.daysPerWeek)
+        let weekdays = PlanGenerator.weekdays(count: max(schedule.count, 1))
         var workouts: [GeneratedWorkout] = []
         var reportDays: [PerDayNote] = []
+        var resolutions: [Int: (resolved: ProgramPlanBuilder.DayResolution, rationale: String)] = [:]
 
-        for (index, day) in chosen.days.enumerated() {
-            let entries = slotCandidateEntries(for: day, answers: answers)
-            guard !entries.isEmpty else { continue }
+        for (index, scheduled) in schedule.enumerated() {
+            let day = scheduled.day
+            if resolutions[scheduled.templateIndex] == nil {
+                let entries = slotCandidateEntries(for: day, answers: answers)
+                guard !entries.isEmpty else { continue }
 
-            let selectionSession = LanguageModelSession(instructions: Self.selectionInstructions)
-            let selection = try await selectionSession.respond(
-                to: Self.slotSelectionPrompt(day: day, entries: entries, answers: answers),
-                generating: DaySelection.self,
-                options: options
-            ).content
+                let selectionSession = LanguageModelSession(instructions: Self.selectionInstructions)
+                let selection = try await selectionSession.respond(
+                    to: Self.slotSelectionPrompt(day: day, entries: entries, answers: answers),
+                    generating: DaySelection.self,
+                    options: options
+                ).content
 
-            let picks = alignPicks(selection: selection, entries: entries, slotCount: day.slots.count)
-            let resolved = ProgramPlanBuilder.resolveDay(day, answers: answers,
-                                                         catalog: generator.catalog, picks: picks)
-            guard !resolved.items.isEmpty else { continue }
+                let picks = alignPicks(selection: selection, entries: entries, slotCount: day.slots.count)
+                let resolved = ProgramPlanBuilder.resolveDay(day, answers: answers,
+                                                             catalog: generator.catalog, picks: picks)
+                resolutions[scheduled.templateIndex] = (
+                    resolved, selection.dayRationale.trimmingCharacters(in: .whitespacesAndNewlines)
+                )
+            }
+            guard let entry = resolutions[scheduled.templateIndex], !entry.resolved.items.isEmpty else { continue }
 
             let weekday = index < weekdays.count ? weekdays[index] : Weekday.allCases[index % 7]
-            let name = day.name.trimmingCharacters(in: .whitespaces).isEmpty ? "Day \(index + 1)" : day.name
-            workouts.append(GeneratedWorkout(name: name, day: weekday, items: resolved.items))
-            reportDays.append(PerDayNote(
-                dayName: name,
-                text: selection.dayRationale.trimmingCharacters(in: .whitespacesAndNewlines),
-                exercises: resolved.notes
-            ))
+            workouts.append(GeneratedWorkout(name: scheduled.name, day: weekday, items: entry.resolved.items))
+            // One note per template: the report explains each session, not each repeat.
+            if scheduled.occurrence == 1 {
+                reportDays.append(PerDayNote(dayName: scheduled.name,
+                                             text: entry.rationale,
+                                             exercises: entry.resolved.notes))
+            }
         }
 
         guard !workouts.isEmpty else { return programFallback(program: chosen, answers: answers) }
@@ -264,7 +283,9 @@ struct AIPlanService {
         let list = candidates.enumerated().map { i, match in
             let p = match.program
             let who = firstSentence(p.whoIsItFor)
-            return "\(i + 1). \(p.name) — \(who) (\(p.daysPerWeek)×/week, \(p.durationWeeks) weeks)"
+            // Session length is listed because the athlete's is: without it the model was
+            // asked to fit a program to a time budget it could not see.
+            return "\(i + 1). \(p.name) — \(who) (\(p.daysPerWeek)×/week, ~\(p.sessionMinutes) min/session, \(p.durationWeeks) weeks)"
         }.joined(separator: "\n")
 
         return """
@@ -274,6 +295,10 @@ struct AIPlanService {
 
         Programs to choose from (pick exactly one by number):
         \(list)
+
+        The program must fit the days per week and the session length above: do not choose a \
+        20-minute maintenance circuit for someone with an hour, or an hour-long program for \
+        someone with 20 minutes.
 
         Give the chosen program's number, a one-sentence justification, a headline, and the report \
         sections: philosophy, why this program works, the science, safety adaptations, and an \
