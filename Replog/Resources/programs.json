@@ -1489,6 +1489,7 @@
     },
     {
       "id": "mobility_flexibility_4w",
+   "standalone": false,
       "name": "Move Free: Daily Mobility & Flexibility",
       "category": "mobility",
       "goals": [
@@ -1665,6 +1666,7 @@
     },
     {
       "id": "return_to_training_generic_6wk",
+   "standalone": false,
       "name": "Rebuild: Graded Return to Training",
       "category": "return_to_activity",
       "goals": [
@@ -6229,6 +6231,7 @@
     },
     {
       "id": "postnatal_rebuild_8wk",
+   "standalone": false,
       "name": "Rebuild: Postnatal Return to Strength",
       "category": "return_to_activity",
       "goals": [
@@ -8497,6 +8500,7 @@
     },
     {
       "id": "recovery_week_template",
+   "standalone": false,
       "name": "Down Week: Active Recovery Template",
       "category": "recovery",
       "goals": [
@@ -9511,6 +9515,7 @@
     },
     {
       "id": "morning_15_daily",
+   "standalone": false,
       "name": "Daily Fifteen: Morning Movement Habit",
       "category": "general_fitness",
       "goals": [

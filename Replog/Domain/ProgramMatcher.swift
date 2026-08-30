@@ -264,9 +264,13 @@ enum ProgramMatcher {
             reasons.append(bonus.reason)
         }
 
+        // Auto-pickable is the app's existing "never chosen FOR the athlete" channel. An
+        // adjunct belongs in it for the same reason a disclaimer programme does: it is not
+        // a complete plan, so it must not become somebody's entire programme by winning a
+        // score. Both remain in the ranking, and both stay browsable.
         return ProgramMatch(program: program,
                             score: score,
-                            autoPickable: !program.requiresDisclaimerAcknowledgement,
+                            autoPickable: !program.requiresDisclaimerAcknowledgement && program.isStandalone,
                             reasons: reasons)
     }
 

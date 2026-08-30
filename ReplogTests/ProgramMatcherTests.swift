@@ -296,6 +296,47 @@ struct ProgramFitTests {
         #expect(ranked.first?.id != "womens_upper_strength_4d")
     }
 
+    // MARK: An adjunct is never somebody's whole programme
+
+    @Test func aDeloadOrStretchRoutineIsNeverRecommendedAsTheWholePlan() {
+        // A one-week deload template and a stretching-only routine were winning as primary
+        // plans: a 12-week answer built from a one-week adjunct.
+        let adjuncts = Set(programs.all.filter { !$0.isStandalone }.map(\.id))
+        #expect(adjuncts.contains("recovery_week_template"))
+        #expect(adjuncts.contains("mobility_flexibility_4w"))
+
+        let gym = EquipmentAccess.fullGym.allowedEquipment.intersection(Set(Equipment.selectable))
+        for goal in Goal.allCases {
+            for days in 2...6 {
+                for minutes in [20, 45, 90] {
+                    var ctx = MatchContext(goal: goal, experience: .beginner, age: 30,
+                                           daysPerWeek: days, minutesPerSession: minutes,
+                                           equipment: gym)
+                    if goal == .sport { ctx.sport = .running }
+                    let picked = ProgramMatcher.rank(ctx, in: programs).filter(\.autoPickable)
+                    #expect(!adjuncts.contains(picked.first?.id ?? ""),
+                            "\(goal)/\(days)d/\(minutes)min was given \(picked.first?.id ?? "")")
+                }
+            }
+        }
+    }
+
+    @Test func anAdjunctStaysRankedAndBrowsableEvenThoughItIsNeverPicked() throws {
+        // Gating recommendation, not access — the same rule the disclaimer programmes follow.
+        let gym = EquipmentAccess.fullGym.allowedEquipment.intersection(Set(Equipment.selectable))
+        let ctx = MatchContext(goal: .recomp, experience: .beginner, age: 30, daysPerWeek: 3,
+                               minutesPerSession: 45, equipment: gym)
+        let deload = try #require(ProgramMatcher.rank(ctx, in: programs).first { $0.id == "recovery_week_template" })
+        #expect(!deload.autoPickable)
+    }
+
+    @Test func aProgramIsAPlanUnlessItSaysOtherwise() {
+        // The flag defaults to true, so adding a program to the library does not require
+        // remembering to declare it.
+        #expect(programs.all.filter { !$0.isStandalone }.count == 5)
+        #expect(programs.all.filter(\.isStandalone).count == programs.all.count - 5)
+    }
+
     // MARK: The library must be reachable by real answers
 
     @Test func noProgramRequiresGearTheQuizNeverAsksAbout() {

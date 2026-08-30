@@ -239,6 +239,15 @@ nonisolated struct WorkoutProgram: Identifiable, Equatable, Sendable {
     /// Plain-language training principles the program rests on. Deliberately never a
     /// citation: the science informs the copy, it is not name-dropped at the athlete.
     let principles: [String]
+    /// Whether this is a complete training plan in its own right.
+    ///
+    /// A few entries are adjuncts, not plans: a one-week deload, a stretching routine, a
+    /// daily habit that says outright it "runs alongside any other plan", and the two
+    /// return-to-training protocols that require clinician clearance. Recommending one as
+    /// somebody's entire programme is a category error — a 12-week answer made of a
+    /// one-week template. They stay browsable; they are just never auto-selected.
+    /// Defaults to true, so a new program is a plan unless it says otherwise.
+    let isStandalone: Bool
     let expectedResults: String
     let cautions: String
     let tags: [String]
@@ -268,6 +277,7 @@ extension WorkoutProgram: Decodable {
         case weeklyStructure, monthlyWave, schedule, progression
         case scienceRationale, expectedResults, cautions, tags
         case principles = "evidence"
+        case isStandalone = "standalone"
     }
 
     nonisolated init(from decoder: Decoder) throws {
@@ -294,6 +304,7 @@ extension WorkoutProgram: Decodable {
         progression = (try? c.decodeIfPresent(ProgramProgression.self, forKey: .progression)) ?? ProgramProgression()
         scienceRationale = (try? c.decodeIfPresent(String.self, forKey: .scienceRationale)) ?? ""
         principles = (try? c.decodeIfPresent([String].self, forKey: .principles)) ?? []
+        isStandalone = (try? c.decodeIfPresent(Bool.self, forKey: .isStandalone)) ?? true
         expectedResults = (try? c.decodeIfPresent(String.self, forKey: .expectedResults)) ?? ""
         cautions = (try? c.decodeIfPresent(String.self, forKey: .cautions)) ?? ""
         tags = (try? c.decodeIfPresent([String].self, forKey: .tags)) ?? []
