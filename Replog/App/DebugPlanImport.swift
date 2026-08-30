@@ -109,6 +109,20 @@ enum DebugPlanImport {
 
     static let planName = "PROJECT BODY"
 
+    /// What each day is called, taken from what it actually trains rather than from the
+    /// notebook it came out of. Counted by direct (primary) exercises: Friday is 4 shoulder,
+    /// 4 arm and 3 back movements; Saturday 5 leg and 3 chest; Sunday 3 back and 2 arm. All
+    /// three finish on core, so core only earns a place in the name where it is not the
+    /// thing that distinguishes the day.
+    static func name(for day: Weekday) -> String {
+        switch day {
+        case .fri: return "Back, Shoulders & Arms"
+        case .sat: return "Chest, Legs & Core"
+        case .sun: return "Back, Arms & Core"
+        default:   return planName
+        }
+    }
+
     /// Adds the plan unless one of the same name is already there. Returns what happened,
     /// so a caller can log it.
     @discardableResult
@@ -116,8 +130,14 @@ enum DebugPlanImport {
         guard isRequested else { return "not requested" }
 
         let existing = (try? context.fetch(FetchDescriptor<Plan>())) ?? []
-        if existing.contains(where: { $0.name == planName }) {
-            print("[PROJECT BODY] already present — nothing added")
+        if let plan = existing.first(where: { $0.name == planName }) {
+            // The plan is already on the device, so adding it again would duplicate it. A
+            // NAME, though, is safe to bring up to date: renaming a workout touches no sets,
+            // no history and no logged session, and leaving the old ones stale would mean
+            // this only ever works on a device that has never run it.
+            let renamed = reconcileNames(of: plan)
+            print("[PROJECT BODY] already present — \(renamed) workout(s) renamed")
+            if renamed > 0 { try? context.save() }
             return "already present"
         }
 
@@ -125,9 +145,9 @@ enum DebugPlanImport {
             name: planName,
             colorHex: "#E8663A",
             workouts: [
-                workout(named: "Day 2 + Day 1", on: .fri, from: friday),
-                workout(named: "Day 4 + Day 3", on: .sat, from: saturday),
-                workout(named: "Day 5 + Day 6", on: .sun, from: sunday),
+                workout(named: Self.name(for: .fri), on: .fri, from: friday),
+                workout(named: Self.name(for: .sat), on: .sat, from: saturday),
+                workout(named: Self.name(for: .sun), on: .sun, from: sunday),
             ],
             headline: "PROJECT BODY"
         )
@@ -139,6 +159,20 @@ enum DebugPlanImport {
             print("[PROJECT BODY]   \(workout.day) — \(workout.name): \(workout.items.count) exercises")
         }
         return "added \(generated.workouts.count) workouts"
+    }
+
+    /// Brings an existing plan's workout names in line with `name(for:)`. Returns how many
+    /// actually changed, so a no-op run says so rather than claiming work it did not do.
+    private static func reconcileNames(of plan: Plan) -> Int {
+        var changed = 0
+        for workout in plan.workouts {
+            let wanted = name(for: workout.day)
+            guard workout.name != wanted else { continue }
+            print("[PROJECT BODY]   \(workout.day): \"\(workout.name)\" -> \"\(wanted)\"")
+            workout.name = wanted
+            changed += 1
+        }
+        return changed
     }
 
     private static func workout(named name: String, on day: Weekday, from entries: [Entry]) -> GeneratedWorkout {
