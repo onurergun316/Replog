@@ -32,6 +32,9 @@ struct MatchContext: Equatable, Sendable {
     var gender: Gender
     var age: Int
     var daysPerWeek: Int
+    /// How long one session may run. Collected at onboarding and, until now, thrown away:
+    /// the matcher could not tell a 20-minute hotel circuit from a 75-minute gym session.
+    var minutesPerSession: Int
     /// The equipment the athlete can train with (already resolved from access level / picks).
     var equipment: Set<Equipment>
     /// Whether the athlete's history satisfies gated prerequisites. False at onboarding
@@ -45,6 +48,7 @@ struct MatchContext: Equatable, Sendable {
          gender: Gender = .male,
          age: Int = 28,
          daysPerWeek: Int = 3,
+         minutesPerSession: Int = 45,
          equipment: Set<Equipment> = [],
          satisfiesPrerequisites: Bool = false) {
         self.goal = goal
@@ -54,6 +58,7 @@ struct MatchContext: Equatable, Sendable {
         self.gender = gender
         self.age = age
         self.daysPerWeek = daysPerWeek
+        self.minutesPerSession = minutesPerSession
         self.equipment = equipment
         self.satisfiesPrerequisites = satisfiesPrerequisites
     }
@@ -68,6 +73,7 @@ struct MatchContext: Equatable, Sendable {
                      gender: quiz.gender,
                      age: quiz.age,
                      daysPerWeek: quiz.daysPerWeek,
+                     minutesPerSession: quiz.minutesPerSession,
                      equipment: quiz.allowedEquipment,
                      satisfiesPrerequisites: satisfiesPrerequisites)
     }
@@ -164,6 +170,10 @@ enum ProgramMatcher {
     /// the program.
     static func score(_ program: WorkoutProgram, for context: MatchContext) -> ProgramMatch? {
         // ---- Hard gates ----
+        // A program with no day templates cannot become a plan: the builder resolves zero
+        // workouts and the whole thing silently falls through to the legacy split generator,
+        // leaving the athlete with a plan that is not the program they were shown.
+        guard !program.days.isEmpty else { return nil }
         guard equipmentSatisfied(program, by: context.equipment) else { return nil }
         guard program.audience.admits(age: context.age) else { return nil }
         guard sportGatePasses(program, for: context) else { return nil }
@@ -193,14 +203,27 @@ enum ProgramMatcher {
             reasons.append("Matches your \(context.goal.shortName.lowercased()) goal.")
         }
 
-        // Days-per-week fit: full marks on an exact match, tapering with distance.
+        // Days-per-week fit. The athlete named a number; a program two or more days away
+        // from it is a different commitment, so the distance now carries a real penalty
+        // rather than merely forfeiting a bonus.
         let dayGap = abs(program.daysPerWeek - context.daysPerWeek)
-        let dayScore = max(0, 20 - dayGap * 7)
-        score += Double(dayScore)
+        score += dayFitScore(gap: dayGap)
         if dayGap == 0 {
             reasons.append("Fits your \(context.daysPerWeek) days/week.")
         } else if dayGap == 1 {
             reasons.append("Close to your \(context.daysPerWeek) days/week (\(program.daysPerWeek)).")
+        }
+
+        // Session-length fit. This is the term whose absence handed an athlete with 85
+        // minutes a 20-minute hotel-room circuit: nothing in the scoring could tell the
+        // difference, so goal words and an exact day count carried a maintenance program
+        // past every real training program in the library.
+        let fit = sessionFitScore(programMinutes: program.sessionMinutes,
+                                  athleteMinutes: context.minutesPerSession)
+        score += fit
+        if let reason = sessionFitReason(programMinutes: program.sessionMinutes,
+                                         athleteMinutes: context.minutesPerSession) {
+            reasons.append(reason)
         }
 
         // Experience fit.
@@ -219,6 +242,72 @@ enum ProgramMatcher {
                             score: score,
                             autoPickable: !program.requiresDisclaimerAcknowledgement,
                             reasons: reasons)
+    }
+
+    // MARK: Fit scoring
+
+    /// How well a program's weekly frequency matches the athlete's answer.
+    ///
+    /// Exact is worth more than any single goal keyword, because "three days a week" is a
+    /// promise about the athlete's life rather than a preference about training style.
+    static func dayFitScore(gap: Int) -> Double {
+        switch gap {
+        case 0:  return 30
+        case 1:  return 14
+        case 2:  return 0
+        default: return -22
+        }
+    }
+
+    /// How well a program's session length matches the time the athlete set aside.
+    ///
+    /// Scored as a RATIO rather than a difference, so it behaves the same for someone with
+    /// 20 minutes and someone with 90: half the time you have is half the time you have.
+    /// A missing figure on either side scores neutral rather than guessing.
+    ///
+    /// The two directions are not symmetric, because the mistakes are not symmetric. A
+    /// program that needs MORE time than the athlete has cannot be finished — it is close to
+    /// disqualifying. A program that needs less merely leaves time on the table, so it is
+    /// penalised on a smooth slope instead of a cliff: bucketing scored a 20-minute and a
+    /// 40-minute program identically against a 90-minute athlete, which let the shorter one
+    /// win on unrelated points. Continuity is what makes "closest available" actually mean
+    /// closest, whatever the library happens to contain.
+    static func sessionFitScore(programMinutes: Int, athleteMinutes: Int) -> Double {
+        guard programMinutes > 0, athleteMinutes > 0 else { return 0 }
+        let ratio = Double(programMinutes) / Double(athleteMinutes)
+        if ratio > 1.35 { return -60 }                       // will not fit in the time they have
+        if ratio >= 0.75 { 
+            return ratio <= 1.15 ? 26                        // fits the slot
+                                 : 26 - (ratio - 1.15) * 120 // slightly over, tapering
+        }
+        // Under-use, straight-line from "fine" at 0.75 down to "barely a session" at 0.
+        return -45 + 49 * (ratio / 0.75)
+    }
+
+    /// The plain-language reason attached to a session-length verdict, or nil when the fit
+    /// is unremarkable enough not to be worth a line in the report.
+    static func sessionFitReason(programMinutes: Int, athleteMinutes: Int) -> String? {
+        guard programMinutes > 0, athleteMinutes > 0 else { return nil }
+        let ratio = Double(programMinutes) / Double(athleteMinutes)
+        if ratio >= 0.75 && ratio < 1.16 {
+            return "Built for the ~\(athleteMinutes) minutes you have."
+        }
+        return nil
+    }
+
+    /// Whether a program is a defensible answer for this athlete at all — as opposed to
+    /// merely the least bad thing the library happens to hold.
+    ///
+    /// Ranking always produces a winner, even when every candidate is wrong: with 90 minutes
+    /// and nothing but bodyweight, the library's best offer is a 40-minute program, and
+    /// "best available" quietly became "half the session you asked for". When nothing fits,
+    /// the caller is better off building a plan from the catalog to the athlete's own time
+    /// and days than dressing a mismatch up as a recommendation. As the library grows this
+    /// answers true more often; it needs no maintenance to stay correct.
+    static func fitsTheAthlete(_ program: WorkoutProgram, for context: MatchContext) -> Bool {
+        guard program.sessionMinutes > 0, context.minutesPerSession > 0 else { return true }
+        let ratio = Double(program.sessionMinutes) / Double(context.minutesPerSession)
+        return ratio >= 0.5 && ratio <= 1.35
     }
 
     // MARK: Sport gate
@@ -267,7 +356,10 @@ enum ProgramMatcher {
             return ["weight_loss", "fat_loss", "conditioning", "work_capacity",
                     "energy", "endurance"]
         case .recomp:
-            return ["muscle_building", "muscle_retention", "maintenance", "weight_loss",
+            // "maintenance" is deliberately absent: holding what you have is the opposite of
+            // recomposition, and counting it here is what let a hotel-room maintenance
+            // circuit score as a match for someone trying to change their body.
+            return ["muscle_building", "muscle_retention", "weight_loss",
                     "recomp", "strength_hypertrophy", "general_fitness"]
         case .sport:
             return ["general_athleticism", "athletic_base", "power", "speed", "conditioning",
@@ -295,14 +387,22 @@ enum ProgramMatcher {
 
     // MARK: Sex focus
 
-    /// A small, never-exclusionary ranking nudge when a program's sex focus aligns with the
-    /// athlete. `female` and `female_focused` programs stay available to everyone.
+    /// A ranking nudge when a program's sex focus aligns with the athlete — and a push in
+    /// the other direction when it is aimed squarely at someone else.
+    ///
+    /// Never a gate: a program stays reachable whoever the athlete is, and the Programs tab
+    /// still lists every one of them. But an alignment bonus alone is not symmetric — it
+    /// left "Women's Upper Strength" as the top recommendation for a male athlete, which
+    /// reads as the app not having looked at the answers it just collected. The penalty is
+    /// smaller than a day-count mismatch, so a genuinely better-fitting program still wins.
     private static func sexFocusBonus(_ program: WorkoutProgram, gender: Gender) -> (points: Double, reason: String)? {
         switch (program.audience.sex, gender) {
         case (.female, .female), (.femaleFocused, .female):
             return (15, "Designed with women in mind.")
         case (.maleFocused, .male):
             return (8, "Emphasis suited to your profile.")
+        case (.female, .male), (.femaleFocused, .male), (.maleFocused, .female):
+            return (-20, "Written for a different athlete, but still open to you.")
         default:
             return nil
         }
