@@ -118,3 +118,84 @@ struct RepSchemeTests {
         #expect(RepScheme.sets(for: slot, startingWeightKg: 8).count == 1)  // at least one set
     }
 }
+
+// MARK: - Distances are distances
+
+@MainActor
+struct RepSchemeDistanceTests {
+
+    @Test func aBareMetreIsNotAMinute() {
+        // "20m" is a twenty-metre farmer's carry. Read as minutes it became 1200 seconds,
+        // clamped to the 600s ceiling — a ten-minute carry set, written into real plans.
+        // 32 slots across the library parsed this way.
+        let carry = RepScheme.parse(reps: "20m", pattern: .carry)
+        #expect(carry.isTimed)
+        #expect(carry.reps == 25)          // 20 m at ~0.8 m/s
+        #expect(carry.reps < 600)
+    }
+
+    @Test func minutesStillHaveToSayMinutes() {
+        #expect(RepScheme.parse(reps: "3 min").reps == 180)
+        #expect(RepScheme.parse(reps: "20 min hard").reps == 600)   // clamped at the 10-minute ceiling
+        #expect(RepScheme.parse(reps: "45s").reps == 45)
+        #expect(RepScheme.parse(reps: "30-60s").reps == 30)
+    }
+
+    @Test func aDistanceCostsWhatTheMovementCosts() {
+        // The same 200 metres is five minutes of swimming and a minute of running.
+        let swim = RepScheme.parse(reps: "200m", pattern: .swim)
+        let run = RepScheme.parse(reps: "200m", pattern: .run)
+        #expect(swim.reps == 300)
+        #expect(run.reps == 60)
+        #expect(swim.reps > run.reps)
+    }
+
+    @Test func aSprintIsNotATenMinuteEffort() {
+        let sprint = RepScheme.parse(reps: "20m from standing", pattern: .run)
+        #expect(sprint.isTimed)
+        #expect(sprint.reps == 6)
+    }
+
+    @Test func aRepSchemeWithADistanceAlternativeStaysARepScheme() {
+        // "10-12 or 30m": the unit belongs to the second alternative, not the first number.
+        let target = RepScheme.parse(reps: "10-12 or 30m", pattern: .carry)
+        #expect(!target.isTimed)
+        #expect(target.reps == 10)
+    }
+
+    @Test func aUnitMentionedLaterInTheStringDoesNotClaimTheFirstNumber() {
+        // "6 x 30m shuttle, 20s between reps, 3 min between sets" was a SIX-MINUTE set,
+        // because the string mentions minutes somewhere.
+        let shuttle = RepScheme.parse(reps: "6 x 30m shuttle, 20s between reps, 3 min between sets",
+                                      pattern: .run)
+        #expect(!shuttle.isTimed)
+        #expect(shuttle.reps == 6)
+    }
+
+    @Test func aRangeStillCarriesItsUnitAtTheEnd() {
+        #expect(RepScheme.parse(reps: "30-60s").reps == 30)
+        #expect(RepScheme.parse(reps: "30-60s").isTimed)
+        #expect(RepScheme.parse(reps: "8-12 min").reps == 480)
+        #expect(RepScheme.parse(reps: "8-12").reps == 8)
+        #expect(!RepScheme.parse(reps: "8-12").isTimed)
+    }
+
+    @Test func noDistanceSlotBecomesATenMinuteSet() {
+        // Library-wide guard on the defect's signature: a distance must never land ON the
+        // 600-second ceiling, which is what told us it had been read as minutes and clamped.
+        // Being long is not the bug — a 300 m continuous swim really is about 7 minutes.
+        // Genuine long efforts written in minutes ("10 min steady") are untouched.
+        let programs = ProgramCatalog(bundle: .main)
+        for program in programs.all {
+            for day in program.days {
+                for slot in day.slots where !slot.reps.lowercased().contains("min") {
+                    let target = RepScheme.parse(reps: slot.reps, pattern: slot.pattern)
+                    if target.isTimed {
+                        #expect(target.reps < 600,
+                                "\(program.id) \"\(slot.reps)\" -> \(target.reps)s (clamped)")
+                    }
+                }
+            }
+        }
+    }
+}
