@@ -312,18 +312,25 @@ enum ProgramMatcher {
 
     // MARK: Sport gate
 
-    /// When training for a sport, exclude programs built for a *different* specific sport
-    /// (a runner shouldn't be handed the golf program); general and sport-agnostic programs
-    /// stay eligible as fallbacks. Non-sport goals don't apply this gate.
+    /// A program written for one sport is for that sport's athletes, and nobody else.
+    ///
+    /// The gate used to open with `guard context.goal == .sport else { return true }`, which
+    /// let all 17 sport-specific programs through for every OTHER goal. Nothing downstream
+    /// says a basketball block is not a hypertrophy plan — its goals (`power`, `vertical_jump`,
+    /// `speed`) simply score zero overlap — so it could win on day count and session length
+    /// alone and be handed to someone who never mentioned basketball. That is exactly what
+    /// happened. The sport question is asked first now, whatever the goal:
+    ///
+    ///  • sport-agnostic and general/GPP programs: eligible for everyone;
+    ///  • a specific sport's program: only for an athlete training for THAT sport.
+    ///
+    /// This gates recommendation, not access — the Programs tab still lists all 62, and an
+    /// athlete who wants the basketball block can pick it themselves.
     private static func sportGatePasses(_ program: WorkoutProgram, for context: MatchContext) -> Bool {
-        guard context.goal == .sport else { return true }
         guard let programSport = program.sport?.lowercased(),
               programSport != "general" else { return true }   // agnostic / GPP: always eligible
-        // A sport-specific program is eligible only if it's the athlete's sport.
-        guard let token = context.sportToken else {
-            // Unrecognised custom sport → keep only general/agnostic programs.
-            return false
-        }
+        // A sport-specific program is only ever right for someone training for that sport.
+        guard context.goal == .sport, let token = context.sportToken else { return false }
         return programSport == token.lowercased()
     }
 

@@ -292,6 +292,77 @@ struct ProgramFitTests {
         #expect(ranked.first?.id != "womens_upper_strength_4d")
     }
 
+    // MARK: Sport programs reach sport athletes only
+
+    @Test func aSportProgramIsNeverRecommendedToSomeoneNotTrainingForThatSport() {
+        // The reported bug: a user who never chose basketball was handed the basketball
+        // block. It scores zero goal overlap for every non-sport goal, so it won on day
+        // count and session length alone.
+        for goal in [Goal.buildMuscle, .loseWeight, .recomp] {
+            let ctx = MatchContext(goal: goal, experience: .beginner, age: 28, daysPerWeek: 3,
+                                   minutesPerSession: 60,
+                                   equipment: [.barbell, .dumbbell, .machine, .cable, .bodyOnly, .bands])
+            let ranked = ProgramMatcher.rank(ctx, in: programs)
+            #expect(!ranked.contains { $0.id == "basketball_athleticism_8wk" },
+                    "basketball reachable for \(goal)")
+        }
+    }
+
+    @Test func noSportSpecificProgramSurvivesANonSportGoal() {
+        // The whole class, not just basketball: 17 programs declare a sport.
+        let sportIds = Set(programs.all.compactMap { p -> String? in
+            guard let sport = p.sport?.lowercased(), sport != "general" else { return nil }
+            return p.id
+        })
+        #expect(sportIds.count > 10, "expected the library's sport-specific programs")
+
+        for goal in [Goal.buildMuscle, .loseWeight, .recomp] {
+            for days in 2...6 {
+                let ctx = MatchContext(goal: goal, experience: .intermediate, age: 28,
+                                       daysPerWeek: days, minutesPerSession: 55,
+                                       equipment: [.barbell, .dumbbell, .machine, .cable, .bodyOnly, .bands])
+                let leaked = ProgramMatcher.rank(ctx, in: programs).map(\.id).filter { sportIds.contains($0) }
+                #expect(leaked.isEmpty, "\(goal) at \(days) days reached \(leaked)")
+            }
+        }
+    }
+
+    @Test func theSportAthleteStillGetsTheirOwnSport() throws {
+        // The gate must not cost the people it exists for.
+        let baller = MatchContext(goal: .sport, sport: .basketball, experience: .intermediate,
+                                  age: 24, daysPerWeek: 3, minutesPerSession: 60,
+                                  equipment: [.barbell, .dumbbell, .machine, .cable, .bodyOnly])
+        let ranked = ProgramMatcher.rank(baller, in: programs)
+        #expect(ranked.first?.id == "basketball_athleticism_8wk")
+    }
+
+    @Test func aSportAthleteIsNeverGivenADifferentSportsProgram() {
+        for sport in Sport.allCases where sport != .other {
+            let ctx = MatchContext(goal: .sport, sport: sport, experience: .intermediate, age: 26,
+                                   daysPerWeek: 3, minutesPerSession: 55,
+                                   equipment: [.barbell, .dumbbell, .machine, .cable, .bodyOnly])
+            let token = ctx.sportToken
+            for match in ProgramMatcher.rank(ctx, in: programs) {
+                guard let programSport = match.program.sport?.lowercased(),
+                      programSport != "general" else { continue }
+                #expect(programSport == token?.lowercased(),
+                        "\(sport) reached \(match.id) (\(programSport))")
+            }
+        }
+    }
+
+    @Test func aSportWithNoProgramFallsBackToGeneralAthleticWork() {
+        // Nothing in the library is built for this, so the athlete gets a general base
+        // rather than another sport's block or nothing at all.
+        var ctx = MatchContext(goal: .sport, sport: .other, experience: .beginner, age: 30,
+                               daysPerWeek: 3, minutesPerSession: 60,
+                               equipment: [.barbell, .dumbbell, .machine, .cable, .bodyOnly])
+        ctx.customSport = "quidditch"
+        let ranked = ProgramMatcher.rank(ctx, in: programs)
+        #expect(!ranked.isEmpty)
+        #expect(ranked.allSatisfy { ($0.program.sport?.lowercased() ?? "general") == "general" })
+    }
+
     @Test func maintenanceIsNotRecomposition() {
         // Holding what you have is the opposite of changing it; counting "maintenance" as a
         // recomp match is what let a maintenance circuit outrank real training programs.
