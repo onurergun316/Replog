@@ -124,6 +124,7 @@ struct RootView: View {
         #if DEBUG
         .onAppear {
             DebugSeed.seedIfNeeded(context)
+            DebugPlanImport.addIfNeeded(context)
             gate.debugOverride = DebugSeed.accessOverride
             if !didPreviewBadges, let badges = DebugSeed.sampleUnlockedBadges {
                 didPreviewBadges = true
